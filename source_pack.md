@@ -262,3 +262,20 @@ Decision: keep `verify-atlas.sh` minimal and add a Node-version guard so the `B1
 Verified (clean-shell, Node 22.16 + cargo, `verify-atlas.sh --all` exit 0): tsc exit 0, vitest 91 passed, pnpm build exit 0 (3142 modules), cargo check/clippy/test exit 0 with 101 Rust tests.
 
 Process note: the dev shell profile injected phantom text into command stdout and produced false clippy pass/fail readings mid-slice. Ground truth was re-established with the Read tool and an `env -i ... --noprofile --norc` shell. Lesson: trust exit codes from a clean shell and file reads, not decorated stdout.
+
+## Slice 0.3: fixture harness
+
+Tiny-fix exemption: deterministic test fixtures and a temp-copy helper introduce no subsystem design decision, so upstream inspection is not required. The temp-dir helper reuses the existing `tempfile` crate rather than hand-rolling one (CLAUDE.md simplicity rule).
+
+Files inspected: `tsconfig.json`, `package.json` (vitest defaults), `src-tauri/Cargo.toml` (confirmed `tempfile = "3"` present), `vite.config.ts`, `src/modules/ai/lib/sessions.test.ts` (test style).
+
+Files added: `tests/fixtures/{README.md,simple-ts,stale-edit,ignore-heavy}`, `src-tauri/tests/common/mod.rs`, `src-tauri/tests/harness.rs`.
+Files changed: `vite.config.ts` (`test.include` scoped to `src/**`).
+
+Decisions:
+
+- Build only the three fixtures the near-term slices need (`simple-ts`, `stale-edit`, `ignore-heavy`). Defer the other five; create each with the slice that defines its exact test shape. Recorded in `tests/fixtures/README.md`.
+- `symlink-escape` is intentionally not committed as static files; symlinks are created at runtime in Slice 1.1 tests to avoid platform-dependent committed symlinks.
+- Scope vitest to `src/**` so fixture `*.test.ts` (written for the agent-under-test, sometimes intentionally failing) never join Atlas's own suite.
+
+Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 91 passed, build 0, cargo clippy 0, cargo test 104 passed (3 new harness tests: copy idempotence, drop cleanup, parallel isolation).

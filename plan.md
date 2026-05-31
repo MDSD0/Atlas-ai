@@ -288,3 +288,18 @@ Baseline (Node 22.16, definitive clean-shell run, `verify-atlas.sh --all` exit 0
 Not done in this slice: Slice 0.3 fixture harness, Slice 0.4 CI matrix.
 
 Environment note: the dev shell profile injects phantom text into command stdout, which produced false pass/fail readings mid-slice. Reliable runs use `env -i HOME=$HOME PATH=<node>:<cargo>:/usr/bin:/bin /bin/bash --noprofile --norc`. The `--all` receipt above came from that clean shell.
+
+## Slice 0.3 status: fixture harness
+
+Plan followed: `ATLAS_EXECUTION_PLAN.md` Slice 0.3.
+
+Done:
+
+- Added `tests/fixtures/` with three ready fixtures: `simple-ts`, `stale-edit`, `ignore-heavy` (the last has `.gitignore`, generated `dist/`, `node_modules/`, and a binary `assets/data.bin`). Five other fixtures from section 7.2 are deferred and listed in `tests/fixtures/README.md`; each is built with the slice that first needs its exact shape.
+- Added `src-tauri/tests/common/mod.rs`: `copy_fixture()` (pristine copy into a temp dir) and re-exported `tempfile::TempDir`. Used the existing `tempfile` dependency instead of a hand-rolled temp dir.
+- Added `src-tauri/tests/harness.rs`: 3 integration tests proving copy idempotence, temp cleanup on drop, and no shared state between parallel copies.
+- Added `test.include = ["src/**/*.{test,spec}.{ts,tsx}"]` to `vite.config.ts` so future intentionally-failing fixture tests (e.g. `proof-failure`) never enter Atlas's own vitest run.
+
+Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 91 passed (8 files), build 0, cargo clippy 0, cargo test 104 passed (101 + 3 new harness).
+
+M0 complete except Slice 0.4 (CI matrix), which needs the GitHub Actions runner and is deferred until first push.

@@ -13,6 +13,11 @@ export default defineConfig(async ({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Atlas unit tests live under src/. Fixture repos under tests/fixtures carry
+  // their own *.test.ts meant for the agent-under-test, not Atlas's own runner.
+  test: {
+    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+  },
   esbuild: {
     drop: mode === "production" ? (["debugger"] as ["debugger"]) : [],
     pure:

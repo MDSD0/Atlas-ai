@@ -174,3 +174,15 @@ Source-parity hook now also enforced at the harness level: `.claude/settings.jso
 Memory decision locked: `LocalRecordsProvider` default (always on, no dependency), SimpleMem `WRAP` optional advanced provider, Mem0 `BENCHMARK`. New invariant: boot never depends on memory-provider health.
 
 Next: Slice 0.3 fixture harness, then Phase 1 trust boundary (S0 native fs authorization first).
+
+## Slice 0.3 status: fixture harness (M0)
+
+Done.
+
+- `tests/fixtures/`: `simple-ts`, `stale-edit`, `ignore-heavy` ready; five others deferred to the slice that needs them (`tests/fixtures/README.md`).
+- `src-tauri/tests/common/mod.rs` + `harness.rs`: `copy_fixture()` over `tempfile::TempDir`; 3 integration tests (idempotence, drop cleanup, parallel isolation).
+- `vite.config.ts`: `test.include` scoped to `src/**` so fixture tests stay out of Atlas's suite.
+
+Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 91, build 0, clippy 0, cargo test 104.
+
+M0 done except Slice 0.4 CI matrix (deferred to first push). Next: Phase 1 S0 native filesystem authorization.
