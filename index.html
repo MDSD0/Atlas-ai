@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Atlas</title>
+    <script>
+      (function () {
+        window.onerror = function (message, source, lineno, colno, error) {
+          var div = document.createElement('div');
+          div.style.position = 'fixed';
+          div.style.top = '0';
+          div.style.left = '0';
+          div.style.width = '100%';
+          div.style.height = '100%';
+          div.style.backgroundColor = 'rgba(0,0,0,0.95)';
+          div.style.color = '#ff3333';
+          div.style.padding = '20px';
+          div.style.fontFamily = 'monospace';
+          div.style.zIndex = '999999';
+          div.style.overflow = 'auto';
+          div.style.whiteSpace = 'pre-wrap';
+          div.style.boxSizing = 'border-box';
+          div.innerHTML = '<h2>Uncaught Error: ' + message + '</h2><p>' + source + ':' + lineno + ':' + colno + '</p><pre>' + (error ? error.stack : '') + '</pre>';
+          document.body.appendChild(div);
+          return false;
+        };
+        window.onunhandledrejection = function (event) {
+          var div = document.createElement('div');
+          div.style.position = 'fixed';
+          div.style.top = '0';
+          div.style.left = '0';
+          div.style.width = '100%';
+          div.style.height = '100%';
+          div.style.backgroundColor = 'rgba(0,0,0,0.95)';
+          div.style.color = '#ff9900';
+          div.style.padding = '20px';
+          div.style.fontFamily = 'monospace';
+          div.style.zIndex = '999999';
+          div.style.overflow = 'auto';
+          div.style.whiteSpace = 'pre-wrap';
+          div.style.boxSizing = 'border-box';
+          div.innerHTML = '<h2>Unhandled Rejection: ' + event.reason + '</h2><pre>' + (event.reason && event.reason.stack ? event.reason.stack : event.reason) + '</pre>';
+          document.body.appendChild(div);
+        };
+      })();
+    </script>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("atlas-ui-theme-shadow");
+          var resolved =
+            t === "light" || t === "dark"
+              ? t
+              : window.matchMedia("(prefers-color-scheme: dark)").matches
+                ? "dark"
+                : "light";
+          document.documentElement.classList.add(resolved);
+          document.documentElement.style.backgroundColor =
+            resolved === "dark" ? "#0a0a0a" : "#ffffff";
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+
+  <body>
+    <div id="root">
+      <div id="terminal"></div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
