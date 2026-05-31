@@ -256,7 +256,7 @@ export function AiChatView({
       >
         <ConversationContent>
           <ConversationEmptyState
-            title={title}
+            title={title as any}
             description={description}
             icon={<img src="/logo-transparent.png" alt="Atlas Logo" className="w-16 h-16 opacity-80" />}
           />
