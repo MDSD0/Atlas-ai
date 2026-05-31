@@ -19,6 +19,16 @@ Atlas is a lightweight, natively compiled desktop application built with Tauri 2
 
 Latest installers are on the [Releases](https://github.com/MDSD0/Atlas-ai/releases/latest) page. 
 
+### macOS Troubleshooting
+
+If you receive an error that **"Atlas is damaged and can't be opened"** after downloading the app, this is due to macOS Gatekeeper quarantining unsigned applications downloaded from the internet. 
+
+To fix this, open your Terminal and run the following command to remove the quarantine attribute:
+```bash
+xattr -cr /Applications/Atlas.app
+```
+*(Assuming you placed Atlas in your Applications folder)*
+
 ## Features
 
 - **Context-Aware AI**: Open any folder to "ground" the AI in your local workspace.
