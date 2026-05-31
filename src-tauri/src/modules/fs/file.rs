@@ -6,7 +6,9 @@ use serde::Serialize;
 use tauri::Emitter;
 use tempfile::NamedTempFile;
 
-use crate::modules::workspace::{resolve_path, WorkspaceEnv};
+use crate::modules::workspace::{
+    authorize_existing_path, authorize_path_target, WorkspaceEnv, WorkspaceRegistry,
+};
 
 const MAX_READ_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
 const BINARY_SNIFF_BYTES: usize = 8 * 1024;
@@ -43,10 +45,13 @@ pub struct FileStat {
     pub kind: StatKind,
 }
 
-#[tauri::command]
-pub fn fs_read_file(path: String, workspace: Option<WorkspaceEnv>) -> Result<ReadResult, String> {
+fn fs_read_file_inner(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: &WorkspaceRegistry,
+) -> Result<ReadResult, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let p = resolve_path(&path, &workspace);
+    let p = authorize_existing_path(registry, &path, &workspace)?;
     let meta = std::fs::metadata(&p).map_err(|e| {
         log::debug!("fs_read_file stat({}) failed: {e}", p.display());
         e.to_string()
@@ -78,6 +83,15 @@ pub fn fs_read_file(path: String, workspace: Option<WorkspaceEnv>) -> Result<Rea
     }
 }
 
+#[tauri::command]
+pub fn fs_read_file(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<ReadResult, String> {
+    fs_read_file_inner(path, workspace, &registry)
+}
+
 #[derive(Serialize, Clone)]
 struct FileWrittenEvent {
     path: String,
@@ -98,16 +112,16 @@ fn write_atomic(target: &Path, content: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
-#[tauri::command]
-pub fn fs_write_file(
+// Authorize the target and perform the atomic write. Split out so the write
+// boundary is unit-testable without a Tauri AppHandle.
+fn fs_write_file_inner_no_emit(
     path: String,
     content: String,
     workspace: Option<WorkspaceEnv>,
-    source: Option<String>,
-    app: tauri::AppHandle,
+    registry: &WorkspaceRegistry,
 ) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let target = resolve_path(&path, &workspace);
+    let target = authorize_path_target(registry, &path, &workspace)?;
     let original_permissions = fs::metadata(&target).ok().map(|m| m.permissions());
     write_atomic(&target, content.as_bytes()).map_err(|e| {
         log::warn!("fs_write_file({}) failed: {e}", target.display());
@@ -117,6 +131,18 @@ pub fn fs_write_file(
     if let Some(perms) = original_permissions {
         let _ = fs::set_permissions(&target, perms);
     }
+    Ok(())
+}
+
+fn fs_write_file_inner(
+    path: String,
+    content: String,
+    workspace: Option<WorkspaceEnv>,
+    source: Option<String>,
+    app: &tauri::AppHandle,
+    registry: &WorkspaceRegistry,
+) -> Result<(), String> {
+    fs_write_file_inner_no_emit(path.clone(), content, workspace, registry)?;
     let _ = app.emit(
         "fs:file-written",
         FileWrittenEvent {
@@ -129,17 +155,43 @@ pub fn fs_write_file(
 }
 
 #[tauri::command]
-pub fn fs_canonicalize(path: String, workspace: Option<WorkspaceEnv>) -> Result<String, String> {
+pub fn fs_write_file(
+    path: String,
+    content: String,
+    workspace: Option<WorkspaceEnv>,
+    source: Option<String>,
+    app: tauri::AppHandle,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<(), String> {
+    fs_write_file_inner(path, content, workspace, source, &app, &registry)
+}
+
+fn fs_canonicalize_inner(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: &WorkspaceRegistry,
+) -> Result<String, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let p = resolve_path(&path, &workspace);
-    let canon = std::fs::canonicalize(&p).map_err(|e| e.to_string())?;
+    let canon = authorize_existing_path(registry, &path, &workspace)?;
     Ok(super::to_canon(&canon))
 }
 
 #[tauri::command]
-pub fn fs_stat(path: String, workspace: Option<WorkspaceEnv>) -> Result<FileStat, String> {
+pub fn fs_canonicalize(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<String, String> {
+    fs_canonicalize_inner(path, workspace, &registry)
+}
+
+fn fs_stat_inner(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: &WorkspaceRegistry,
+) -> Result<FileStat, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let p = resolve_path(&path, &workspace);
+    let p = authorize_existing_path(registry, &path, &workspace)?;
     let meta = std::fs::metadata(&p).map_err(|e| e.to_string())?;
     let kind = if meta.is_dir() {
         StatKind::Dir
@@ -161,16 +213,32 @@ pub fn fs_stat(path: String, workspace: Option<WorkspaceEnv>) -> Result<FileStat
     })
 }
 
+#[tauri::command]
+pub fn fs_stat(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<FileStat, String> {
+    fs_stat_inner(path, workspace, &registry)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn authed_registry(dir: &std::path::Path) -> WorkspaceRegistry {
+        let reg = WorkspaceRegistry::default();
+        reg.authorize(dir).expect("authorize temp root");
+        reg
+    }
+
     #[test]
     fn read_file_classifies_utf8_as_text() {
         let dir = tempfile::tempdir().unwrap();
+        let reg = authed_registry(dir.path());
         let f = dir.path().join("a.txt");
         std::fs::write(&f, b"hello world").unwrap();
-        match fs_read_file(f.to_string_lossy().into_owned(), None).unwrap() {
+        match fs_read_file_inner(f.to_string_lossy().into_owned(), None, &reg).unwrap() {
             ReadResult::Text { content, size } => {
                 assert_eq!(content, "hello world");
                 assert_eq!(size, 11);
@@ -182,10 +250,11 @@ mod tests {
     #[test]
     fn read_file_detects_binary_via_null_byte() {
         let dir = tempfile::tempdir().unwrap();
+        let reg = authed_registry(dir.path());
         let f = dir.path().join("a.bin");
         std::fs::write(&f, b"PNG\0\x89image").unwrap();
         assert!(matches!(
-            fs_read_file(f.to_string_lossy().into_owned(), None).unwrap(),
+            fs_read_file_inner(f.to_string_lossy().into_owned(), None, &reg).unwrap(),
             ReadResult::Binary { .. }
         ));
     }
@@ -193,13 +262,63 @@ mod tests {
     #[test]
     fn read_file_detects_binary_via_invalid_utf8() {
         let dir = tempfile::tempdir().unwrap();
+        let reg = authed_registry(dir.path());
         let f = dir.path().join("a.bin");
         // Invalid UTF-8 with no null byte: must still classify as binary.
         std::fs::write(&f, [0xff, 0xfe, 0xfd, 0xfc]).unwrap();
         assert!(matches!(
-            fs_read_file(f.to_string_lossy().into_owned(), None).unwrap(),
+            fs_read_file_inner(f.to_string_lossy().into_owned(), None, &reg).unwrap(),
             ReadResult::Binary { .. }
         ));
+    }
+
+    #[test]
+    fn read_file_rejects_path_outside_authorized_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let reg = authed_registry(dir.path());
+        let f = outside.path().join("secret.txt");
+        std::fs::write(&f, b"top secret").unwrap();
+        let err = match fs_read_file_inner(f.to_string_lossy().into_owned(), None, &reg) {
+            Err(e) => e,
+            Ok(_) => panic!("read outside authorized root must be rejected"),
+        };
+        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_file_rejects_symlink_escape() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let reg = authed_registry(dir.path());
+        let secret = outside.path().join("secret.txt");
+        std::fs::write(&secret, b"top secret").unwrap();
+        let link = dir.path().join("link.txt");
+        symlink(&secret, &link).unwrap();
+        let err = match fs_read_file_inner(link.to_string_lossy().into_owned(), None, &reg) {
+            Err(e) => e,
+            Ok(_) => panic!("symlink escape must be rejected"),
+        };
+        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+    }
+
+    #[test]
+    fn write_file_rejects_target_outside_authorized_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let outside = tempfile::tempdir().unwrap();
+        let reg = authed_registry(dir.path());
+        let target = outside.path().join("planted.txt");
+        let err = fs_write_file_inner_no_emit(
+            target.to_string_lossy().into_owned(),
+            "x".into(),
+            None,
+            &reg,
+        )
+        .expect_err("write outside authorized root must be rejected");
+        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+        assert!(!target.exists(), "rejected write must not create the file");
     }
 
     #[test]

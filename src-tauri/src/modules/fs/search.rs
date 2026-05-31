@@ -2,7 +2,7 @@ use ignore::WalkBuilder;
 use serde::Serialize;
 
 use super::to_canon;
-use crate::modules::workspace::{resolve_path, WorkspaceEnv};
+use crate::modules::workspace::{authorize_existing_path, WorkspaceEnv, WorkspaceRegistry};
 
 #[derive(Serialize)]
 pub struct SearchHit {
@@ -49,6 +49,7 @@ pub fn fs_search(
     limit: Option<usize>,
     workspace: Option<WorkspaceEnv>,
     show_hidden: Option<bool>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<SearchResult, String> {
     let q = query.trim().to_lowercase();
     if q.is_empty() {
@@ -60,7 +61,7 @@ pub fn fs_search(
     let cap = limit.unwrap_or(200).min(1000);
     let show_hidden = show_hidden.unwrap_or(false);
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root_path = resolve_path(&root, &workspace);
+    let root_path = authorize_existing_path(&registry, &root, &workspace)?;
     if !root_path.is_dir() {
         return Err(format!("not a directory: {root}"));
     }
@@ -150,6 +151,7 @@ pub fn fs_list_files(
     max_depth: Option<usize>,
     workspace: Option<WorkspaceEnv>,
     show_hidden: Option<bool>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<ListFilesResult, String> {
     const DEFAULT_LIMIT: usize = 2_000;
     const HARD_LIMIT: usize = 10_000;
@@ -160,7 +162,7 @@ pub fn fs_list_files(
     let depth = max_depth.unwrap_or(DEFAULT_DEPTH).clamp(1, HARD_DEPTH);
     let show_hidden = show_hidden.unwrap_or(false);
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root_path = resolve_path(&root, &workspace);
+    let root_path = authorize_existing_path(&registry, &root, &workspace)?;
     if !root_path.is_dir() {
         return Err(format!("not a directory: {root}"));
     }

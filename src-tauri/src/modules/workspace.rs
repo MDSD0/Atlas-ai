@@ -114,6 +114,85 @@ pub fn authorize_user_spawn_cwd(
     Ok(Some(canonical))
 }
 
+// Native filesystem authorization for IPC. Two modes share one rule: the
+// access must resolve to a location under an authorized root. Forged frontend
+// invokes cannot escape because the check runs server-side after canonicalization.
+
+/// Mode A (existing path): canonicalize `raw` following symlinks, then require
+/// the real target under an authorized root. Use for read, stat, list, search,
+/// and grep where following a symlink to its target is the intended behavior;
+/// this rejects a symlink inside a root that points outside it.
+pub fn authorize_existing_path(
+    registry: &WorkspaceRegistry,
+    raw: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<PathBuf, String> {
+    let resolved = resolve_path(raw, workspace);
+    let canonical =
+        std::fs::canonicalize(&resolved).map_err(|e| format!("path not accessible: {e}"))?;
+    if !registry.is_authorized(&canonical) {
+        return Err(format!(
+            "path is outside the authorized workspace: {}",
+            canonical.display()
+        ));
+    }
+    Ok(canonical)
+}
+
+/// Mode B (mutation target): canonicalize the deepest existing ancestor of the
+/// parent (following only parent symlinks), require it under an authorized root,
+/// then re-attach the not-yet-existing components and the final name without
+/// following a final-component symlink. Use for write, create, rename, delete so
+/// symlink delete/rename act on the link, not its target, and nested create
+/// (`a/b/c`) is authorized by the real existing directory.
+pub fn authorize_path_target(
+    registry: &WorkspaceRegistry,
+    raw: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<PathBuf, String> {
+    let resolved = resolve_path(raw, workspace);
+    let file_name = resolved
+        .file_name()
+        .ok_or_else(|| "path has no final component".to_string())?
+        .to_os_string();
+    let parent = resolved
+        .parent()
+        .ok_or_else(|| "path has no parent".to_string())?;
+
+    let mut tail: Vec<std::ffi::OsString> = Vec::new();
+    let mut cur = parent.to_path_buf();
+    let parent_canonical = loop {
+        match std::fs::canonicalize(&cur) {
+            Ok(c) => break c,
+            Err(_) => {
+                let name = cur
+                    .file_name()
+                    .ok_or_else(|| "path has no existing ancestor".to_string())?
+                    .to_os_string();
+                tail.push(name);
+                cur = cur
+                    .parent()
+                    .ok_or_else(|| "path has no existing ancestor".to_string())?
+                    .to_path_buf();
+            }
+        }
+    };
+
+    if !registry.is_authorized(&parent_canonical) {
+        return Err(format!(
+            "path is outside the authorized workspace: {}",
+            parent_canonical.display()
+        ));
+    }
+
+    let mut out = parent_canonical;
+    for name in tail.iter().rev() {
+        out.push(name);
+    }
+    out.push(&file_name);
+    Ok(out)
+}
+
 pub fn bootstrap_registry(registry: &WorkspaceRegistry) {
     let _ = registry.authorize(resolve_launch_dir());
     if let Some(home) = dirs::home_dir() {

@@ -186,3 +186,17 @@ Done.
 Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 91, build 0, clippy 0, cargo test 104.
 
 M0 done except Slice 0.4 CI matrix (deferred to first push). Next: Phase 1 S0 native filesystem authorization.
+
+## Slice 1.1 status: native filesystem authorization (S0)
+
+Done.
+
+- Two helpers in `workspace.rs`: `authorize_existing_path` (Mode A, follow symlinks, target authorized) and `authorize_path_target` (Mode B, canonicalize parent only, preserve symlink delete/rename, support nested create).
+- All 7 fs commands gated (`fs_read_file`, `fs_write_file`, `fs_stat`, `fs_canonicalize`, `fs_read_dir`, `list_subdirs`, `fs_search`, `fs_list_files`, `fs_grep`, `fs_glob`) via `_inner` + thin `State`-injecting shell. `fs_watch` was already gated.
+- Frontend unchanged (Tauri injects `State`). App-level boundary = registry (home + launch + authorized workspaces); narrower agent policy stays in `context.ts` (Slices 1.2/1.3).
+
+Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 91, build 0, clippy 0, cargo test 106 lib + 3 harness = 109; 5 new auth tests pass, symlink-delete preservation intact. grep.rs (`fs_grep`/`fs_glob`) gated too.
+
+Risk: GUI explorer/editor smoke not run here (needs display; phantom dev shell unreliable). Recommended user test: `pnpm tauri dev`, open a folder, confirm explorer lists + file opens + edit saves.
+
+Next: Slice 1.2 fail-closed workspace binding (S1).

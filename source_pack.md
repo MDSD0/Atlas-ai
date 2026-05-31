@@ -279,3 +279,26 @@ Decisions:
 - Scope vitest to `src/**` so fixture `*.test.ts` (written for the agent-under-test, sometimes intentionally failing) never join Atlas's own suite.
 
 Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 91 passed, build 0, cargo clippy 0, cargo test 104 passed (3 new harness tests: copy idempotence, drop cleanup, parallel isolation).
+
+## Slice 1.1: native filesystem authorization (S0)
+
+Source-parity packet:
+
+- Slice: native fs IPC authorization against the workspace registry.
+- Atlas files inspected: `src-tauri/src/modules/workspace.rs`, `fs/file.rs`, `fs/mutate.rs`, `fs/tree.rs`, `fs/search.rs`, `fs/grep.rs`, `fs/watch.rs`, `fs/mod.rs`, `src/lib.rs`, `src/modules/workspace/workspaceStore.ts`, `src/modules/ai/lib/native.ts`.
+- opensrc resolved (cache): `crynta/terax-ai` (substrate), `anomalyco/opencode` (permission model), `tauri-apps/tauri` (IPC/State). Freshness: cached fallback (Node 16 in dev shell blocked refresh; non-blocking, the resolver fell back to local cache).
+- Disposition: `ADAPT` Atlas's own `fs/watch.rs` registry gate (`registry.is_authorized` after canonicalize) - it is the established in-repo precedent for exactly this check. opencode allow/ask/deny is for the frontend agent-tool layer (later slice), not this native root gate, so `STUDY` here.
+- Atlas-owned integration: two helpers in `workspace.rs` - `authorize_existing_path` (Mode A: canonicalize following symlinks, target must be under an authorized root; for read/stat/list/search/grep) and `authorize_path_target` (Mode B: canonicalize the deepest existing ancestor of the parent only, never a final-component symlink, then re-attach tail; for write/create/rename/delete so symlink delete/rename act on the link and nested create authorizes by the real ancestor).
+- Rejected behavior: gating against the final-component symlink for delete/rename (would follow the link and act on the target). Mode B avoids it; the preserved `delete_does_not_follow_symlink_into_target` test proves it.
+
+Applied to every fs command by splitting each into a testable `_inner(..., &WorkspaceRegistry)` plus a thin `#[tauri::command]` shell that injects `tauri::State<WorkspaceRegistry>`. The `generate_handler!` registration is unchanged and the frontend invoke calls are unchanged (Tauri injects `State` server-side), so this is transparent to the webview.
+
+Boundary note (app vs agent): the native gate authorizes against the registry, which bootstraps home + launch dir and gains workspace roots via `workspace_authorize`. This is the app-level OS boundary that blocks forged IPC outside all roots. The narrower agent-project policy (only the bound project) stays in the frontend tool layer (`context.ts`) and is hardened in Slices 1.2/1.3. Native secret-path deny-list is a separate invariant (frontend `security.ts` already enforces it for the agent surface); a native version is a Phase 1 follow-up, not this slice.
+
+L2 forged-IPC note: `mod modules` is private, so a `tests/` harness cannot call the commands without widening the crate API. Not widened (surgical). The inner-function tests cover the forged-IPC case because the command shell is a one-line pass-through: a path outside roots is rejected by the inner fn regardless of how it arrived.
+
+All 10 fs commands gated: `fs_read_file`, `fs_write_file`, `fs_stat`, `fs_canonicalize` (file.rs); `fs_create_file`, `fs_create_dir`, `fs_rename`, `fs_delete` (mutate.rs); `fs_read_dir`, `list_subdirs` (tree.rs); `fs_search`, `fs_list_files` (search.rs); `fs_grep`, `fs_glob` (grep.rs). `fs_watch_add` was already gated.
+
+Process note: a first commit (23f0174) was pushed with a broken build because verify and commit were batched in one turn, so the commit landed before the RC=101 result was read. Two real defects were hidden: (a) the new read-reject tests used `.expect_err()` on `ReadResult`, which is not `Debug` (fixed by matching on the result in the test, leaving the production enum untouched); (b) grep.rs was never actually edited because a `/tmp` copy was read instead of the real file, so the Edit calls were rejected and grep stayed ungated. Both fixed and the commit amended. Lesson reinforced: never batch verify with commit; read the receipt first.
+
+Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 91, build 0, clippy 0, cargo test 106 lib + 3 harness = 109 (5 new auth tests: read-outside reject, read symlink-escape reject, write-outside reject, create-outside reject, delete-outside reject; all prior fs tests including symlink-delete preservation still pass).
