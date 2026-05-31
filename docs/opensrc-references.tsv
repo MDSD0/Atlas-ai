@@ -1,0 +1,51 @@
+tier	topics	repo	purpose
+0	substrate,workspace,terminal,session,frontend	github:crynta/terax-ai	Atlas substrate lineage and surgical mutation reference
+0	source-inspection,dependencies,tooling	github:vercel-labs/opensrc	Dependency and upstream source inspection tool
+1	repo-reality,repo-map,ranking,context-projection	github:Aider-AI/aider	Budgeted repo-map behavior and ranking reference
+1	repo-reality,repo-map,tree-sitter,ast	github:Aider-AI/grep-ast	Aider tree-sitter extraction dependency reference
+1	lsp,permissions,tools,session,workspace	github:anomalyco/opencode	LSP lifecycle diagnostics and permission model reference; memo used the older opencode-ai name
+1	semantic-tools,mcp,lsp,repo-reality	github:oraios/serena	Semantic-code scaffold and optional provider reference
+1	repo-reality,graph,tree-sitter,mcp,impact	github:DeusData/codebase-memory-mcp	Persistent graph scaffold watcher and selective query reference
+1	repo-reality,graph,research,impact	github:QuantaAlpha/RepoMaster	Graph-guided repository understanding research reference
+2	agent-loop,tools,aci,evidence	github:princeton-nlp/SWE-agent	Agent-computer interface and tool feedback reference
+2	agent-loop,tools,aci,minimalism	github:SWE-agent/mini-swe-agent	Small coding-agent loop reference
+2	runtime,sandbox,events,agent-loop	github:All-Hands-AI/OpenHands	Runtime boundary sandbox and event-trace reference
+2	approvals,sandbox,agents,project-instructions	github:openai/codex	Public coding-agent approval and project-guidance reference
+2	minimal-core,session,extensions,skills	github:earendil-works/pi	Small programmable core and extension-shape reference
+3	memory,consolidation,retrieval,benchmark	github:aiming-lab/SimpleMem	MemoryLab benchmark candidate and consolidation reference
+3	memory,provider,retrieval,benchmark	github:mem0ai/mem0	MemoryLab benchmark candidate for production-style memory
+3	memory,temporal-graph,enterprise	github:getzep/graphiti	Temporal graph memory study reference; not V1 core
+3	memory,temporal-graph,enterprise	github:getzep/zep	Temporal memory platform study reference; not V1 core
+4	skills,hooks,examples	github:anthropics/skills	Skill packaging examples
+4	agent-loop,hooks,examples	github:anthropics/anthropic-quickstarts	Small loop and history-compaction examples
+4	skills,examples	github:vercel-labs/skills	Skill packaging examples
+4	agents,examples	github:vercel-labs/open-agents	Agent examples and patterns
+4	mcp,protocol,typescript	github:modelcontextprotocol/typescript-sdk	MCP TypeScript protocol implementation reference
+4	mcp,protocol,python	github:modelcontextprotocol/python-sdk	MCP Python protocol implementation reference
+4	mcp,connectors,examples	github:modelcontextprotocol/servers	MCP connector examples
+4	mcp,github,connector	github:github/github-mcp-server	GitHub MCP connector reference
+4	mcp,browser,connector	github:microsoft/playwright-mcp	Browser MCP connector reference
+5	workflow,orchestration,validation	github:coleam00/archon	Optional workflow-layer reference; not default loop
+6	governance,casebook,execution-trail	github:odylith/odylith	Governance and execution-trail study reference; not V1 shape
+6	ide,extensibility	github:eclipse-theia/theia	IDE architecture fallback study if the Terax substrate becomes limiting
+7	tree-sitter,parser,repo-reality	github:tree-sitter/tree-sitter	Incremental parser source and documentation
+7	tree-sitter,parser,javascript	github:tree-sitter/tree-sitter-javascript	JavaScript grammar reference
+7	tree-sitter,parser,typescript	github:tree-sitter/tree-sitter-typescript	TypeScript grammar reference
+7	tree-sitter,parser,python	github:tree-sitter/tree-sitter-python	Python grammar reference
+7	tree-sitter,parser,rust	github:tree-sitter/tree-sitter-rust	Rust grammar reference
+7	scip,indexing,repo-reality	github:sourcegraph/scip	Deferred SCIP protocol study reference
+7	lsp,protocol,repo-reality	github:microsoft/language-server-protocol	LSP protocol source and documentation
+7	lsp,client,python	github:openlawlibrary/pygls	Python LSP client study reference from the legacy plan
+7	lsp,server,typescript	github:typescript-language-server/typescript-language-server	TypeScript LSP server integration reference
+7	lsp,server,python	github:microsoft/pyright	Python LSP server integration reference
+7	lsp,server,rust	github:rust-lang/rust-analyzer	Rust LSP server integration reference
+7	lsp,editor,ide	github:helix-editor/helix	Deferred editor and LSP integration study reference
+7	lsp,editor,ide	github:zed-industries/zed	Deferred editor and LSP integration study reference
+7	lsp,editor,ide	github:lapce/lapce	Deferred editor and LSP integration study reference
+7	lsp,editor,ide	github:microsoft/vscode	Deferred editor and LSP integration study reference
+7	tauri,frontend,scaffold	github:tauri-apps/create-tauri-app	Tauri scaffold pattern reference
+7	tauri,rust,ipc,frontend	github:tauri-apps/tauri	Active desktop runtime dependency reference
+7	editor,codemirror,frontend	github:codemirror/dev	Active editor dependency reference
+7	terminal,xterm,frontend	github:xtermjs/xterm.js	Active terminal renderer dependency reference
+7	frontend,reactivity,legacy-ui	github:sveltejs/svelte	Legacy-plan UI reference only; active Atlas uses React
+7	memory,study,reject	github:langchain-ai/langmem	Memory framework study reference; not Atlas core

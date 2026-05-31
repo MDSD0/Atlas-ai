@@ -233,3 +233,58 @@ Checks:
 - Passed: `pnpm exec tsc --noEmit`
 - Passed: `pnpm test src/modules/ai/lib/sessions.test.ts src/modules/ai/tools/context.test.ts`
 - Passed: `pnpm test`
+
+## Pre-plan learning phase
+
+No feature slice is active yet.
+
+Completed setup:
+
+- Read the final architecture record and legacy Atlas queue as learning material.
+- Added `docs/opensrc-references.tsv` with the recommended upstream source inventory.
+- Added `scripts/consult-opensrc.sh` to resolve topic-relevant upstreams through opensrc.
+- Added the mandatory source-parity hook to `ATLAS.md`.
+
+Before the next implementation plan:
+
+1. Run `bash scripts/consult-opensrc.sh <topic>` for the candidate slice.
+2. Inspect the active Atlas path and the returned reference paths.
+3. Update `source_pack.md` with exact files and copy/adapt/reject decisions.
+4. Write the smallest vertical slice and its acceptance checks here.
+
+## Canonical evidence-backed execution roadmap
+
+The post-learning implementation overview now lives in `ATLAS_EXECUTION_PLAN.md`.
+
+It replaces the executable meaning of `plans/ATLAS_PLAN.md`, which remains useful only as historical evidence from the archived Python/FastAPI and Svelte direction.
+
+The first active queue is intentionally narrow:
+
+1. Freeze refreshed source evidence and exact commits.
+2. Restore a reproducible verification baseline and add the fixture harness.
+3. Enforce native filesystem authorization.
+4. Make workspace binding fail closed.
+5. Fix platform-aware path containment.
+6. Reject stale edits and serialize same-file mutations.
+7. Ship one visible read-edit-run-proof vertical slice before CodeReality, LSP, memory-provider, skills, or MCP expansion.
+
+## Slice 0.2 status: verification floor
+
+Plan followed: `ATLAS_EXECUTION_PLAN.md` Slice 0.2.
+
+Done:
+
+- `B0` (clippy): fixed. On macOS the only `builder =` reassignment (`lib.rs:64`) is gated `#[cfg(not(target_os = "macos"))]` and the macOS branch shadows with `let builder = builder...`, so `mut` on `lib.rs:49` is unused on macOS. Fix: `#[allow(unused_mut)]` on that `let` (keeps `mut` for the non-macOS reassignment, no runtime change). `cargo clippy --all-targets --locked -- -D warnings` now returns 0 errors.
+- `B1` (vitest blocked): root cause was active Node v16.20.2 while pnpm requires Node >= 22.13. Resolved by using Node 22.16. Documented with a fail-fast Node-version guard in `scripts/verify-atlas.sh`.
+- Added `scripts/verify-atlas.sh` with `--fast`, `--native`, `--all` working and `--desktop`/`--eval` as explicit not-implemented stubs.
+
+Baseline (Node 22.16, definitive clean-shell run, `verify-atlas.sh --all` exit 0):
+
+- `pnpm exec tsc --noEmit`: exit 0.
+- `pnpm test`: 91 passed (8 files).
+- `pnpm build`: exit 0 (3142 modules).
+- `cargo check/clippy/test --locked`: exit 0; 101 Rust tests pass.
+
+Not done in this slice: Slice 0.3 fixture harness, Slice 0.4 CI matrix.
+
+Environment note: the dev shell profile injects phantom text into command stdout, which produced false pass/fail readings mid-slice. Reliable runs use `env -i HOME=$HOME PATH=<node>:<cargo>:/usr/bin:/bin /bin/bash --noprofile --norc`. The `--all` receipt above came from that clean shell.

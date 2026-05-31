@@ -115,3 +115,150 @@ Correction after Agent authority feedback:
 - `TabBar.tsx` puts Agent first in the new-tab menu and labels Cmd+I there.
 - `shortcuts.ts` labels Cmd+I as the Agent-tab toggle.
 - `App.tsx` no longer uses terminal reset during project/session restore or workspace environment switching.
+
+## Pre-plan learning pass: source-parity discipline
+
+Read thoroughly:
+
+- `Backend analysis and feedback.md`: accumulated architecture discussion. The final ROI-ranked sections are the current learning surface; earlier Python-backend recommendations are historical.
+- `plans/ATLAS_PLAN.md`: legacy executable queue for the archived Python/FastAPI and Svelte build. Useful for doctrine and failure lessons, but not executable against the active React/Tauri repo.
+- `ATLAS.md`: active project architecture and quality contract.
+
+Added:
+
+- `docs/opensrc-references.tsv`: curated upstream manifest grouped by topic and ROI tier.
+- `scripts/consult-opensrc.sh`: mandatory pre-edit resolver for relevant upstream source trees.
+- `ATLAS.md` source-parity hook: inspect active Atlas plus relevant opensrc upstream, then record copy/adapt/reject before non-trivial edits.
+
+Cache refresh note:
+
+- The recommended GitHub repository set was fetched through opensrc.
+- A later full refresh hit GitHub's unauthenticated API rate limit. The resolver now prefers opensrc and falls back to already-fetched local source trees when refresh traffic is rate-limited.
+- Verified: `bash scripts/consult-opensrc.sh --all` resolves all 50 curated upstream entries from the local opensrc cache.
+- Freshness-sensitive slices should refresh through the authenticated hook and record cached versus refreshed source use.
+
+Initial source reads already completed through opensrc:
+
+- `Aider-AI/aider:aider/repomap.py`: budgeted repo-map ranking and projection behavior.
+- `anomalyco/opencode:packages/opencode/src/lsp/lsp.ts`: lazy LSP lifecycle and language-server routing.
+- `anomalyco/opencode:packages/opencode/src/tool/edit.ts`: edit flow that notifies LSP and returns diagnostics.
+- `DeusData/codebase-memory-mcp:README.md`: tree-sitter graph, watcher, ignore, and selective query scaffold.
+- `aiming-lab/SimpleMem:EvolveMem/evolvemem/models.py`: memory-unit schema.
+- `aiming-lab/SimpleMem:EvolveMem/evolvemem/retriever.py`: adaptive retrieval signals.
+- `aiming-lab/SimpleMem:EvolveMem/evolvemem/consolidator.py`: dry-run consolidation behavior.
+- `All-Hands-AI/OpenHands`: runtime and sandbox boundary study.
+- `crynta/terax-ai`: substrate lineage comparison.
+
+Decision:
+
+- Never implement a non-trivial subsystem from a blank page.
+- Prefer reference, adapter, parity test, then the smallest Atlas-native ownership layer.
+- Keep repo reality, memory, and proof separate even when studying systems that combine them.
+
+## Roadmap evidence packet: 2026-05-31
+
+Purpose:
+
+- Produce the canonical post-learning execution roadmap without implementing product features.
+- Reconcile the final backend memo, the legacy plan, current primary documentation, opensrc upstreams, and the active React/Tauri repository.
+
+Active Atlas paths inspected:
+
+- `src-tauri/src/modules/workspace.rs`
+- `src-tauri/src/modules/fs/file.rs`
+- `src-tauri/src/modules/fs/tree.rs`
+- `src-tauri/src/modules/fs/mutate.rs`
+- `src-tauri/src/modules/fs/search.rs`
+- `src-tauri/src/modules/fs/grep.rs`
+- `src-tauri/src/modules/fs/watch.rs`
+- `src-tauri/src/modules/shell/mod.rs`
+- `src-tauri/src/modules/shell/session.rs`
+- `src-tauri/src/lib.rs`
+- `src/modules/workspace/workspaceStore.ts`
+- `src/modules/ai/tools/context.ts`
+- `src/modules/ai/tools/edit.ts`
+- `src/modules/ai/tools/fs.ts`
+- `src/modules/ai/tools/search.ts`
+- `src/modules/ai/lib/agent.ts`
+- `src/modules/ai/store/chatStore.ts`
+- `src/modules/explorer/lib/watch.ts`
+- `.github/workflows/ci.yml`
+
+Primary sources selected:
+
+- Tauri 2 commands, capabilities, and testing documentation.
+- Language Server Protocol 3.17 specification.
+- Tree-sitter parser usage documentation.
+- Aider repo-map documentation.
+- Model Context Protocol official documentation and latest specification.
+- Claude Code memory, hooks, skills, and MCP documentation.
+
+opensrc upstream files inspected:
+
+- `Aider-AI/aider:aider/repomap.py`
+- `Aider-AI/aider:tests/basic/test_repomap.py`
+- `anomalyco/opencode:packages/opencode/src/lsp/lsp.ts`
+- `anomalyco/opencode:packages/opencode/src/lsp/client.ts`
+- `anomalyco/opencode:packages/opencode/src/permission/index.ts`
+- `anomalyco/opencode:packages/opencode/src/tool/edit.ts`
+- `DeusData/codebase-memory-mcp:README.md`
+- `aiming-lab/SimpleMem:EvolveMem/evolvemem/models.py`
+- `aiming-lab/SimpleMem:EvolveMem/evolvemem/retriever.py`
+- `aiming-lab/SimpleMem:EvolveMem/evolvemem/consolidator.py`
+- `earendil-works/pi:packages/coding-agent/src/core/extensions/types.ts`
+- `earendil-works/pi:packages/coding-agent/src/core/tools/file-mutation-queue.ts`
+- `All-Hands-AI/OpenHands:openhands/app_server/event/README.md`
+- `All-Hands-AI/OpenHands:openhands/app_server/sandbox/README.md`
+- `modelcontextprotocol/typescript-sdk:README.md`
+- `modelcontextprotocol/typescript-sdk:packages/core/src/types/spec.types.ts`
+- `modelcontextprotocol/typescript-sdk:test/conformance/README.md`
+
+Key decisions:
+
+- `ATLAS_EXECUTION_PLAN.md` is the canonical roadmap.
+- "Implement every reference" means every consulted upstream receives an explicit `COPY`, `ADAPT`, `WRAP`, `BENCHMARK`, `STUDY`, or `REJECT` disposition with the required evidence.
+- Existing Rust grep is benchmarked before any ripgrep subprocess is introduced.
+- Native filesystem authorization, fail-closed binding, platform-aware containment, stale-edit rejection, and same-file serialization precede CodeReality.
+- Minimal proof receipts ship before graph, LSP, memory-provider, skills, or MCP expansion.
+- MCP must use a pinned tested stable protocol and SDK release. SDK development `main` is not a release pin.
+
+Freshness:
+
+- Mixed: opensrc cached fallback was used after GitHub unauthenticated API rate limiting.
+- Before implementing a freshness-sensitive slice, refresh focused upstreams through the authenticated hook and record exact commits.
+
+## Follow-up correction: GitHub CLI token bridge
+
+Inspected opensrc source:
+
+- `vercel-labs/opensrc:packages/opensrc/cli/src/core/registries/mod.rs`
+- `vercel-labs/opensrc:packages/opensrc/cli/src/core/registries/repo.rs`
+- `vercel-labs/opensrc:packages/opensrc/cli/src/core/git.rs`
+
+Decision:
+
+- `opensrc` reads `GITHUB_TOKEN` for GitHub API requests.
+- `scripts/consult-opensrc.sh` now uses `GITHUB_TOKEN` or `GH_TOKEN` when present and otherwise reads the active `gh` keyring token at runtime.
+- The token is passed only to the `opensrc` subprocess. The hook never prints or writes it.
+- The inspected opensrc clone flow removes `.git` after fetch, so its cache does not retain an authenticated Git remote.
+- The hook refreshes repositories in bounded batches so `--all` does not create one resource-heavy 50-repository opensrc process. A failed batch falls back to the corresponding local cache paths.
+- The globally installed opensrc binary currently hangs even for `--help` on this machine, so the minimal desktop shell fallback continues to use the working `pnpm dlx opensrc` path.
+
+## Slice 0.2: verification floor (M0)
+
+Tiny-fix exemption: `B0`/`B1` repair and `scripts/verify-atlas.sh` wrap existing commands with no subsystem design decision, so upstream source inspection is not required.
+
+Files inspected: `package.json`, `vite.config.ts`, `src-tauri/src/lib.rs`.
+
+Files changed: `src-tauri/src/lib.rs` (one attribute), added `scripts/verify-atlas.sh`.
+
+Findings:
+
+- `B1` was an environment trap, not a code defect: active Node was v16.20.2; pnpm requires Node >= 22.13. With Node 22.16 the full suite passes.
+- `B0` clippy is fixed with `#[allow(unused_mut)]` on `lib.rs:49`. On macOS the `builder =` reassignment is gated `#[cfg(not(target_os = "macos"))]`, so `mut` is unused on that platform but required elsewhere; the attribute keeps both correct with no runtime change.
+
+Decision: keep `verify-atlas.sh` minimal and add a Node-version guard so the `B1` trap fails fast with a clear message instead of a cryptic pnpm error.
+
+Verified (clean-shell, Node 22.16 + cargo, `verify-atlas.sh --all` exit 0): tsc exit 0, vitest 91 passed, pnpm build exit 0 (3142 modules), cargo check/clippy/test exit 0 with 101 Rust tests.
+
+Process note: the dev shell profile injected phantom text into command stdout and produced false clippy pass/fail readings mid-slice. Ground truth was re-established with the Read tool and an `env -i ... --noprofile --norc` shell. Lesson: trust exit codes from a clean shell and file reads, not decorated stdout.

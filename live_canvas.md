@@ -113,3 +113,64 @@ Implemented after the Agent home feedback:
 - Cmd+I now toggles the Agent tab instead of using the mini overlay route.
 - Project/session restore no longer creates or focuses a terminal. It updates project binding and resets the visible surface to Agent.
 - Workspace environment switches no longer create a default terminal at `$HOME`.
+
+## Pre-plan learning status: opensrc-first hook
+
+The active repo now has a durable source-parity rule:
+
+- `ATLAS.md` requires relevant opensrc inspection before non-trivial subsystem edits.
+- `docs/opensrc-references.tsv` maps Atlas topics to the upstream repositories recommended by the final backend analysis.
+- `scripts/consult-opensrc.sh` resolves the relevant cached source paths without forcing a blind read of every upstream.
+- The manifest currently resolves 50 upstream source trees. If GitHub rate-limits refresh traffic, the script labels the fallback and uses the existing local opensrc cache.
+
+Interpretation rule:
+
+- `plans/ATLAS_PLAN.md` is legacy evidence from the archived Python/FastAPI backend.
+- The final sections of `Backend analysis and feedback.md` provide the current product direction.
+- Active implementation decisions must be reconciled against the React/Tauri codebase and current upstream source before a new slice is planned.
+
+## Canonical execution plan
+
+Added `ATLAS_EXECUTION_PLAN.md` as the evidence-backed implementation roadmap.
+
+The roadmap is built around the active React/Tauri substrate and requires:
+
+- A source-parity packet before every non-trivial slice.
+- Explicit `COPY`, `ADAPT`, `WRAP`, `BENCHMARK`, `STUDY`, or `REJECT` disposition for each consulted upstream.
+- Fixture-backed unit, native integration, frontend integration, desktop, scripted-agent, and cross-platform test layers.
+- A trusted-editing milestone before CodeReality, LSP, memory-provider, skill, or MCP expansion.
+- Primary-documentation and focused opensrc refresh when a slice begins.
+
+Immediate risk queue:
+
+- Restore reproducible clippy and Vitest baseline.
+- Gate raw native filesystem IPC through workspace authorization.
+- Stop swallowing frontend workspace authorization failures.
+- Fix case-sensitive frontend path containment.
+- Replace cache-presence edit checks with real stale-content fingerprints.
+- Serialize same-file mutations using a Pi-informed realpath queue.
+
+## Follow-up status: authenticated opensrc refresh
+
+Updated `scripts/consult-opensrc.sh` to use the existing GitHub CLI login automatically:
+
+- Prefer an explicit `GITHUB_TOKEN`.
+- Accept `GH_TOKEN` as a bridge.
+- Otherwise read the active `gh` keyring token at runtime, including common Homebrew paths when the desktop app shell has a minimal `PATH`.
+- Pass the token only to the `opensrc` subprocess without printing or persisting it.
+- Refresh upstreams in bounded batches so a complete manifest pass stays controlled and a failed batch can use its local cache paths.
+
+## Slice 0.2 status: verification floor (M0)
+
+Baseline restored and gated.
+
+- `B1` root cause: active Node v16.20.2 vs pnpm's Node >= 22.13 requirement. Use Node 22.16. Codified by a Node-version guard in `scripts/verify-atlas.sh`.
+- `B0` clippy: already clean in current source (earlier failure was stale artifacts).
+- Added `scripts/verify-atlas.sh` (`--fast`/`--native`/`--all`; `--desktop`/`--eval` are explicit stubs).
+- Green: tsc 0, vitest 91 passed, build 0, cargo clippy 0, cargo test 53 passed.
+
+Source-parity hook now also enforced at the harness level: `.claude/settings.json` PreToolUse runs `scripts/opensrc-hook.sh` on Edit/Write/MultiEdit, printing the relevant upstreams for files under `src-tauri/src/modules/**` and `src/modules/**`.
+
+Memory decision locked: `LocalRecordsProvider` default (always on, no dependency), SimpleMem `WRAP` optional advanced provider, Mem0 `BENCHMARK`. New invariant: boot never depends on memory-provider health.
+
+Next: Slice 0.3 fixture harness, then Phase 1 trust boundary (S0 native fs authorization first).

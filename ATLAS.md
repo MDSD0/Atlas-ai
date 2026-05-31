@@ -2,6 +2,8 @@
 
 Atlas loads `ATLAS.md` from the workspace root as agent memory (similar to AGENTS.md / CLAUDE.md). This file is also the project's living architecture doc — read it before making changes.
 
+The canonical phased implementation roadmap is `ATLAS_EXECUTION_PLAN.md`. Read it before starting a non-trivial slice and patch it when refreshed evidence changes a decision.
+
 ## Project
 
 **Atlas** — open-source AI-native terminal emulator. Tauri 2 + Rust (`portable-pty`) backend, React 19 + TypeScript + xterm.js (webgl) client, BYOK AI via Vercel AI SDK v6.
@@ -31,6 +33,23 @@ Verify before claiming done: `pnpm exec tsc --noEmit`, `pnpm test`, `cargo clipp
 - **No emojis** anywhere.
 - **Imports**: always `@/...` on the frontend, never relative across modules.
 - **pnpm only**, never npm/npx/yarn.
+
+## Source-parity hook
+
+Do not design non-trivial Atlas behavior from scratch. Before editing a subsystem:
+
+1. Run `bash scripts/consult-opensrc.sh <topic> [topic...]`.
+2. Inspect the active Atlas path and at least one relevant upstream path returned by `opensrc`.
+3. Record exact inspected files and the copy/adapt/reject decision in `source_pack.md`.
+4. Implement the smallest Atlas-native mutation or adapter that preserves the current architecture.
+
+Use `bash scripts/consult-opensrc.sh --list` to see the curated reference manifest and `bash scripts/consult-opensrc.sh --all` only when refreshing the cache. Do not read every upstream blindly. Select references by the current slice.
+
+For dependency behavior, inspect the package source directly with `opensrc path <package>`. For harness architecture, consult the matching GitHub upstreams in `docs/opensrc-references.tsv`.
+
+The resolver refreshes upstreams in bounded batches and falls back to previously fetched local source when a batch refresh fails. It uses `GITHUB_TOKEN` or `GH_TOKEN` when present and otherwise bridges the active `gh` keyring token at runtime without printing or persisting it. For freshness-sensitive decisions, record whether cached or refreshed source was used.
+
+Tiny local fixes may skip upstream inspection only when they introduce no design decision. Note that exception in `source_pack.md`.
 
 ## Architecture
 
