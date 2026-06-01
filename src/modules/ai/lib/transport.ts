@@ -10,6 +10,7 @@ import {
 } from "../tools/tools";
 import { proofJournal } from "../proof";
 import { RunRecorder } from "../proof/recorder";
+import { useProofStore } from "../store/proofStore";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -87,10 +88,14 @@ export function createContextAwareTransport(deps: Deps) {
 
     // Hard hook: record one proof run around this agent turn. Journal failures
     // must never block the agent, so recorder creation and calls are guarded.
-    const recorder = await RunRecorder.start(proofJournal, {
-      sessionId: deps.toolContext.getSessionId() ?? "unknown",
-      workspaceRoot: live.workspaceRoot,
-    }).catch(() => null);
+    const recorder = await RunRecorder.start(
+      proofJournal,
+      {
+        sessionId: deps.toolContext.getSessionId() ?? "unknown",
+        workspaceRoot: live.workspaceRoot,
+      },
+      { onUpdate: (summary) => useProofStore.getState().setSummary(summary) },
+    ).catch(() => null);
 
     if (options.abortSignal && recorder) {
       options.abortSignal.addEventListener(

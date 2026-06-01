@@ -1,5 +1,23 @@
 import type { ProofJournal } from "@/modules/ai/proof/journal";
-import type { ProofRun, ProofVerdictStatus } from "@/modules/ai/proof/contracts";
+import type {
+  ProofRun,
+  ProofRunStatus,
+  ProofVerdictStatus,
+} from "@/modules/ai/proof/contracts";
+
+// Compact, synchronous view of a run for the UI. Built from state the recorder
+// already accumulates, so the receipt strip never has to reload the journal.
+export type ReceiptSummary = {
+  runId: string;
+  sessionId: string;
+  status: ProofRunStatus;
+  eventCount: number;
+  changedFiles: string[];
+  checks: string[];
+  failures: string[];
+  startedAt: number;
+  finishedAt: number | null;
+};
 
 // Maps agent-loop lifecycle callbacks onto journal events. This is the Slice 2.2
 // "hard hook" layer: it does NOT add a second tool runtime — it observes the
@@ -64,27 +82,57 @@ function summarize(toolName: string, input: Record<string, unknown>): string {
  * stream, and closed once with a verdict. All journal writes are serialized by
  * the journal itself; this class only sequences its own calls.
  */
+export type RecorderOptions = {
+  /** Notified on start, after each recorded tool, and on finish. Synchronous. */
+  onUpdate?: (summary: ReceiptSummary) => void;
+};
+
 export class RunRecorder {
   private readonly changedFiles = new Set<string>();
   private readonly failures: string[] = [];
   private readonly shellChecks: string[] = [];
+  private eventCount = 0;
+  private status: ProofRunStatus = "running";
+  private finishedAt: number | null = null;
   private finished = false;
 
   private constructor(
     private readonly journal: ProofJournal,
     private readonly run: ProofRun,
+    private readonly onUpdate?: (summary: ReceiptSummary) => void,
   ) {}
 
   static async start(
     journal: ProofJournal,
     input: { sessionId: string; workspaceRoot: string | null },
+    options: RecorderOptions = {},
   ): Promise<RunRecorder> {
     const run = await journal.startRun(input);
-    return new RunRecorder(journal, run);
+    const recorder = new RunRecorder(journal, run, options.onUpdate);
+    recorder.emit();
+    return recorder;
   }
 
   get runId(): string {
     return this.run.id;
+  }
+
+  summary(): ReceiptSummary {
+    return {
+      runId: this.run.id,
+      sessionId: this.run.sessionId,
+      status: this.status,
+      eventCount: this.eventCount,
+      changedFiles: [...this.changedFiles],
+      checks: [...this.shellChecks],
+      failures: [...this.failures],
+      startedAt: this.run.startedAt,
+      finishedAt: this.finishedAt,
+    };
+  }
+
+  private emit(): void {
+    this.onUpdate?.(this.summary());
   }
 
   async recordTool(record: ToolStepRecord): Promise<void> {
@@ -96,9 +144,11 @@ export class RunRecorder {
       summary,
       payload: record.output,
     });
+    this.eventCount += 1;
 
     if (failed) {
       this.failures.push(`${summary}: ${(record.output as { error: string }).error}`);
+      this.emit();
       return;
     }
 
@@ -113,6 +163,7 @@ export class RunRecorder {
     if (SHELL_TOOLS.has(record.toolName) && typeof record.input.command === "string") {
       this.shellChecks.push(record.input.command);
     }
+    this.emit();
   }
 
   /**
@@ -132,11 +183,14 @@ export class RunRecorder {
       : outcome.errored || this.failures.length > 0
         ? "failed"
         : "passed";
-    await this.journal.finishRun(this.run.id, {
+    const verdict = await this.journal.finishRun(this.run.id, {
       status,
       changedFiles: [...this.changedFiles],
       checks: this.shellChecks,
       unresolvedFailures: this.failures,
     });
+    this.status = verdict.status;
+    this.finishedAt = Date.now();
+    this.emit();
   }
 }

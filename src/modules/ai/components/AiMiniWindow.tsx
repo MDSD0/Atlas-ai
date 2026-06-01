@@ -31,6 +31,7 @@ import { AiChatView } from "./AiChat";
 import { PlanDiffReview } from "./PlanDiffReview";
 import { SessionsList } from "./SessionsPanel";
 import { TodoStrip } from "./TodoStrip";
+import { ReceiptStrip } from "./ReceiptStrip";
 import { AiInput } from "./AiInputBar";
 
 const SUGGESTIONS = [
@@ -257,6 +258,7 @@ function Body({
       </div>
 
       <TodoStrip sessionId={sessionId} />
+      <ReceiptStrip sessionId={sessionId} />
       <div className="shrink-0">
         <AiInput />
       </div>

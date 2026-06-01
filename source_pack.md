@@ -507,3 +507,16 @@ Source-parity packet:
 - Tests: `proof/recorder.test.ts` (4) — complete read-edit-test trace with passed verdict + changed-file artifact + checks; failed result visible and run failed; cancelled verdict + idempotent finish; bounded shell summary.
 
 Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 133 passed (15 files), build 0, cargo check/clippy 0, cargo test 115 lib + 3 harness.
+
+## Slice 2.3: minimal proof UI
+
+Source-parity packet:
+
+- Slice: surface the Slice 2.2 proof receipts in the agent UI.
+- Atlas files inspected: `proof/recorder.ts`, `lib/transport.ts`, `components/TodoStrip.tsx` (compact-strip pattern), `components/AiMiniWindow.tsx` (mount point + TodoStrip placement), `components/AiChat.tsx`, `vite.config.ts`/`package.json` (test infra check).
+- Disposition: this is UI composition over the existing journal + the established TodoStrip strip pattern. No new subsystem or protocol, no upstream code copied (recorded exception per ATLAS.md source-parity hook). Reference shape: Claude Code / Codex proof-of-work surfaces, already STUDY in the Phase 2 references.
+- Atlas-owned integration: synchronous `ReceiptSummary` on the recorder (no journal reload for render), a small `proofStore` (zustand) fed by the recorder's `onUpdate`, and `ReceiptStrip` mounted under `TodoStrip`.
+- Test convention: the repo has no jsdom/testing-library and zero `.test.tsx`. Rather than add component-test infra for one strip, the real logic (`shouldShowReceipt`) is a pure exported function unit-tested in `receiptStrip.test.ts`; the component body stays thin presentation. Verdict-mapping and accumulation are already covered by `recorder.test.ts`.
+- Deferred (avoids overbuild): mini-window click-through needs the live file-open bridge (optional `onOpenFile` left unwired there); run-history list and receipt→terminal/diff deep links are later slices.
+
+Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 136 passed (16 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.

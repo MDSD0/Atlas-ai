@@ -451,3 +451,16 @@ Source-parity: opensrc OpenHands event-trace + SWE-agent ACI feedback (STUDY).
 Green (clean shell verify-atlas.sh --all): tsc 0, vitest 133 passed (15 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.
 
 Next: Phase 2 Slice 2.3 minimal proof UI.
+
+## Slice 2.3 status: minimal proof UI
+
+Done. Surfaces the 2.2 receipts on the agent surface.
+
+- recorder.ts: synchronous ReceiptSummary + onUpdate (start/tool/finish), from state already tracked.
+- store/proofStore.ts: zustand latestBySession; transport recorder pushes via onUpdate.
+- components/ReceiptStrip.tsx: compact strip under TodoStrip in AiMiniWindow - verdict, action count, changed files (click-through optional), checks, failures expanded. Pure shouldShowReceipt gate unit-tested (no jsdom in repo; thin component, pure-tested logic).
+- components/receiptStrip.test.ts: 3 tests.
+
+Green (clean shell verify-atlas.sh --all): tsc 0, vitest 136 passed (16 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.
+
+Phase 2 complete. Next: Phase 3 Slice 3.1 shared repository ignore policy.

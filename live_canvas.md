@@ -317,3 +317,25 @@ Done.
 Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 129 passed (14 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
 
 Next: Phase 2 Slice 2.2 hard hooks around the existing tool runtime.
+
+## Slice 2.2 status: hard hooks around the existing tool runtime
+
+Done (committed 590967a). No second tool runtime: the recorder observes the existing streamText loop.
+
+- proof/recorder.ts: RunRecorder maps run start / per-tool result / finish onto the journal. Events keyed lane.tool.ok|failed; {error} results become .failed events + unresolvedFailures (structured, not strings); successful mutations add changed_file artifacts; shell commands populate checks; verdict cancelled>failed>passed; idempotent finish.
+- agent.ts: onToolResult observation callback from onStepFinish (toolResults matched to toolCalls by id).
+- transport.ts: owns run lifecycle (start at turn boundary; finish on finishReason resolve, abort=cancelled, throw=errored); all recorder calls guarded so journal failure never blocks the agent.
+- proof/recorder.test.ts: 4 tests (full trace+passed+artifact+checks; failed visible; cancelled+idempotent; bounded shell summary).
+
+## Slice 2.3 status: minimal proof UI
+
+Done. The durable receipts are now visible.
+
+- proof/recorder.ts: synchronous ReceiptSummary + onUpdate (start/tool/finish), from state already tracked; no journal reload for render.
+- store/proofStore.ts: zustand latestBySession; transport recorder pushes via onUpdate.
+- components/ReceiptStrip.tsx: compact strip under TodoStrip in AiMiniWindow - verdict (colour+icon), action count, changed files (click-through via optional onOpenFile), checks, failures kept expanded. Pure shouldShowReceipt gate extracted + unit-tested (repo has no jsdom; thin component, pure-tested logic).
+- components/receiptStrip.test.ts: 3 tests (hide empty running, show once active, always show finished verdict).
+
+Green (clean shell verify-atlas.sh --all): tsc 0, vitest 136 passed (16 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.
+
+Phase 2 complete (event journal + hard hooks + proof UI). Next: Phase 3 Slice 3.1 shared repository ignore policy (CodeReality V0).
