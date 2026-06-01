@@ -9,6 +9,7 @@ import {
   validateWithinWorkspace,
   type ToolContext,
 } from "./context";
+import { editNeedsApproval } from "../lib/permissions";
 import {
   fingerprintText,
   fingerprintsMatch,
@@ -159,7 +160,7 @@ export function buildEditTools(ctx: ToolContext) {
         new_string: z.string().describe("Replacement substring."),
         replace_all: z.boolean().optional(),
       }),
-      needsApproval: true,
+      needsApproval: () => editNeedsApproval(ctx.getApprovalMode()),
       execute: async ({ path, old_string, new_string, replace_all }) => {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);
@@ -201,7 +202,7 @@ export function buildEditTools(ctx: ToolContext) {
           )
           .min(1),
       }),
-      needsApproval: true,
+      needsApproval: () => editNeedsApproval(ctx.getApprovalMode()),
       execute: async ({ path, edits }) => {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);

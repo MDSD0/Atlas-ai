@@ -394,3 +394,18 @@ Source-parity packet:
 - Tests: two unit tests in `context.test.ts` prove the unbound guard blocks mutation (the "Create TODO.md" case) and allows it when bound. GUI flows (composer/sidebar/welcome open, A/B session switch restoring workspaceRoot) are user-verify because they need the Tauri window.
 
 Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 112 passed (12 files), `verify-atlas.sh --fast` OK.
+
+## Feature slice: approval modes and auto-run safe shell
+
+Source-parity packet:
+
+- Slice: per-session approval modes (default / acceptEdits / full) plus a read-only/open auto-run allow-list, so low-risk actions flow without prompts while edits, shell, and protected areas stay controlled.
+- Atlas files inspected: `src/modules/ai/lib/security.ts` (checkShellCommand circuit breaker, checkReadable/Writable deny-lists), `src/modules/ai/tools/{fs,edit,shell,terminal,tools}.ts`, `src/modules/ai/store/chatStore.ts`, `src/modules/ai/tools/context.ts`, `node_modules/@ai-sdk/provider-utils` (needsApproval type).
+- opensrc inspected (cache): `anomalyco/opencode:packages/opencode/src/permission/index.ts` (allow/ask/deny model). Freshness: cached fallback. Primary docs referenced: Claude Code permission modes and read-only bash allow-list (default/acceptEdits/bypassPermissions, protected paths never auto-approved, rm -rf circuit breaker) as the product pattern.
+- Disposition: `ADAPT` the allow/ask/deny shape into three named modes plus a read-only command allow-list. Atlas owns the classifier; no upstream code copied.
+- Key invariant (plan section 5.1 merge-blocker preserved): a mode only suppresses the approval PROMPT for an otherwise-permitted call. The deny layer is untouched and runs inside each tool's execute (checkShellCommand) and in Rust (native out-of-workspace, S0). "Full access" skips prompts but NOT the circuit breaker, secret deny-list, or native boundary. Verified by an explicit test that compounded commands (`open x && rm -rf /`) never classify as auto-run.
+- AI SDK: `needsApproval` accepts `boolean | (input, opts) => boolean | Promise<boolean>` (confirmed in `@ai-sdk/provider-utils` types), so modes are read at tool-call time without forking the SDK. The model's tool choice is never overridden; only the prompt is gated. If the model picks a propose-only tool over running, that is the model, not the harness.
+- Atlas-owned integration: `permissions.ts` (pure), `approvalMode` in chatStore (per-session, resets on new/switch), `getApprovalMode` on ToolContext, `AccessChip.tsx` composer control.
+- Tests: 7 unit tests in `permissions.test.ts` (auto-run allow-list, operator rejection, edit-mode matrix, shell-mode matrix, compounded-command safety). GUI mode switching is user-verify (Tauri window).
+
+Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 119 passed (13 files), `verify-atlas.sh --fast` OK.

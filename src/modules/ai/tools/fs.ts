@@ -12,6 +12,7 @@ import {
   validateWithinWorkspace,
   type ToolContext,
 } from "./context";
+import { editNeedsApproval } from "../lib/permissions";
 import { withFileMutationQueue } from "./fileMutationQueue";
 import { fingerprintText, type ReadFingerprint } from "./fingerprint";
 
@@ -152,7 +153,7 @@ export function buildFsTools(ctx: ToolContext) {
         path: z.string(),
         content: z.string(),
       }),
-      needsApproval: true,
+      needsApproval: () => editNeedsApproval(ctx.getApprovalMode()),
       execute: async ({ path, content }) => {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);
@@ -209,7 +210,7 @@ export function buildFsTools(ctx: ToolContext) {
       inputSchema: z.object({
         path: z.string(),
       }),
-      needsApproval: true,
+      needsApproval: () => editNeedsApproval(ctx.getApprovalMode()),
       execute: async ({ path }) => {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);

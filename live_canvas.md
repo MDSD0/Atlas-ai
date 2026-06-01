@@ -217,6 +217,22 @@ Green (clean shell): tsc 0, vitest 112 passed (12 files; +2 unbound-guard tests)
 
 User-verify (GUI, ~3 min): composer chip open-folder; sidebar "Open project" icon; welcome "Open Folder"; ask agent "Create TODO.md" while Unbound (must refuse); open Project A, switch to a Project B session, confirm explorer + branch chip follow.
 
+## Feature slice status: approval modes + auto-run safe shell
+
+Done. Policy classifier, not a pipeline: the model calls any tool freely; the classifier only decides whether the call needs an approval PROMPT. Deny decisions (dangerous-command circuit breaker, secret deny-list, native out-of-workspace) live in execute/Rust and are NEVER skipped by any mode.
+
+- `src/modules/ai/lib/permissions.ts` (new, pure): `ApprovalMode` (default / acceptEdits / full), `isAutoRunShell` (single safe read-only/open command, no shell operators), `editNeedsApproval`, `shellNeedsApproval`.
+- chatStore: per-session `approvalMode` (default), `setApprovalMode`; resets to default on `newSession` and `switchSession`. Exposed to tools via `ToolContext.getApprovalMode`.
+- Tools: `write_file`, `create_directory`, `edit`, `multi_edit` use `needsApproval: () => editNeedsApproval(mode)`; `bash_run`, `bash_background` use `needsApproval: ({command}) => shellNeedsApproval(command, mode)`. AI SDK v6 supports the function form (verified in provider-utils types).
+- UI: `AccessChip.tsx` in the composer (Ask / Accept edits / Full access; Full access is amber + risky-flagged).
+- "open auto-run": `open`/`ls`/`cat`/`git status`/etc. auto-run in every mode (Claude-Code-style read-only allow-list). `open index.html` no longer needs approval — the dino-game friction.
+
+Default = Ask (chosen). Per-session persistence (chosen). The model picking `suggest_command` over running is a model issue, unchanged by design.
+
+Green (clean shell): tsc 0, vitest 119 passed (13 files; +7 permission tests), verify-atlas --fast OK.
+
+User-verify (GUI): composer "Access" chip switches Ask/Accept edits/Full access; in Full access a command runs without a prompt; `rm -rf /` is still blocked in Full access (circuit breaker); a new session resets to Ask.
+
 ## Slice 1.2 status: fail-closed workspace binding (S1)
 
 Done.

@@ -22,6 +22,7 @@ import { useChatStore } from "../store/chatStore";
 import { useSnippetsStore } from "../store/snippetsStore";
 import { ModelDropdown } from "./AiStatusBarControls";
 import { ProjectChip } from "./ProjectChip";
+import { AccessChip } from "./AccessChip";
 import { FilePickerContent } from "./FilePicker";
 import { SnippetPickerContent, type PickerItem } from "./SnippetPicker";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -388,9 +389,10 @@ export function AiInputBar() {
 
         {/* Bottom toolbar — model pill + action buttons */}
         <div className="flex items-center gap-1 border-t border-border/40 bg-card/50 px-2 py-1.5">
-          {/* Project + Model/Agent selector pills — live inside composer */}
+          {/* Project + Access + Model/Agent selector pills — live inside composer */}
           <div className="flex-1 flex items-center gap-1 min-w-0">
             <ProjectChip />
+            <AccessChip />
             <ModelDropdown />
           </div>
 

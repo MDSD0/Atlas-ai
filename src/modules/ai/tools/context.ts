@@ -1,3 +1,4 @@
+import type { ApprovalMode } from "../lib/permissions";
 import type { ReadFingerprint } from "./fingerprint";
 
 export type ToolContext = {
@@ -24,6 +25,8 @@ export type ToolContext = {
   readCache: Map<string, ReadFingerprint>;
   /** Active chat session id — used by tools that persist per-session state (todos). */
   getSessionId: () => string | null;
+  /** Per-session approval mode, read at tool-call time so changes take effect immediately. */
+  getApprovalMode: () => ApprovalMode;
 };
 
 export type ExecutionCwdMode = "workspace" | "activeFolder" | "activeTerminal";

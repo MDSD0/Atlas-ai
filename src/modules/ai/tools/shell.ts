@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { native } from "../lib/native";
 import { checkShellCommand } from "../lib/security";
+import { shellNeedsApproval } from "../lib/permissions";
 import { resolvePath, type ToolContext } from "./context";
 import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace";
 
@@ -47,7 +48,8 @@ export function buildShellTools(ctx: ToolContext) {
         command: z.string(),
         timeout_secs: z.number().int().min(1).max(300).optional(),
       }),
-      needsApproval: true,
+      needsApproval: ({ command }) =>
+        shellNeedsApproval(command, ctx.getApprovalMode()),
       execute: async ({ command, timeout_secs }) => {
         const safety = checkShellCommand(command);
         if (!safety.ok) return { error: safety.reason };
@@ -88,7 +90,8 @@ export function buildShellTools(ctx: ToolContext) {
         command: z.string(),
         cwd: z.string().nullable().optional(),
       }),
-      needsApproval: true,
+      needsApproval: ({ command }) =>
+        shellNeedsApproval(command, ctx.getApprovalMode()),
       execute: async ({ command, cwd }) => {
         const safety = checkShellCommand(command);
         if (!safety.ok) return { error: safety.reason };

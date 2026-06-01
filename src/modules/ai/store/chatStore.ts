@@ -15,6 +15,7 @@ import { usePreferencesStore } from "@/modules/settings/preferences";
 import { BUILTIN_AGENTS } from "../lib/agents";
 import { useAgentsStore } from "./agentsStore";
 import { usePlanStore } from "./planStore";
+import type { ReadFingerprint } from "../tools/fingerprint";
 import { useTodosStore } from "./todoStore";
 import type { AgentUsage } from "../lib/agent";
 import { EMPTY_PROVIDER_KEYS, type ProviderKeys } from "../lib/keyring";
@@ -31,6 +32,7 @@ import {
   type SessionMeta,
 } from "../lib/sessions";
 import { pushRecentModel } from "../lib/modelPrefs";
+import type { ApprovalMode } from "../lib/permissions";
 import { createContextAwareTransport } from "../lib/transport";
 import type {
   AtlasToolProjectContext,
@@ -131,6 +133,10 @@ type StoreState = {
 
   executionCwdMode: ExecutionCwdMode;
   setExecutionCwdMode: (mode: ExecutionCwdMode) => void;
+
+  /** Per-session approval mode. Resets to "default" on every new session. */
+  approvalMode: ApprovalMode;
+  setApprovalMode: (mode: ApprovalMode) => void;
 
   mini: MiniState;
   openMini: () => void;
@@ -275,7 +281,7 @@ export function flushPersist(id?: string): void {
 }
 
 function makeChat(sessionId: string): Chat<UIMessage> {
-  const readCache = new Map<string, { size: number; hash: number }>();
+  const readCache = new Map<string, ReadFingerprint>();
   const toolContext: ToolContext = {
     getCwd: () => useChatStore.getState().live.getCwd(),
     getWorkspaceRoot: () =>
@@ -295,6 +301,7 @@ function makeChat(sessionId: string): Chat<UIMessage> {
       useChatStore.getState().live.readLeafBuffer(leafId),
     readCache,
     getSessionId: () => sessionId,
+    getApprovalMode: () => useChatStore.getState().approvalMode,
   };
 
   const transport = createContextAwareTransport({
@@ -401,6 +408,9 @@ export const useChatStore = create<StoreState>((set, get) => ({
 
   executionCwdMode: "workspace",
   setExecutionCwdMode: (mode) => set({ executionCwdMode: mode }),
+
+  approvalMode: "default",
+  setApprovalMode: (mode) => set({ approvalMode: mode }),
 
   mini: { open: false, dock: readMiniDock() },
   openMini: () => set((s) => ({ mini: { ...s.mini, open: true } })),
@@ -514,7 +524,12 @@ export const useChatStore = create<StoreState>((set, get) => ({
       workspaceRoot,
     );
     const next = [meta, ...get().sessions];
-    set({ sessions: next, activeSessionId: id, agentMeta: IDLE_META });
+    set({
+      sessions: next,
+      activeSessionId: id,
+      agentMeta: IDLE_META,
+      approvalMode: "default",
+    });
     void saveSessionsList(next);
     void saveActiveId(id);
     return id;
@@ -528,10 +543,14 @@ export const useChatStore = create<StoreState>((set, get) => ({
     // Lazily seed the chat with persisted messages the first time we open
     // this session. Subsequent switches reuse the cached Chat instance.
     const flip = async () => {
-      const restored = await restoreWorkspaceForSession(meta);
-      if (!restored) return;
-      set({ activeSessionId: id, agentMeta: IDLE_META });
-      void saveActiveId(id);
+      try {
+        const restored = await restoreWorkspaceForSession(meta);
+        if (!restored) return;
+        set({ activeSessionId: id, agentMeta: IDLE_META, approvalMode: "default" });
+        void saveActiveId(id);
+      } catch (error) {
+        console.error("Unable to restore session workspace", error);
+      }
     };
     if (chats.has(id) || seedMessages.has(id)) {
       flip();

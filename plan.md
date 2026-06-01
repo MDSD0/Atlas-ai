@@ -371,3 +371,27 @@ Files changed:
 Behavior: selecting/adding a folder creates or switches to a project-bound session; unbound creates an unbound session that allows chat but fails mutation closed; switching sessions restores the bound workspace; missing-path degraded state has Locate/Open-unbound/Remove. Branch chip + dirty-state path untouched. Vague progress/grid icons not repurposed.
 
 Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 112 passed (12 files; +2 unbound-guard), `verify-atlas.sh --fast` OK. GUI flows are user-verify (listed in live_canvas.md).
+
+## Feature slice: approval modes + auto-run safe shell
+
+User-requested. Reduce prompt fatigue for low-risk actions via Claude-Code-style modes + a read-only allow-list, without weakening the deny layer.
+
+Files added:
+
+- `src/modules/ai/lib/permissions.ts`: pure classifier (ApprovalMode, isAutoRunShell, editNeedsApproval, shellNeedsApproval).
+- `src/modules/ai/lib/permissions.test.ts`: 7 tests.
+- `src/modules/ai/components/AccessChip.tsx`: composer Ask/Accept-edits/Full-access control.
+
+Files changed:
+
+- `src/modules/ai/store/chatStore.ts`: per-session `approvalMode` (default), reset on new/switch session, exposed via ToolContext.getApprovalMode.
+- `src/modules/ai/tools/context.ts`: ToolContext.getApprovalMode.
+- `src/modules/ai/tools/fs.ts`, `edit.ts`: edit/create needsApproval = editNeedsApproval(mode).
+- `src/modules/ai/tools/shell.ts`: bash needsApproval = shellNeedsApproval(command, mode).
+- `src/modules/ai/components/AiInputBar.tsx`: mount AccessChip.
+
+Invariant preserved (plan 5.1): modes suppress prompts only; checkShellCommand circuit breaker, secret deny-list, and native S0 boundary still apply in every mode incl. full access. Model tool choice never overridden.
+
+Decisions: default = Ask; per-session persistence (resets on new/switch).
+
+Verified (clean shell): tsc 0, pnpm test 119 passed (13 files; +7), verify-atlas.sh --fast OK.
