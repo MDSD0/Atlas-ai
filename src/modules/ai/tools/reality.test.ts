@@ -1,0 +1,72 @@
+import { describe, expect, it } from "vitest";
+import type { RepoContextResponse } from "../lib/native";
+import {
+  exactSymbolMatches,
+  impactCandidateFiles,
+  summarizeRepoStatus,
+} from "./reality";
+
+const RESPONSE: RepoContextResponse = {
+  root: "/repo",
+  indexed_at_ms: 1,
+  cache_hit: true,
+  watch_status: "snapshot_ttl",
+  rescan_bound_ms: 4_000,
+  file_count: 3,
+  symbol_count: 4,
+  definition_count: 2,
+  reference_count: 2,
+  parse_failures: 1,
+  skipped_dirs: 2,
+  truncated: false,
+  max_tokens: 256,
+  projected_tokens: 40,
+  naive_tokens: 100,
+  included_files: ["/repo/a.ts", "/repo/b.ts"],
+  excluded_files: 1,
+  degraded_files: [{ path: "/repo/c.ts", status: "parse_failed" }],
+  matches: [
+    {
+      path: "/repo/a.ts",
+      name: "Widget",
+      kind: "function",
+      line: 1,
+      is_definition: true,
+    },
+    {
+      path: "/repo/b.ts",
+      name: "widget",
+      kind: "reference",
+      line: 3,
+      is_definition: false,
+    },
+    {
+      path: "/repo/c.ts",
+      name: "WidgetFactory",
+      kind: "function",
+      line: 5,
+      is_definition: true,
+    },
+  ],
+  context: "bounded projection",
+};
+
+describe("repo reality helpers", () => {
+  it("keeps exact case-insensitive symbol matches only", () => {
+    expect(exactSymbolMatches(RESPONSE, "Widget")).toHaveLength(2);
+  });
+
+  it("returns bounded unique impact files", () => {
+    expect(impactCandidateFiles(RESPONSE, "Widget")).toEqual([
+      "/repo/a.ts",
+      "/repo/b.ts",
+    ]);
+  });
+
+  it("summarizes freshness without returning broad context", () => {
+    const summary = summarizeRepoStatus(RESPONSE);
+    expect(summary.watch_status).toBe("snapshot_ttl");
+    expect(summary.degraded_files).toHaveLength(1);
+    expect(summary).not.toHaveProperty("context");
+  });
+});

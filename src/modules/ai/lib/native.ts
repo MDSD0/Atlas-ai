@@ -71,6 +71,15 @@ export type RepoContextResponse = {
   context: string;
 };
 
+export type LspProviderInfo = {
+  id: string;
+  language: string;
+  status: "available" | "unavailable";
+  executable: string;
+  resolved_path: string | null;
+  detail: string;
+};
+
 export type GitRepoInfo = {
   repoRoot: string;
   branch: string;
@@ -466,6 +475,13 @@ export const agentNative = {
       root: projectRoot,
       projectRoot,
       maxTokens: maxTokens ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+  lspStatus: (projectRoot: string, file?: string) =>
+    invoke<LspProviderInfo[]>("agent_lsp_status", {
+      root: projectRoot,
+      projectRoot,
+      file: file ?? null,
       workspace: currentWorkspaceEnv(),
     }),
 };

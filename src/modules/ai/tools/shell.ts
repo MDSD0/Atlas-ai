@@ -61,6 +61,7 @@ export function buildShellTools(ctx: ToolContext) {
           if (!cwd) return { error: "no execution_cwd is available" };
           await maybeAuthorizeTerminalExecution(ctx, cwd);
           const shellId = await getSessionShell(shellSessionKey(sid, cwd), cwd);
+          const startedAt = Date.now();
           const r = await native.shellSessionRun(
             shellId,
             command,
@@ -76,6 +77,7 @@ export function buildShellTools(ctx: ToolContext) {
             truncated: r.truncated,
             cwd,
             cwd_after: r.cwd_after,
+            duration_ms: Date.now() - startedAt,
           };
         } catch (e) {
           return { error: String(e) };

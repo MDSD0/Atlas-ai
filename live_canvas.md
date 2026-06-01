@@ -249,6 +249,18 @@ Environment note: macOS `trustd` / `syspolicyd` temporarily delayed fresh Node s
 
 Next: Slice 1.3 platform-aware path containment (S1).
 
+## Accelerated V1 Slice A status: selective reality tools and truthful receipts
+
+Implemented.
+
+- Kept the M2-V CodeReality snapshot as the only repository inventory. Narrow tools now expose status, bounded maps, exact symbols, references, and impact candidates without adding an index.
+- Added an optional semantic-provider boundary for TypeScript, Python, and Rust. It reports executable availability honestly and does not start a language server yet.
+- Added a verification planner that suggests commands but cannot count suggestions as proof.
+- Tightened receipts: only successful foreground shell checks count as verified. Nonzero exits and timeouts fail; runs without a successful check remain `incomplete`.
+- Preserved read-only subagent isolation while giving subagents the new selective tools.
+
+Next: Accelerated V1 Slice B lazy LSP process lifecycle, initialize handshake, file synchronization, and TypeScript diagnostics.
+
 ## Slice 1.3 status: platform-correct path containment (S1)
 
 Done.

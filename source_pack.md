@@ -580,3 +580,31 @@ Applied:
 Focused verification: `pnpm exec tsc --noEmit` 0, `git diff --check` 0, `cargo test --locked modules::reality` 9 passed, `cargo test --locked modules::fs::watch` 1 passed + 1 host probe ignored, explicit native-grep benchmark passed.
 
 Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 136 passed (16 files), build 0 across 3156 modules, cargo check/clippy 0, cargo test 127 lib passed + 2 intentional diagnostics ignored + 3 harness passed.
+
+## Accelerated V1 Slice A: selective repo tools, semantic boundary, and truthful receipts
+
+Source-parity packet:
+
+- Slice: expose CodeReality through narrow selective tools, add the optional semantic-provider boundary without pretending an unavailable language server is connected, and make receipt verdicts depend on real command exit status.
+- Atlas files inspected: `src-tauri/src/modules/reality/{mod,index,projection}.rs`, `src-tauri/src/modules/proc.rs`, `src-tauri/src/lib.rs`, `src/modules/ai/tools/{reality,shell,tools}.ts`, `src/modules/ai/lib/native.ts`, and `src/modules/ai/proof/{contracts,recorder,journal}.ts`.
+- Primary documentation refreshed: official LSP `3.17` specification server lifecycle, initialize handshake, synchronization requirements, and language-feature request model.
+- opensrc refreshed through the authenticated GitHub CLI keyring: `anomalyco/opencode`, `microsoft/language-server-protocol`, `typescript-language-server/typescript-language-server`, `princeton-nlp/SWE-agent`, `SWE-agent/mini-swe-agent`, and `All-Hands-AI/OpenHands`.
+- Exact upstream files inspected: `anomalyco/opencode:packages/opencode/src/lsp/{lsp,client}.ts`; `microsoft/language-server-protocol:_specifications/lsp/3.17/{specification.md,general/initialize.md}`; `typescript-language-server:README.md`, `package.json`, and `src/cli.ts`; `SWE-agent/mini-swe-agent:tests/environments/test_local.py`, `tests/config/test_swebench_template.py`, and `src/minisweagent/models/utils/actions_toolcall.py`; `All-Hands-AI/OpenHands:openhands/app_server/event/{event_service,event_service_base,filesystem_event_service}.py`.
+- Disposition: `ADAPT` OpenCode's provider status, extension routing, lazy-start boundary, broken-provider visibility, and bounded semantic surface. Slice A lands the provider registry and availability shell first; semantic process startup remains lazy and belongs to Slice B. `REJECT` silently installing language servers or claiming semantic evidence while the provider is unavailable.
+- Disposition: `ADAPT` mini-SWE-agent's structured command observation: command exit status and timeout state are authoritative receipt inputs. `REJECT` the existing Atlas behavior where any shell tool result counted as a passing check.
+- Disposition: `ADAPT` OpenHands' independently addressable event records through the existing Atlas proof journal. Keep the small local receipt contract; do not add a second trace engine.
+- Atlas-owned integration: reuse the M2-V snapshot and projection response for bounded `repo_status`, `repo_map`, `find_symbol`, `find_references`, and `impact_candidates`; add an optional native semantic provider registry; add a pure verification planner; classify shell checks by actual exit and timeout fields; and make unverified runs visibly `incomplete`.
+- Tests required: bounded selective-tool helpers, missing semantic provider status, verification suggestions, nonzero exit failure, timeout failure, successful exit pass, and changed-without-check incomplete verdict.
+
+Applied:
+
+- Added selective CodeReality wrappers without a second index: `repo_status`, `repo_map`, `find_symbol`, `find_references`, and `impact_candidates` all project from the existing lazy M2-V snapshot.
+- Added `agent_lsp_status` with extension routing for TypeScript, Python, and Rust. It checks real executable availability, including Unix execute bits and Windows command extensions, but never starts a server or claims semantic evidence.
+- Added `lsp_status` to the main loop and read-only subagents. Its response states `semantic_requests: not_started`.
+- Added `verification_plan` as a pure suggestion surface. Suggested commands are explicitly not executed evidence.
+- Added shell-command durations and changed proof receipts so only a successful foreground `bash_run` result records a verification check. Nonzero exits, timeouts, and malformed results fail the run; runs with no successful check finish as `incomplete`.
+- Added frontend and native regressions for selective projection helpers, semantic status summaries, verification suggestions, successful exits, nonzero exits, timeouts, mutation-only incompleteness, executable discovery, and non-executable rejection.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 17 passed, `cargo test --locked lsp::` 3 passed.
+
+Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, Vitest 146 passed (19 files), production build 0 across 3158 modules, cargo check/clippy 0, cargo test 130 lib passed + 2 intentional diagnostics ignored + 3 harness passed.

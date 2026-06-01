@@ -1,6 +1,6 @@
 mod modules;
 
-use modules::{agent, fs, git, net, pty, reality, secrets, shell, workspace};
+use modules::{agent, fs, git, lsp, net, pty, reality, secrets, shell, workspace};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_window_state::StateFlags;
@@ -158,6 +158,7 @@ pub fn run() {
             fs::grep::fs_glob,
             fs::grep::agent_fs_glob,
             reality::agent_reality_context,
+            lsp::agent_lsp_status,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,

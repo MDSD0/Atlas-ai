@@ -3,10 +3,12 @@ import { buildEditTools } from "./edit";
 import { buildFsTools } from "./fs";
 import { buildRealityTools } from "./reality";
 import { buildSearchTools } from "./search";
+import { buildSemanticTools } from "./semantic";
 import { buildShellTools } from "./shell";
 import { buildSubagentTools } from "./subagent";
 import { buildTerminalTools } from "./terminal";
 import { buildTodoTools } from "./todo";
+import { buildVerificationTools } from "./verification";
 
 export {
   atlasContextBlock,
@@ -41,6 +43,8 @@ export function buildTools(ctx: import("./context").ToolContext) {
     ...buildEditTools(ctx),
     ...buildSearchTools(ctx),
     ...buildRealityTools(ctx),
+    ...buildSemanticTools(ctx),
+    ...buildVerificationTools(),
     ...buildShellTools(ctx),
     ...buildSubagentTools(ctx),
     ...buildTerminalTools(ctx),

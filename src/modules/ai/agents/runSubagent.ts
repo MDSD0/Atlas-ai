@@ -6,6 +6,8 @@ import type { ToolContext } from "../tools/context";
 import { buildFsTools } from "../tools/fs";
 import { buildRealityTools } from "../tools/reality";
 import { buildSearchTools } from "../tools/search";
+import { buildSemanticTools } from "../tools/semantic";
+import { buildVerificationTools } from "../tools/verification";
 import { SUBAGENTS, type SubagentType } from "./registry";
 
 const SUBAGENT_MAX_STEPS = 12;
@@ -42,6 +44,8 @@ export async function runSubagent({
     ...buildFsTools(toolContext),
     ...buildRealityTools(toolContext),
     ...buildSearchTools(toolContext),
+    ...buildSemanticTools(toolContext),
+    ...buildVerificationTools(),
   };
   const tools: Record<string, unknown> = {};
   for (const t of def.tools) {

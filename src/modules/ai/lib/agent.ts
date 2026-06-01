@@ -36,6 +36,15 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
     glob: (i) => `Globbing ${ellipsize(String(i.pattern ?? ""), 40)}`,
     repo_context: (i) =>
       `Mapping ${ellipsize(String(i.task ?? "repository"), 40)}`,
+    repo_status: () => "Reading repository status",
+    repo_map: (i) => `Mapping ${ellipsize(String(i.task ?? "repository"), 40)}`,
+    find_symbol: (i) => `Finding ${ellipsize(String(i.symbol ?? ""), 40)}`,
+    find_references: (i) =>
+      `Tracing ${ellipsize(String(i.symbol ?? ""), 40)}`,
+    impact_candidates: (i) =>
+      `Scoping ${ellipsize(String(i.symbol ?? ""), 40)}`,
+    lsp_status: () => "Checking semantic provider",
+    verification_plan: () => "Planning verification",
     edit: (i) => `Editing ${shortPath(i.path)}`,
     multi_edit: (i) => `Editing ${shortPath(i.path)}`,
     write_file: (i) => `Writing ${shortPath(i.path)}`,

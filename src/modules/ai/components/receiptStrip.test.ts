@@ -31,6 +31,7 @@ describe("shouldShowReceipt", () => {
   it("always shows a finished verdict, even with no events", () => {
     expect(shouldShowReceipt(summary({ status: "passed" }))).toBe(true);
     expect(shouldShowReceipt(summary({ status: "failed" }))).toBe(true);
+    expect(shouldShowReceipt(summary({ status: "incomplete" }))).toBe(true);
     expect(shouldShowReceipt(summary({ status: "cancelled" }))).toBe(true);
   });
 });

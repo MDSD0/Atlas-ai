@@ -63,7 +63,7 @@ describe("RunRecorder", () => {
       "/repo/a.ts",
     ]);
     expect(run?.verdict?.checks.items.map((c) => c.preview)).toEqual([
-      "npm test",
+      "npm test (exit 0)",
     ]);
     // The mutation produced a changed-file artifact.
     expect(run?.artifacts.map((a) => a.pathOrCommand.preview)).toEqual([
@@ -125,5 +125,66 @@ describe("RunRecorder", () => {
     const payload = run?.events[0].boundedPayload;
     expect(payload?.truncated).toBe(true);
     expect(payload!.preview.length).toBeLessThan(huge.length);
+  });
+
+  it("marks a non-zero foreground shell result failed", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "bash_run",
+      input: { command: "pnpm test" },
+      output: { exit_code: 1, timed_out: false, stderr: "failed" },
+    });
+    await rec.finish();
+
+    const run = await journal.getRun(rec.runId);
+    expect(run?.events[0].kind).toBe("shell.bash_run.failed");
+    expect(run?.status).toBe("failed");
+    expect(run?.verdict?.checks.originalCount).toBe(0);
+    expect(run?.verdict?.unresolvedFailures.items[0].preview).toContain(
+      "exited 1",
+    );
+  });
+
+  it("marks a timed-out foreground shell result failed", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "bash_run",
+      input: { command: "pnpm test" },
+      output: { exit_code: null, timed_out: true },
+    });
+    await rec.finish();
+
+    const run = await journal.getRun(rec.runId);
+    expect(run?.status).toBe("failed");
+    expect(run?.verdict?.unresolvedFailures.items[0].preview).toContain(
+      "timed out",
+    );
+  });
+
+  it("keeps a mutation-only run incomplete", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "write_file",
+      input: { path: "/repo/out.ts" },
+      output: { ok: true },
+    });
+    await rec.finish();
+
+    const run = await journal.getRun(rec.runId);
+    expect(run?.status).toBe("incomplete");
+    expect(run?.verdict?.changedFiles.originalCount).toBe(1);
+    expect(run?.verdict?.checks.originalCount).toBe(0);
   });
 });

@@ -48,6 +48,7 @@ const MUTATION_TOOLS = new Set([
   "create_directory",
 ]);
 const SHELL_TOOLS = new Set(["bash_run", "bash_background"]);
+const VERIFICATION_TOOL = "bash_run";
 
 function isErrorResult(output: unknown): output is { error: string } {
   return (
@@ -56,6 +57,26 @@ function isErrorResult(output: unknown): output is { error: string } {
     "error" in output &&
     typeof (output as { error: unknown }).error === "string"
   );
+}
+
+function shellFailure(record: ToolStepRecord): string | null {
+  if (record.toolName !== VERIFICATION_TOOL) return null;
+  if (typeof record.output !== "object" || record.output === null) {
+    return "missing structured shell result";
+  }
+  const output = record.output as Record<string, unknown>;
+  if (output.timed_out === true) return "timed out";
+  if (typeof output.exit_code !== "number") return "missing exit code";
+  return output.exit_code === 0 ? null : `exited ${output.exit_code}`;
+}
+
+function shellCheckSummary(
+  command: string,
+  output: Record<string, unknown>,
+): string {
+  const duration =
+    typeof output.duration_ms === "number" ? `, ${output.duration_ms}ms` : "";
+  return `${command} (exit ${String(output.exit_code)}${duration})`;
 }
 
 function eventKind(toolName: string, failed: boolean): string {
@@ -136,7 +157,8 @@ export class RunRecorder {
   }
 
   async recordTool(record: ToolStepRecord): Promise<void> {
-    const failed = isErrorResult(record.output);
+    const shellError = shellFailure(record);
+    const failed = isErrorResult(record.output) || shellError !== null;
     const kind = eventKind(record.toolName, failed);
     const summary = summarize(record.toolName, record.input);
     await this.journal.appendEvent(this.run.id, {
@@ -147,7 +169,10 @@ export class RunRecorder {
     this.eventCount += 1;
 
     if (failed) {
-      this.failures.push(`${summary}: ${(record.output as { error: string }).error}`);
+      const detail = isErrorResult(record.output)
+        ? record.output.error
+        : (shellError as string);
+      this.failures.push(`${summary}: ${detail}`);
       this.emit();
       return;
     }
@@ -160,8 +185,18 @@ export class RunRecorder {
         contentHash: "",
       });
     }
-    if (SHELL_TOOLS.has(record.toolName) && typeof record.input.command === "string") {
-      this.shellChecks.push(record.input.command);
+    if (
+      record.toolName === VERIFICATION_TOOL &&
+      typeof record.input.command === "string" &&
+      typeof record.output === "object" &&
+      record.output !== null
+    ) {
+      this.shellChecks.push(
+        shellCheckSummary(
+          record.input.command,
+          record.output as Record<string, unknown>,
+        ),
+      );
     }
     this.emit();
   }
@@ -169,8 +204,8 @@ export class RunRecorder {
   /**
    * Close the run exactly once. The verdict is computed from observed evidence:
    * a cancelled run is "cancelled"; any recorded failure makes it "failed";
-   * otherwise "passed". Idempotent — extra calls (e.g. abort then finish) are
-   * ignored so the first authoritative verdict wins.
+   * a successful foreground shell check makes it "passed"; otherwise it is
+   * "incomplete". Extra calls are ignored so the first verdict wins.
    */
   async finish(outcome: {
     cancelled?: boolean;
@@ -182,7 +217,9 @@ export class RunRecorder {
       ? "cancelled"
       : outcome.errored || this.failures.length > 0
         ? "failed"
-        : "passed";
+        : this.shellChecks.length === 0
+          ? "incomplete"
+          : "passed";
     const verdict = await this.journal.finishRun(this.run.id, {
       status,
       changedFiles: [...this.changedFiles],

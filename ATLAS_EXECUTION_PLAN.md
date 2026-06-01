@@ -797,6 +797,25 @@ Implementation checkpoint `2026-06-01`:
 - Existing native watcher events invalidate snapshots when delivered. CodeReality separately expires cached snapshots after `4000ms`, keeping correctness inside the `<5s` refresh bound on hosts where native events are unavailable.
 - The native grep benchmark remains favorable: `68.198333ms` for 25 Atlas iterations versus `138.564584ms` for 25 `rg` subprocess iterations. Preserve native grep.
 
+### Accelerated V1 ten-slice queue
+
+Status: active as of `2026-06-01`.
+
+The remaining V1 is delivered as ten measurable vertical slices. Optional providers stay optional, but their boundaries, degraded states, and tests are not optional.
+
+1. `A`: selective CodeReality tools, semantic provider status, verification suggestions, and truthful receipts.
+2. `B`: lazy LSP process lifecycle with TypeScript diagnostics first; unavailable providers remain graceful.
+3. `C`: post-edit diagnostic refresh and receipt attachment.
+4. `D`: LocalRecords memory provider with inspectable persistence and project isolation.
+5. `E`: memory invalidation against changed source artifacts; current repo truth always wins.
+6. `F`: optional SimpleMem health-check adapter and MemoryLab fixture; LocalRecords remains the default.
+7. `G`: scoped local skill packages and bounded lifecycle hooks, policy subordinate.
+8. `H`: optional MCP client boundary with explicit disabled-by-default policy and connector studies only.
+9. `I`: local metrics and a compact context inspector covering reality, LSP, memory, skills, MCP, and proof.
+10. `J`: scripted eval layer, desktop smoke layer, golden fixture, dependency review, and release qualification report.
+
+Each slice records source parity before implementation, lands focused tests, runs the relevant verifier layers, and patches this queue when measured reality changes a decision.
+
 ### Slice 3.1: Shared repository ignore policy
 
 Active Atlas files:

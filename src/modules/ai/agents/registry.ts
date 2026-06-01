@@ -15,6 +15,13 @@ export type SubagentDef = {
 
 const READ_ONLY_TOOLS = [
   "repo_context",
+  "repo_status",
+  "repo_map",
+  "find_symbol",
+  "find_references",
+  "impact_candidates",
+  "lsp_status",
+  "verification_plan",
   "read_file",
   "list_directory",
   "grep",
