@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  checkMutationAllowed,
   resolvePath,
+  UNBOUND_MUTATION_ERROR,
   validateWithinWorkspace,
   type AtlasToolProjectContext,
 } from "./context";
@@ -61,6 +63,19 @@ describe("Atlas path resolution", () => {
   });
 });
 
+describe("Atlas unbound mutation guard", () => {
+  it("blocks mutation when no project is bound (e.g. Create TODO.md)", () => {
+    const blocked = checkMutationAllowed(
+      ctx({ projectId: null, workspaceRoot: null }),
+    );
+    expect(blocked).toEqual({ error: UNBOUND_MUTATION_ERROR });
+  });
+
+  it("allows mutation when a project is bound", () => {
+    expect(checkMutationAllowed(ctx({ workspaceRoot: "/repo" }))).toBeNull();
+  });
+});
+
 describe("Atlas workspace boundary", () => {
   const canonicalize = async (path: string) => {
     if (path === "/repo" || path.startsWith("/repo/")) return path;
@@ -84,5 +99,104 @@ describe("Atlas workspace boundary", () => {
     await expect(
       validateWithinWorkspace("/repo/new/deep/notes.md", ctx(), canonicalize),
     ).resolves.toEqual({ ok: true });
+  });
+
+  it("rejects case-variant siblings when native canonicalization keeps them distinct", async () => {
+    await expect(
+      validateWithinWorkspace("/Repo/src/app.ts", ctx(), async (path) => path),
+    ).resolves.toMatchObject({ ok: false });
+  });
+
+  it("rejects a Unix sibling whose filename contains a backslash", async () => {
+    await expect(
+      validateWithinWorkspace("/repo\\escape/file.ts", ctx(), async (path) => path),
+    ).resolves.toMatchObject({ ok: false });
+  });
+
+  it("rejects a sibling that only shares the root prefix", async () => {
+    await expect(
+      validateWithinWorkspace("/repository/file.ts", ctx(), async (path) => path),
+    ).resolves.toMatchObject({ ok: false });
+  });
+
+  it("allows a macOS-style case variant only when native canonicalization resolves it into root", async () => {
+    const canonicalizeMacPath = async (path: string) => {
+      if (path === "/Users/me/Repo") return "/Users/me/Repo";
+      if (path === "/users/me/repo/src/app.ts") return "/Users/me/Repo/src/app.ts";
+      throw new Error("missing");
+    };
+
+    await expect(
+      validateWithinWorkspace(
+        "/users/me/repo/src/app.ts",
+        ctx({ workspaceRoot: "/Users/me/Repo" }),
+        canonicalizeMacPath,
+      ),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("allows Windows drive paths after native canonicalization", async () => {
+    const canonicalizeWindowsPath = async (path: string) => {
+      if (path === "C:\\Repo") return "C:/Repo";
+      if (path === "c:\\repo\\src\\app.ts") return "C:/Repo/src/app.ts";
+      throw new Error("missing");
+    };
+
+    await expect(
+      validateWithinWorkspace(
+        "c:\\repo\\src\\app.ts",
+        ctx({ workspaceRoot: "C:\\Repo" }),
+        canonicalizeWindowsPath,
+      ),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("allows Windows UNC descendants after native canonicalization", async () => {
+    const canonicalizeUncPath = async (path: string) => {
+      if (path === "\\\\server\\share\\Repo") return "//server/share/Repo";
+      if (path === "\\\\server\\share\\Repo\\src\\app.ts") {
+        return "//server/share/Repo/src/app.ts";
+      }
+      throw new Error("missing");
+    };
+
+    await expect(
+      validateWithinWorkspace(
+        "\\\\server\\share\\Repo\\src\\app.ts",
+        ctx({ workspaceRoot: "\\\\server\\share\\Repo" }),
+        canonicalizeUncPath,
+      ),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("allows missing Windows-style descendants when an ancestor canonicalizes", async () => {
+    const canonicalizeWindowsAncestor = async (path: string) => {
+      if (path === "C:\\Repo" || path === "C:/Repo") return "C:/Repo";
+      throw new Error("missing");
+    };
+
+    await expect(
+      validateWithinWorkspace(
+        "C:\\Repo\\new\\deep\\file.ts",
+        ctx({ workspaceRoot: "C:\\Repo" }),
+        canonicalizeWindowsAncestor,
+      ),
+    ).resolves.toEqual({ ok: true });
+  });
+
+  it("rejects traversal after native canonicalization", async () => {
+    const canonicalizeTraversal = async (path: string) => {
+      if (path === "/repo") return "/repo";
+      if (path === "/repo/../tmp/notes.md") return "/tmp/notes.md";
+      throw new Error("missing");
+    };
+
+    await expect(
+      validateWithinWorkspace(
+        "/repo/../tmp/notes.md",
+        ctx(),
+        canonicalizeTraversal,
+      ),
+    ).resolves.toMatchObject({ ok: false });
   });
 });

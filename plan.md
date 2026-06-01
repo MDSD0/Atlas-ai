@@ -303,3 +303,71 @@ Done:
 Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 91 passed (8 files), build 0, cargo clippy 0, cargo test 104 passed (101 + 3 new harness).
 
 M0 complete except Slice 0.4 (CI matrix), which needs the GitHub Actions runner and is deferred until first push.
+
+## Slice 1.1 status: native filesystem authorization
+
+Done. Native filesystem IPC is gated through the workspace registry. Existing-path operations canonicalize the target; mutation operations canonicalize the deepest existing parent so delete and rename do not follow a final-component symlink.
+
+Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 91 passed, build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+## Slice 1.2 status: fail-closed workspace binding
+
+Done.
+
+- Frontend workspace binding now mutates state only after native authorization succeeds.
+- Failed folder opens and session restores preserve the existing project and recents while surfacing a readable error.
+- WSL keeps the selected logical workspace path after authorization; Rust's canonical host path is an authorization result, not the frontend shell path.
+- Added store tests for authorization ordering and rejection preservation.
+
+Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 93 passed (9 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Next: Slice 1.3 platform-aware path containment.
+
+## Slice 1.3 status: platform-correct path containment
+
+Done.
+
+- Frontend project containment no longer lowercases every canonical path.
+- Native canonical display paths compare case-exactly; raw Windows drive and UNC input normalize separators only while locating an existing ancestor for new targets.
+- Unix filenames containing backslashes cannot be mistaken for descendants.
+- Added eight regressions for case-sensitive siblings, macOS canonical behavior, drive paths, UNC paths, missing descendants, and traversal.
+
+Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 101 passed (9 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Next: Slice 1.4 real stale-edit fingerprint rejection.
+
+## Slice 1.4 status: real stale-edit fingerprint rejection
+
+Done.
+
+- Added shared UTF-8 fingerprints for agent read caches.
+- Direct edits reject stale prior reads with `code: "stale_read"` before writing.
+- Delayed Plan Mode writes carry and revalidate the reviewed source fingerprint.
+- Added five regressions for changed, unchanged non-ASCII, binary, queued stale, and queued fresh paths.
+
+Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 106 passed (11 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Next: Slice 1.5 serialize same-file mutations.
+
+## Feature slice: shared project/session binding flow
+
+User-requested UX slice (open/add project from composer + sidebar + welcome, one shared flow). Not a numbered plan slice; supports M1 trusted-editing usability.
+
+Files added:
+
+- `src/modules/workspace/projectFlow.ts`: shared `openProjectFromDialog`, `openProjectFromPath`, `startUnboundSession`, `switchToProject`, `listKnownProjects`.
+- `src/modules/ai/components/ProjectChip.tsx`: composer project chip.
+
+Files changed:
+
+- `src/modules/ai/components/AiInputBar.tsx`: mount `ProjectChip` left of the model pill.
+- `src/modules/explorer/FileExplorer.tsx`: header "Open project" icon; no-folder + broken-workspace states route through the shared flow; broken state offers Locate folder / Open unbound copy / Remove.
+- `src/modules/workspace/WelcomeScreen.tsx`: open-folder/open-recent route through the shared flow.
+- `src/modules/workspace/index.ts`: export the shared flow + `workspaceBindingErrorMessage`.
+- `src/modules/ai/tools/context.ts`: add `checkMutationAllowed` + `UNBOUND_MUTATION_ERROR`.
+- `src/modules/ai/tools/fs.ts`, `edit.ts`: use `checkMutationAllowed` in `write_file`, `create_directory`, `edit`, `multi_edit`.
+- `src/modules/ai/tools/context.test.ts`: 2 tests for unbound mutation guard.
+
+Behavior: selecting/adding a folder creates or switches to a project-bound session; unbound creates an unbound session that allows chat but fails mutation closed; switching sessions restores the bound workspace; missing-path degraded state has Locate/Open-unbound/Remove. Branch chip + dirty-state path untouched. Vague progress/grid icons not repurposed.
+
+Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 112 passed (12 files; +2 unbound-guard), `verify-atlas.sh --fast` OK. GUI flows are user-verify (listed in live_canvas.md).

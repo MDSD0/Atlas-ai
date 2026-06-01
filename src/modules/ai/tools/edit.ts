@@ -4,26 +4,39 @@ import { native } from "../lib/native";
 import { checkWritableCanonical } from "../lib/security";
 import { newQueuedEditId, usePlanStore } from "../store/planStore";
 import {
+  checkMutationAllowed,
   resolvePath,
   validateWithinWorkspace,
   type ToolContext,
 } from "./context";
+import {
+  fingerprintText,
+  fingerprintsMatch,
+  STALE_READ_ERROR,
+  type ReadFingerprint,
+} from "./fingerprint";
+import { withFileMutationQueue } from "./fileMutationQueue";
 
 type EditResult =
   | { ok: true; replacements: number; bytesWritten: number; path: string }
-  | { error: string; path: string };
+  | { error: string; path: string; code?: "stale_read" };
 
-function djb2(s: string): number {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return h >>> 0;
-}
-
-async function applyEdits(
+export async function applyEdits(
   abs: string,
   edits: { old_string: string; new_string: string; replace_all?: boolean }[],
   kind: "edit" | "multi_edit",
-  readCache: Map<string, { size: number; hash: number }>,
+  readCache: Map<string, ReadFingerprint>,
+): Promise<EditResult> {
+  return withFileMutationQueue(abs, () =>
+    applyEditsUnlocked(abs, edits, kind, readCache),
+  );
+}
+
+async function applyEditsUnlocked(
+  abs: string,
+  edits: { old_string: string; new_string: string; replace_all?: boolean }[],
+  kind: "edit" | "multi_edit",
+  readCache: Map<string, ReadFingerprint>,
 ): Promise<EditResult> {
   const r = await native.readFile(abs);
   if (r.kind === "binary")
@@ -32,6 +45,17 @@ async function applyEdits(
     return { error: `file too large (${r.size} bytes)`, path: abs };
 
   const original = r.content;
+  const prior = readCache.get(abs);
+  if (!prior) {
+    return {
+      error: "must call read_file on this path first (read-before-edit invariant).",
+      path: abs,
+    };
+  }
+  const currentFingerprint = fingerprintText(original);
+  if (!fingerprintsMatch(prior, currentFingerprint)) {
+    return { error: STALE_READ_ERROR, code: "stale_read", path: abs };
+  }
   let content = original;
   let totalReplacements = 0;
 
@@ -98,6 +122,7 @@ async function applyEdits(
       originalContent: original,
       proposedContent: content,
       isNewFile: false,
+      expectedFingerprint: currentFingerprint,
     });
     return {
       ok: true,
@@ -109,7 +134,7 @@ async function applyEdits(
 
   try {
     await native.writeFile(abs, content);
-    readCache.set(abs, { size: content.length, hash: djb2(content) });
+    readCache.set(abs, fingerprintText(content));
     return {
       ok: true,
       replacements: totalReplacements,
@@ -137,9 +162,8 @@ export function buildEditTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path, old_string, new_string, replace_all }) => {
         const project = ctx.getProjectContext();
-        if (!project.workspaceRoot) {
-          return { error: "no project is bound; refusing workspace mutation", path };
-        }
+        const blocked = checkMutationAllowed(project);
+        if (blocked) return { ...blocked, path };
         const reqPath = resolvePath(path, project);
         const safety = await checkWritableCanonical(reqPath, native.canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
@@ -180,9 +204,8 @@ export function buildEditTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path, edits }) => {
         const project = ctx.getProjectContext();
-        if (!project.workspaceRoot) {
-          return { error: "no project is bound; refusing workspace mutation", path };
-        }
+        const blocked = checkMutationAllowed(project);
+        if (blocked) return { ...blocked, path };
         const reqPath = resolvePath(path, project);
         const safety = await checkWritableCanonical(reqPath, native.canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };

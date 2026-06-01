@@ -1,4 +1,4 @@
-import { FilePlus as FileAddIcon, Folder as Folder01Icon, FolderPlus as FolderAddIcon, RefreshCw as Refresh01Icon, Search as Search01Icon } from "lucide-react";
+import { FilePlus as FileAddIcon, Folder as Folder01Icon, FolderOpen as FolderOpenIcon, FolderPlus as FolderAddIcon, RefreshCw as Refresh01Icon, Search as Search01Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -27,7 +27,12 @@ import { fileIconUrl, folderIconUrl } from "./lib/iconResolver";
 import { COMPACT_CONTENT, COMPACT_ITEM } from "./lib/menuItemClass";
 import { useFileTree } from "./lib/useFileTree";
 import { useGlobalShortcuts } from "@/modules/shortcuts";
-import { openFolderDialog, useWorkspaceStore } from "@/modules/workspace";
+import {
+  openProjectFromDialog,
+  startUnboundSession,
+  useWorkspaceStore,
+  workspaceBindingErrorMessage,
+} from "@/modules/workspace";
 
 export type FileExplorerHandle = {
   focus: () => void;
@@ -251,8 +256,11 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
 
     if (!rootPath) {
       const openFolder = async () => {
-        const path = await openFolderDialog();
-        if (path) await useWorkspaceStore.getState().setWorkspaceRoot(path);
+        try {
+          await openProjectFromDialog();
+        } catch (error) {
+          window.alert(workspaceBindingErrorMessage(error));
+        }
       };
 
       return (
@@ -263,7 +271,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             className="text-muted-foreground/60"
           />
           <div className="text-xs text-muted-foreground mb-2">
-            No folder open
+            No project open
           </div>
           <div className="flex flex-col gap-2 w-full max-w-[200px]">
             <Button
@@ -272,15 +280,15 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               className="w-full text-[11px] font-medium bg-[#A5E605]/10 text-[#A5E605] hover:bg-[#A5E605]/20 border border-[#A5E605]/30 shadow-none"
               onClick={openFolder}
             >
-              Start an existing one
+              Open project…
             </Button>
             <Button
               variant="outline"
               size="sm"
               className="w-full text-[11px] font-medium border-border/60 hover:text-[#A5E605] hover:border-[#A5E605]/40 hover:bg-[#A5E605]/5 transition-colors"
-              onClick={openFolder}
+              onClick={() => startUnboundSession()}
             >
-              Start a fresh one
+              Don&apos;t work in a project
             </Button>
           </div>
         </div>
@@ -290,7 +298,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
     // Broken-workspace: rootPath set but directory failed to load
     const rootNode = tree.nodes[rootPath];
     if (rootNode?.status === "error") {
-      const { setWorkspaceRoot, clearWorkspace, removeRecent } = useWorkspaceStore.getState();
+      const { removeRecent } = useWorkspaceStore.getState();
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
           <Folder01Icon
@@ -314,21 +322,31 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               type="button"
               className="rounded-md border border-border/60 bg-card px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={async () => {
-                const path = await openFolderDialog();
-                if (path) await setWorkspaceRoot(path);
+                try {
+                  await openProjectFromDialog();
+                } catch (error) {
+                  window.alert(workspaceBindingErrorMessage(error));
+                }
               }}
             >
-              Locate another folder
+              Locate folder
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-border/60 bg-card px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
+              onClick={() => startUnboundSession()}
+            >
+              Open unbound copy
             </button>
             <button
               type="button"
               className="text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               onClick={() => {
                 removeRecent(rootPath);
-                clearWorkspace();
+                startUnboundSession();
               }}
             >
-              Remove from recent
+              Remove
             </button>
           </div>
         </div>
@@ -473,6 +491,23 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             />
             {basename(rootPath)}
           </span>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-6 text-muted-foreground hover:text-foreground"
+            onClick={async () => {
+              try {
+                await openProjectFromDialog();
+              } catch (error) {
+                window.alert(workspaceBindingErrorMessage(error));
+              }
+            }}
+            title="Open project"
+            aria-label="Open project"
+          >
+            <FolderOpenIcon size={13} strokeWidth={1.5} />
+          </Button>
 
           <Button
             variant="ghost"

@@ -200,3 +200,62 @@ Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 91, build 0, clippy 0
 Risk: GUI explorer/editor smoke not run here (needs display; phantom dev shell unreliable). Recommended user test: `pnpm tauri dev`, open a folder, confirm explorer lists + file opens + edit saves.
 
 Next: Slice 1.2 fail-closed workspace binding (S1).
+
+## Feature slice status: shared project/session binding flow
+
+Done. One shared flow, three entry points.
+
+- `src/modules/workspace/projectFlow.ts` (new): `openProjectFromDialog`, `openProjectFromPath`, `startUnboundSession`, `switchToProject`, `listKnownProjects`. All bind workspace then create/switch a project-bound session; switching restores the bound workspace via the existing `switchSession` path.
+- Composer project chip (`ProjectChip.tsx`, new) in the AiInputBar toolbar: existing projects, "Add project (open folder)", "Don't work in a project" (unbound).
+- Explorer header: added an "Open project" folder-open icon. No-folder and broken-workspace states route through the shared flow; broken state now offers Locate folder / Open unbound copy / Remove.
+- Welcome screen: open-folder and open-recent now go through `projectFlow` (already created a session before; now DRY).
+- Unbound fail-closed: extracted `checkMutationAllowed` in `context.ts`; `write_file`, `create_directory`, `edit`, `multi_edit` use it. Unbound sessions allow chat + reads but refuse mutation ("Create TODO.md" blocked).
+
+Did NOT repurpose the vague progress/grid icons (they are agent-panel dock toggles, not project/folder).
+
+Green (clean shell): tsc 0, vitest 112 passed (12 files; +2 unbound-guard tests), verify-atlas --fast OK.
+
+User-verify (GUI, ~3 min): composer chip open-folder; sidebar "Open project" icon; welcome "Open Folder"; ask agent "Create TODO.md" while Unbound (must refuse); open Project A, switch to a Project B session, confirm explorer + branch chip follow.
+
+## Slice 1.2 status: fail-closed workspace binding (S1)
+
+Done.
+
+- `setWorkspaceRoot()` now treats rejected native `workspaceAuthorize()` calls as failed trust transitions. It does not mutate the bound project or recents until native authorization succeeds.
+- The frontend keeps the selected logical workspace path after authorization. This is intentional for WSL: Rust canonicalization may return a host UNC or drive path while the shell and workspace UI still need the logical WSL path.
+- Welcome, explorer, and sessions folder-opening surfaces display a readable authorization error.
+- Cross-project session restore authorizes the destination before disposing panes, so a denied switch preserves the current workspace. The fallback restore path catches errors instead of leaving an unhandled rejection.
+- Added store-level coverage proving delayed authorization cannot mutate state early and rejected authorization preserves the previous binding plus recents.
+
+Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 93 passed (9 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Environment note: macOS `trustd` / `syspolicyd` temporarily delayed fresh Node startup during the serialized run. Node 22.16 recovered without a project change.
+
+Next: Slice 1.3 platform-aware path containment (S1).
+
+## Slice 1.3 status: platform-correct path containment (S1)
+
+Done.
+
+- Removed unconditional lowercase comparison from the frontend project boundary.
+- Canonical native paths now compare case-exactly. This follows filesystem-resolved reality and stays correct for Linux, case-sensitive APFS, Windows per-directory sensitivity, and WSL Linux paths.
+- Raw Windows drive and UNC input still normalize separators while walking upward to a canonical existing ancestor for new-file checks.
+- Unix backslashes remain legal filename characters and are never reinterpreted as separators during canonical comparison.
+- Added eight regressions covering case variants, Unix backslash siblings, raw-prefix siblings, macOS canonical behavior, Windows drive paths, UNC paths, missing Windows descendants, and traversal.
+
+Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 101 passed (9 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Next: Slice 1.4 real stale-edit fingerprint rejection (S1).
+
+## Slice 1.4 status: real stale-edit fingerprint rejection (S1)
+
+Done.
+
+- Added a shared UTF-8 fingerprint utility so native byte sizes and frontend cache sizes use one representation, including non-ASCII content.
+- Direct `edit` and `multi_edit` reread immediately before replacement and refuse with `code: "stale_read"` when the file changed after the prior agent read.
+- Plan Mode carries the reviewed source fingerprint and revalidates before delayed apply, so queued approvals cannot overwrite external work silently.
+- Added five regressions for external edits, non-ASCII content, binary refusal, queued stale rejection, and queued fresh acceptance.
+
+Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 106 passed (11 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Next: Slice 1.5 serialize same-file mutations (S1).

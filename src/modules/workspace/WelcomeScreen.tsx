@@ -9,8 +9,12 @@ import {
 
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
-import { openFolderDialog } from "./openFolderDialog";
-import { useWorkspaceStore, type RecentWorkspace } from "./workspaceStore";
+import { openProjectFromDialog, openProjectFromPath } from "./projectFlow";
+import {
+  useWorkspaceStore,
+  workspaceBindingErrorMessage,
+  type RecentWorkspace,
+} from "./workspaceStore";
 import { getOrCreateChat, useChatStore } from "@/modules/ai/store/chatStore";
 import { AiChatView } from "@/modules/ai/components/AiChat";
 import { AiInput } from "@/modules/ai/components/AiInputBar";
@@ -102,8 +106,7 @@ export function WelcomeScreen() {
 }
 
 function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
-  const { setWorkspaceRoot, recentWorkspaces, removeRecent } =
-    useWorkspaceStore();
+  const { recentWorkspaces, removeRecent } = useWorkspaceStore();
   const chat = useMemo(() => getOrCreateChat(sessionId), [sessionId]);
   const helpers = useChat<UIMessage>({ chat });
   const sessions = useChatStore((s) => s.sessions);
@@ -114,20 +117,20 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
     : "Session history";
 
   const handleOpenFolder = useCallback(async () => {
-    const path = await openFolderDialog();
-    if (path) {
-      await setWorkspaceRoot(path);
-      useChatStore.getState().newSession();
+    try {
+      await openProjectFromDialog();
+    } catch (error) {
+      window.alert(workspaceBindingErrorMessage(error));
     }
-  }, [setWorkspaceRoot]);
+  }, []);
 
-  const handleOpenRecent = useCallback(
-    async (path: string) => {
-      await setWorkspaceRoot(path);
-      useChatStore.getState().newSession();
-    },
-    [setWorkspaceRoot],
-  );
+  const handleOpenRecent = useCallback(async (path: string) => {
+    try {
+      await openProjectFromPath(path);
+    } catch (error) {
+      window.alert(workspaceBindingErrorMessage(error));
+    }
+  }, []);
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-background">

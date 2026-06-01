@@ -302,3 +302,95 @@ All 10 fs commands gated: `fs_read_file`, `fs_write_file`, `fs_stat`, `fs_canoni
 Process note: a first commit (23f0174) was pushed with a broken build because verify and commit were batched in one turn, so the commit landed before the RC=101 result was read. Two real defects were hidden: (a) the new read-reject tests used `.expect_err()` on `ReadResult`, which is not `Debug` (fixed by matching on the result in the test, leaving the production enum untouched); (b) grep.rs was never actually edited because a `/tmp` copy was read instead of the real file, so the Edit calls were rejected and grep stayed ungated. Both fixed and the commit amended. Lesson reinforced: never batch verify with commit; read the receipt first.
 
 Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 91, build 0, clippy 0, cargo test 106 lib + 3 harness = 109 (5 new auth tests: read-outside reject, read symlink-escape reject, write-outside reject, create-outside reject, delete-outside reject; all prior fs tests including symlink-delete preservation still pass).
+
+## Slice 1.2: fail-closed workspace binding (S1)
+
+Source-parity packet:
+
+- Slice: make frontend project binding fail closed when native workspace authorization rejects a selected root.
+- Atlas files inspected: `src/modules/workspace/workspaceStore.ts`, `WelcomeScreen.tsx`, `src/modules/explorer/FileExplorer.tsx`, `src/modules/ai/components/SessionsPanel.tsx`, `src/modules/ai/store/chatStore.ts`, `src/app/App.tsx`, `src/modules/ai/lib/native.ts`, `src-tauri/src/modules/workspace.rs`.
+- Primary docs refreshed: Tauri 2 `Calling Rust from the Frontend` and `Capabilities`. Tauri commands return errors across the IPC boundary; Atlas must treat a rejected custom command as a failed project-binding transition.
+- opensrc inspected: `crynta/terax-ai:src/app/App.tsx`, `anomalyco/opencode:packages/opencode/src/permission/index.ts`, `tauri-apps/tauri` cached source. Freshness: cached fallback because the active `gh auth token` lookup was unavailable in this shell.
+- Disposition: `ADAPT` OpenCode's explicit fail/deny shape at the project-binding boundary. `REJECT` Terax's ambient-cwd tolerance for this operation: a terminal cwd authorization may be best-effort, but selecting an Atlas project is an explicit trust transition and cannot mutate frontend state after native rejection.
+- WSL decision: preserve the selected logical workspace path after native authorization succeeds. Do not bind the canonical string returned by Rust because WSL resolution canonicalizes to a host UNC or drive path while frontend shell and workspace context still need the logical WSL path.
+- Tests required: successful authorization binds only after the promise resolves; rejected authorization leaves the prior project and recents unchanged; user-facing open and session-restore paths surface a readable error without tearing down the current workspace first.
+
+Applied:
+
+- `src/modules/workspace/workspaceStore.ts` now throws a readable error when `workspaceAuthorize` rejects and mutates the bound root plus recents only after authorization succeeds.
+- Folder-opening surfaces catch and display that error: `WelcomeScreen.tsx`, `FileExplorer.tsx`, and `SessionsPanel.tsx`.
+- `src/app/App.tsx` authorizes a session workspace before disposing the current panes, so a rejected switch preserves the visible workspace. `chatStore.ts` also catches fallback restore failures to avoid an unhandled promise rejection.
+- Added `src/modules/workspace/workspaceStore.test.ts` with success-ordering and rejection-preservation coverage.
+
+Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 93 passed (9 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Environment note: macOS `trustd` / `syspolicyd` delayed fresh Node process startup during verification. No project change was needed; the bounded Node 22.16 probe recovered and the serialized full gate completed successfully.
+
+## Slice 1.3: platform-correct path comparison (S1)
+
+Source-parity packet:
+
+- Slice: remove false frontend workspace authorization caused by unconditional case-folding and separator rewriting.
+- Atlas files inspected: `src/modules/ai/tools/context.ts`, `context.test.ts`, `src/modules/ai/lib/security.ts`, `src/modules/ai/lib/native.ts`, `src-tauri/src/modules/fs/mod.rs`, `fs/file.rs`, `src-tauri/src/modules/workspace.rs`, `src/lib/platform.ts`.
+- Primary docs refreshed: Tauri 2 `@tauri-apps/plugin-os` `platform()` reference, Node.js 22.16 `path` platform notes, Microsoft WSL `Case Sensitivity`, and Apple's APFS FAQ.
+- opensrc inspected: `crynta/terax-ai:src/modules/ai/tools/context.ts`, `anomalyco/opencode:packages/opencode/src/tool/external-directory.ts`, `anomalyco/opencode:packages/opencode/src/permission/index.ts`, `tauri-apps/plugins-workspace:plugins/os/guest-js/index.ts`. Freshness: cached fallback; the bounded focused hook was unavailable during the local process-startup delay.
+- Disposition: `ADAPT` Atlas's native `fs_canonicalize` / `to_canon` contract and Rust registry `Path::starts_with` shape for the narrower frontend project boundary. Native canonicalization already resolves platform filesystem behavior and emits forward slashes on Windows while deliberately preserving legal backslashes in Unix filenames.
+- Disposition: `STUDY` Tauri `platform()` and OpenCode's host-platform normalization. `REJECT` using a host-OS lowercase switch for authorization: Microsoft documents Windows per-directory case sensitivity and WSL Linux case-sensitive paths; Apple documents both case-sensitive and case-insensitive APFS variants. Host OS alone cannot prove the mounted filesystem's comparison semantics.
+- Atlas-owned integration: compare canonical native display paths case-exactly; normalize backslashes only while walking raw Windows-style drive or UNC input to find a canonical existing ancestor. Never reinterpret a Unix backslash filename as a separator.
+- Tests required: Linux case-variant sibling rejection, Unix backslash sibling rejection, prefix-sibling rejection, macOS native-canonical behavior, Windows drive and UNC coverage, missing Windows-style descendant resolution, and traversal rejection after canonicalization.
+
+Applied:
+
+- `src/modules/ai/tools/context.ts` now separates canonical comparison from raw Windows-style parent walking. Canonical native paths compare case-exactly; only raw drive or UNC input rewrites backslashes while locating an existing ancestor.
+- `context.test.ts` adds eight regressions: case-variant sibling, Unix backslash sibling, raw prefix sibling, macOS native-canonical behavior, Windows drive, UNC, missing Windows descendant, and canonical traversal rejection.
+- The new workspace-binding error helper imports point directly at `workspaceStore.ts`, so Slice 1.2 does not add another warning to the existing workspace barrel circular-chunk warning family.
+
+Verified (clean shell, final `verify-atlas.sh --all` exit 0): tsc 0, vitest 101 passed (9 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+## Slice 1.4: real stale-edit fingerprint rejection (S1)
+
+Source-parity packet:
+
+- Slice: replace cache-presence edit checks with content fingerprints validated immediately before direct and queued-plan writes.
+- Atlas files inspected: `src/modules/ai/tools/edit.ts`, `fs.ts`, `context.ts`, `src/modules/ai/store/chatStore.ts`, `planStore.ts`, `src/modules/ai/components/AgentRunBridge.tsx`, `tests/fixtures/stale-edit/value.ts`.
+- opensrc inspected: `anomalyco/opencode:packages/opencode/src/tool/edit.ts`, `anomalyco/opencode:packages/opencode/test/tool/edit.test.ts`, `earendil-works/pi:packages/coding-agent/src/core/tools/edit.ts`, `earendil-works/pi:packages/coding-agent/src/core/tools/file-mutation-queue.ts`. Freshness: cached fallback; the bounded focused hook remained unavailable during the local process-startup delay.
+- Disposition: `ADAPT` Pi and OpenCode's read-transform-write placement: reread the actual file at the mutation boundary, then compute the replacement from that fresh text. Atlas adds a stronger session invariant: the fresh text must match the fingerprint recorded by the agent's prior `read_file`.
+- Disposition: `ADAPT` the same freshness check for Atlas Plan Mode. A queued edit is a delayed reviewed write; applying it without revalidation would allow external work created after review to be overwritten.
+- Atlas-owned integration: one shared UTF-8 fingerprint utility used by reads, direct writes, direct edits, and queued-plan checks. Do not mix Rust UTF-8 byte sizes with JavaScript UTF-16 string lengths.
+- Tests required: no-prior-read refusal remains intact; external modification rejects before write with `code: "stale_read"`; same-content edit succeeds including non-ASCII content; binary refusal remains intact; queued plan application rejects a changed file and accepts an unchanged file.
+
+Applied:
+
+- Added `src/modules/ai/tools/fingerprint.ts` with shared UTF-8 byte-size plus hash fingerprints and the structured stale-read refusal text.
+- `read_file`, direct `write_file`, and direct edit cache updates now store the same fingerprint representation.
+- `edit` and `multi_edit` reread the file immediately before replacement and refuse with `code: "stale_read"` when it differs from the prior agent read.
+- Plan Mode queues the reviewed source fingerprint and `planStore.applyAll()` revalidates it immediately before delayed writes.
+- Added `edit.test.ts` and `planStore.test.ts` covering external modification refusal, unchanged non-ASCII acceptance, binary refusal, queued stale rejection, and queued fresh acceptance.
+
+Verified (clean shell, `verify-atlas.sh --all` exit 0): tsc 0, vitest 106 passed (11 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+## Slice 1.5: serialize same-file mutations (S1)
+
+Source-parity packet:
+
+- Slice: serialize concurrent agent writes to the same canonical file while preserving parallelism across different files.
+- Atlas files inspected: `src/modules/ai/tools/edit.ts`, `fs.ts`, `fingerprint.ts`, `src/modules/ai/store/planStore.ts`, `src/modules/ai/lib/native.ts`.
+- opensrc inspected: `earendil-works/pi:packages/coding-agent/src/core/tools/file-mutation-queue.ts`, `earendil-works/pi:packages/coding-agent/src/core/tools/edit.ts`, `anomalyco/opencode:packages/opencode/src/tool/edit.ts`. Freshness: cached fallback.
+- Disposition: `ADAPT` Pi's canonical-realpath-keyed promise queue and registration queue. Atlas runs in a webview, so it cannot use Node `realpath`; use the existing native `fs_canonicalize` bridge and fall back to the already-resolved target path for new files.
+- Disposition: `STUDY` OpenCode's per-resolved-file semaphore. Atlas keeps a small promise queue because it matches the current TypeScript substrate without importing an effect runtime.
+- Atlas-owned integration: wrap direct edits, direct full-file writes, and delayed Plan Mode writes. Different canonical files remain parallel; rejected operations release the queue.
+- Tests required: same canonical key serializes, canonical aliases serialize, different files run concurrently, and a rejected mutation releases the next waiter.
+
+## Feature slice: shared project/session binding flow
+
+Source-parity packet:
+
+- Slice: composer project chip, sidebar "Open project" affordance, and welcome open-folder, all sharing one project/session binding flow; unbound mode fails mutation closed.
+- Atlas files inspected: `src/modules/ai/store/chatStore.ts`, `src/modules/ai/lib/sessions.ts`, `src/modules/workspace/workspaceStore.ts`, `WelcomeScreen.tsx`, `src/modules/explorer/FileExplorer.tsx`, `src/modules/ai/components/AiInputBar.tsx`, `src/modules/ai/tools/context.ts`, `fs.ts`, `edit.ts`.
+- Reference: the Codex / Claude Code session+project switcher UX (composer project chip with existing projects, add-project, and unbound; sidebar open-project) supplied by the user as the target shape. Disposition `ADAPT` the affordance shape only; Atlas owns all binding logic against its existing `useWorkspaceStore` + `chatStore` session model. No upstream code copied. opensrc not consulted: this is UI composition over existing Atlas stores with no new subsystem or protocol (recorded exception per ATLAS.md source-parity hook).
+- Atlas-owned integration: `src/modules/workspace/projectFlow.ts` is the single flow (`openProjectFromDialog`/`FromPath`, `startUnboundSession`, `switchToProject`, `listKnownProjects`). It reuses the existing `setWorkspaceRoot` (fail-closed native authorize), `newSession` (binds current root), and `switchSession` (restores bound workspace) without changing them.
+- Fail-closed: extracted `checkMutationAllowed`/`UNBOUND_MUTATION_ERROR` in `context.ts`, replacing the duplicated inline `!project.workspaceRoot` guard in `write_file`, `create_directory`, `edit`, `multi_edit`. Unbound sessions chat and read but never mutate.
+- Rejected: repurposing the agent-panel dock/grid icons for project actions (they are not project/folder semantics).
+- Tests: two unit tests in `context.test.ts` prove the unbound guard blocks mutation (the "Create TODO.md" case) and allows it when bound. GUI flows (composer/sidebar/welcome open, A/B session switch restoring workspaceRoot) are user-verify because they need the Tauri window.
+
+Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 112 passed (12 files), `verify-atlas.sh --fast` OK.

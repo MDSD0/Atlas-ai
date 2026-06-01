@@ -1,3 +1,5 @@
+import type { ReadFingerprint } from "./fingerprint";
+
 export type ToolContext = {
   /** Active terminal tab cwd. Informational only for file path resolution. */
   getCwd: () => string | null;
@@ -19,7 +21,7 @@ export type ToolContext = {
   spawnAgent: (prompt: string) => { tabId: number; leafId: number } | null;
   /** Read the terminal scrollback tail of a managed agent's leaf. */
   readAgentOutput: (leafId: number) => string | null;
-  readCache: Map<string, { size: number; hash: number }>;
+  readCache: Map<string, ReadFingerprint>;
   /** Active chat session id — used by tools that persist per-session state (todos). */
   getSessionId: () => string | null;
 };
@@ -50,14 +52,39 @@ function isAbsolutePath(path: string): boolean {
   );
 }
 
-function normalize(path: string): string {
-  return path.replace(/\\/g, "/").replace(/\/+$/, "");
+function isWindowsStylePath(path: string): boolean {
+  return path.startsWith("\\\\") || /^[a-zA-Z]:[\\/]/.test(path);
+}
+
+/**
+ * Normalize only for walking a user-supplied path to an existing parent.
+ * Native canonical paths already use forward slashes on Windows. On Unix a
+ * backslash is a legal filename character, so rewriting it would turn a
+ * sibling such as `/repo\escape` into a false child of `/repo`.
+ */
+function normalizeForPathOps(path: string): string {
+  const normalized = isWindowsStylePath(path)
+    ? path.replace(/\\/g, "/")
+    : path;
+  if (normalized === "/" || /^[a-zA-Z]:\/$/.test(normalized)) {
+    return normalized;
+  }
+  return normalized.replace(/\/+$/, "");
+}
+
+function normalizeCanonical(path: string): string {
+  const normalized = path.replace(/\/+$/, "");
+  return normalized || "/";
 }
 
 function dirname(path: string): string | null {
-  const normalized = normalize(path);
+  const normalized = normalizeForPathOps(path);
   const idx = normalized.lastIndexOf("/");
-  if (idx <= 0) return normalized.startsWith("/") ? "/" : null;
+  if (idx < 0) return null;
+  if (idx === 0) return "/";
+  if (idx === 2 && /^[a-zA-Z]:\//.test(normalized)) {
+    return normalized.slice(0, 3);
+  }
   return normalized.slice(0, idx);
 }
 
@@ -74,6 +101,21 @@ function defaultBase(ctx: AtlasToolProjectContext): string | null {
     if (parent) return parent;
   }
   return ctx.activeFolder ?? ctx.workspaceRoot;
+}
+
+export const UNBOUND_MUTATION_ERROR =
+  "no project is bound; refusing workspace mutation";
+
+/**
+ * Fail-closed guard for mutating tools. Unbound sessions (no workspaceRoot)
+ * allow chat and reads but must never create, write, edit, or delete files.
+ * Returns a structured error to return verbatim, or null when a project is bound.
+ */
+export function checkMutationAllowed(
+  ctx: AtlasToolProjectContext,
+): { error: string } | null {
+  if (!ctx.workspaceRoot) return { error: UNBOUND_MUTATION_ERROR };
+  return null;
 }
 
 export function resolvePath(
@@ -103,9 +145,18 @@ export function resolveSearchRoot(
 }
 
 function isWithinPath(candidate: string, root: string): boolean {
-  const c = normalize(candidate).toLowerCase();
-  const r = normalize(root).toLowerCase();
-  return c === r || c.startsWith(`${r}/`);
+  const c = normalizeCanonical(candidate);
+  const r = normalizeCanonical(root);
+  return c === r || (r === "/" ? c.startsWith("/") : c.startsWith(`${r}/`));
+}
+
+function appendCanonicalTail(base: string, tail: string): string {
+  const normalizedBase = normalizeCanonical(base);
+  const normalizedTail = tail.replace(/^\/+/, "");
+  if (!normalizedTail) return normalizedBase;
+  return normalizedBase === "/"
+    ? `/${normalizedTail}`
+    : `${normalizedBase}/${normalizedTail}`;
 }
 
 async function canonicalForBoundary(
@@ -119,8 +170,10 @@ async function canonicalForBoundary(
     while (parent && parent !== path) {
       try {
         const canonParent = await canonicalize(parent);
-        const tail = normalize(path).slice(normalize(parent).length);
-        return `${normalize(canonParent)}${tail}`;
+        const normalizedPath = normalizeForPathOps(path);
+        const normalizedParent = normalizeForPathOps(parent);
+        const tail = normalizedPath.slice(normalizedParent.length);
+        return appendCanonicalTail(canonParent, tail);
       } catch {
         const next = dirname(parent);
         if (!next || next === parent) break;

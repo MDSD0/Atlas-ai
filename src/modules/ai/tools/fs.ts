@@ -7,19 +7,16 @@ import {
 } from "../lib/security";
 import { newQueuedEditId, usePlanStore } from "../store/planStore";
 import {
+  checkMutationAllowed,
   resolvePath,
   validateWithinWorkspace,
   type ToolContext,
 } from "./context";
+import { withFileMutationQueue } from "./fileMutationQueue";
+import { fingerprintText, type ReadFingerprint } from "./fingerprint";
 
 const READ_BYTE_CAP = 25 * 1024;
 const READ_LINE_CAP = 2000;
-
-function djb2(s: string): number {
-  let h = 5381;
-  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
-  return h >>> 0;
-}
 
 export function buildFsTools(ctx: ToolContext) {
   return {
@@ -62,13 +59,18 @@ export function buildFsTools(ctx: ToolContext) {
               path: abs,
             };
 
-          const hash = djb2(r.content);
+          const fingerprint = fingerprintText(r.content);
           const isFullRead = offset === undefined && limit === undefined;
           const prior = ctx.readCache.get(abs);
-          if (isFullRead && prior && prior.size === r.size && prior.hash === hash) {
+          if (
+            isFullRead &&
+            prior &&
+            prior.size === fingerprint.size &&
+            prior.hash === fingerprint.hash
+          ) {
             return { path: abs, unchanged: true, size: r.size };
           }
-          ctx.readCache.set(abs, { size: r.size, hash });
+          ctx.readCache.set(abs, fingerprint);
 
           if (isFullRead) {
             const lines = r.content.split("\n");
@@ -153,9 +155,8 @@ export function buildFsTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path, content }) => {
         const project = ctx.getProjectContext();
-        if (!project.workspaceRoot) {
-          return { error: "no project is bound; refusing workspace mutation", path };
-        }
+        const blocked = checkMutationAllowed(project);
+        if (blocked) return { ...blocked, path };
         const reqPath = resolvePath(path, project);
         const safety = await checkWritableCanonical(reqPath, native.canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
@@ -166,9 +167,13 @@ export function buildFsTools(ctx: ToolContext) {
         if (usePlanStore.getState().active) {
           let original = "";
           let isNewFile = false;
+          let expectedFingerprint: ReadFingerprint | undefined;
           try {
             const r = await native.readFile(abs);
-            if (r.kind === "text") original = r.content;
+            if (r.kind === "text") {
+              original = r.content;
+              expectedFingerprint = fingerprintText(original);
+            }
           } catch {
             isNewFile = true;
           }
@@ -179,6 +184,7 @@ export function buildFsTools(ctx: ToolContext) {
             originalContent: original,
             proposedContent: content,
             isNewFile,
+            expectedFingerprint,
           });
           return {
             path: abs,
@@ -188,8 +194,8 @@ export function buildFsTools(ctx: ToolContext) {
         }
 
         try {
-          await native.writeFile(abs, content);
-          ctx.readCache.set(abs, { size: content.length, hash: djb2(content) });
+          await withFileMutationQueue(abs, () => native.writeFile(abs, content));
+          ctx.readCache.set(abs, fingerprintText(content));
           return { path: abs, bytesWritten: content.length, ok: true };
         } catch (e) {
           return { error: String(e), path: abs };
@@ -206,9 +212,8 @@ export function buildFsTools(ctx: ToolContext) {
       needsApproval: true,
       execute: async ({ path }) => {
         const project = ctx.getProjectContext();
-        if (!project.workspaceRoot) {
-          return { error: "no project is bound; refusing workspace mutation", path };
-        }
+        const blocked = checkMutationAllowed(project);
+        if (blocked) return { ...blocked, path };
         const reqPath = resolvePath(path, project);
         const safety = await checkWritableCanonical(reqPath, native.canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
