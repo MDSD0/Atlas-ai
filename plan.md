@@ -436,3 +436,18 @@ Done.
 Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 129 passed (14 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
 
 Next: Phase 2 Slice 2.2 hard hooks around the existing tool runtime.
+
+## Slice 2.2 status: hard hooks around the existing tool runtime
+
+Done. Instrumented the existing streamText loop; added no second tool runtime.
+
+- proof/recorder.ts: RunRecorder maps run start / per-tool result / finish onto the Slice 2.1 journal. Structured failure capture (error results -> .failed events + unresolvedFailures), changed-file artifacts for successful mutations, shell commands recorded as checks, evidence-based verdict (cancelled/failed/passed), idempotent finish.
+- agent.ts: onToolResult callback fed from onStepFinish (toolResults matched to toolCalls by id). Observation only.
+- transport.ts: run boundary starts/finishes the recorder; closes on finishReason resolve, abort (cancelled), and thrown error (errored). Guarded so journal failures never block the agent.
+- proof/recorder.test.ts: 4 tests (full read-edit-test trace + passed verdict + artifact + checks; failed result visible + failed run; cancelled + idempotent finish; bounded shell summary).
+
+Source-parity: opensrc OpenHands event-trace + SWE-agent ACI feedback (STUDY).
+
+Green (clean shell verify-atlas.sh --all): tsc 0, vitest 133 passed (15 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.
+
+Next: Phase 2 Slice 2.3 minimal proof UI.

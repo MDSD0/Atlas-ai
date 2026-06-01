@@ -493,3 +493,17 @@ Applied:
 Verified (clean shell, final `verify-atlas.sh --all` exit 0): tsc 0, vitest 129 passed (14 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
 
 Performance note: retained storage is capped at 100 runs, 500 events per run, 100 artifacts per run, and 100 items per verdict list. Preview payloads cap at 2048 UTF-8 bytes, summaries at 256 bytes, and paths or commands at 4096 bytes.
+
+## Slice 2.2: hard hooks around the existing tool runtime
+
+Source-parity packet:
+
+- Slice: instrument the existing agent loop and tool wrappers to emit proof-journal events without adding a second tool runtime.
+- Atlas files inspected: `src/modules/ai/lib/agent.ts`, `lib/transport.ts`, `proof/{contracts,journal,persistence,index}.ts`, `store/chatStore.ts`, `node_modules/ai` (StreamTextResult.finishReason, onStepFinish toolResults/toolCalls).
+- opensrc resolved (cache): `All-Hands-AI/OpenHands` (independently addressable event trace), `princeton-nlp/SWE-agent` + `SWE-agent/mini-swe-agent` (ACI tool feedback shape). Freshness: refreshed via authenticated opensrc this slice. Disposition: STUDY (the durable contract shapes were already ADAPTed in Slice 2.1). No upstream code copied.
+- Atlas-owned integration: `proof/recorder.ts` (`RunRecorder`) adapts run-start / per-tool-result / finish onto the journal. The only loop change is an observation callback (`onToolResult`) in `runAgentStream`, populated from the existing `onStepFinish` step (toolResults matched to toolCalls by `toolCallId`). The transport owns the run lifecycle: start at the turn boundary, finish on `result.finishReason` resolve, on abort (cancelled), and on thrown error (errored).
+- Structured failures (not strings): a tool result with `{error}` becomes a `.failed` event and is added to `unresolvedFailures`; a failed mutation is never counted as a changed file. User explorer/editor IO stays on the app lane and is not recorded as an agent action (only model-driven tool calls flow through `onToolResult`).
+- Safety: every recorder call is guarded (`.catch`) so a journal failure can never block or crash the agent turn. Shell output is bounded by the journal payload cap, proven by a 50k-output truncation test.
+- Tests: `proof/recorder.test.ts` (4) — complete read-edit-test trace with passed verdict + changed-file artifact + checks; failed result visible and run failed; cancelled verdict + idempotent finish; bounded shell summary.
+
+Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 133 passed (15 files), build 0, cargo check/clippy 0, cargo test 115 lib + 3 harness.

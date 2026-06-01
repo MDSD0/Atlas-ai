@@ -8,6 +8,8 @@ import {
   type AtlasToolProjectContext,
   type ToolContext,
 } from "../tools/tools";
+import { proofJournal } from "../proof";
+import { RunRecorder } from "../proof/recorder";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -82,34 +84,66 @@ export function createContextAwareTransport(deps: Deps) {
     const messagesForRun = contextBlock
       ? injectEnvIntoLastUser(options.messages, contextBlock)
       : options.messages;
-    const result = await runAgentStream({
-      keys: deps.getKeys(),
-      modelId: deps.getModelId(),
-      customInstructions: deps.getCustomInstructions(),
-      agentPersona: deps.getAgentPersona(),
-      toolContext: deps.toolContext,
-      onStep: deps.onStep,
-      onUsage: deps.onUsage,
-      onCompact: deps.onCompact,
-      onFinishMeta: deps.onFinishMeta,
-      lmstudioBaseURL: deps.getLmstudioBaseURL?.(),
-      lmstudioModelId: deps.getLmstudioModelId?.(),
-      mlxBaseURL: deps.getMlxBaseURL?.(),
-      mlxModelId: deps.getMlxModelId?.(),
-      ollamaBaseURL: deps.getOllamaBaseURL?.(),
-      ollamaModelId: deps.getOllamaModelId?.(),
-      openaiCompatibleBaseURL: deps.getOpenaiCompatibleBaseURL?.(),
-      openaiCompatibleModelId: deps.getOpenaiCompatibleModelId?.(),
-      openaiCompatibleContextLimit: deps.getOpenaiCompatibleContextLimit?.(),
-      openrouterModelId: deps.getOpenrouterModelId?.(),
-      planMode: deps.getPlanMode?.(),
-      projectMemory,
-      uiMessages: messagesForRun,
-      abortSignal: options.abortSignal,
-    });
-    return result.toUIMessageStream({
-      originalMessages: options.messages,
-    });
+
+    // Hard hook: record one proof run around this agent turn. Journal failures
+    // must never block the agent, so recorder creation and calls are guarded.
+    const recorder = await RunRecorder.start(proofJournal, {
+      sessionId: deps.toolContext.getSessionId() ?? "unknown",
+      workspaceRoot: live.workspaceRoot,
+    }).catch(() => null);
+
+    if (options.abortSignal && recorder) {
+      options.abortSignal.addEventListener(
+        "abort",
+        () => void recorder.finish({ cancelled: true }).catch(() => {}),
+        { once: true },
+      );
+    }
+
+    try {
+      const result = await runAgentStream({
+        keys: deps.getKeys(),
+        modelId: deps.getModelId(),
+        customInstructions: deps.getCustomInstructions(),
+        agentPersona: deps.getAgentPersona(),
+        toolContext: deps.toolContext,
+        onStep: deps.onStep,
+        onUsage: deps.onUsage,
+        onCompact: deps.onCompact,
+        onFinishMeta: deps.onFinishMeta,
+        onToolResult: recorder
+          ? (r) => void recorder.recordTool(r).catch(() => {})
+          : undefined,
+        lmstudioBaseURL: deps.getLmstudioBaseURL?.(),
+        lmstudioModelId: deps.getLmstudioModelId?.(),
+        mlxBaseURL: deps.getMlxBaseURL?.(),
+        mlxModelId: deps.getMlxModelId?.(),
+        ollamaBaseURL: deps.getOllamaBaseURL?.(),
+        ollamaModelId: deps.getOllamaModelId?.(),
+        openaiCompatibleBaseURL: deps.getOpenaiCompatibleBaseURL?.(),
+        openaiCompatibleModelId: deps.getOpenaiCompatibleModelId?.(),
+        openaiCompatibleContextLimit: deps.getOpenaiCompatibleContextLimit?.(),
+        openrouterModelId: deps.getOpenrouterModelId?.(),
+        planMode: deps.getPlanMode?.(),
+        projectMemory,
+        uiMessages: messagesForRun,
+        abortSignal: options.abortSignal,
+      });
+      if (recorder) {
+        // Close the receipt when the model stream resolves. finish() is
+        // idempotent, so an earlier abort-driven close wins over this one.
+        void result.finishReason.then(
+          () => recorder.finish(),
+          () => recorder.finish({ errored: true }),
+        );
+      }
+      return result.toUIMessageStream({
+        originalMessages: options.messages,
+      });
+    } catch (e) {
+      if (recorder) await recorder.finish({ errored: true }).catch(() => {});
+      throw e;
+    }
   };
 
   return {

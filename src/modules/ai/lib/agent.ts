@@ -347,6 +347,12 @@ export type RunAgentOptions = {
   onUsage?: (delta: AgentUsageDelta) => void;
   onCompact?: (info: { droppedCount: number }) => void;
   onFinishMeta?: (info: { hitStepCap: boolean; finishReason: string }) => void;
+  /** Per-tool observation for the proof journal. Does not add a tool runtime. */
+  onToolResult?: (record: {
+    toolName: string;
+    input: Record<string, unknown>;
+    output: unknown;
+  }) => void;
   lmstudioBaseURL?: string;
   lmstudioModelId?: string;
   mlxBaseURL?: string;
@@ -420,6 +426,17 @@ export async function runAgentStream(opts: RunAgentOptions) {
     abortSignal: opts.abortSignal,
     onStepFinish: (step) => {
       stepsSeen++;
+      if (opts.onToolResult && step.toolResults) {
+        const calls = step.toolCalls ?? [];
+        for (const result of step.toolResults) {
+          const call = calls.find((c) => c.toolCallId === result.toolCallId);
+          opts.onToolResult({
+            toolName: result.toolName,
+            input: (call?.input ?? {}) as Record<string, unknown>,
+            output: (result as { output?: unknown }).output,
+          });
+        }
+      }
       if (opts.onStep) {
         const last = step.toolCalls?.[step.toolCalls.length - 1];
         if (last) {
