@@ -11,6 +11,7 @@ import {
 } from "react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/modules/workspace";
+import { workspaceBindingErrorMessage } from "@/modules/workspace/workspaceStore";
 
 import { useChatStore } from "@/modules/ai";
 import type { SessionMeta } from "@/modules/ai/lib/sessions";
@@ -360,7 +361,11 @@ export function SessionsList({
 
   const handleOpenWorkspace = useCallback(
     async (path: string) => {
-      await setWorkspaceRoot(path);
+      try {
+        await setWorkspaceRoot(path);
+      } catch (error) {
+        window.alert(workspaceBindingErrorMessage(error));
+      }
     },
     [setWorkspaceRoot],
   );

@@ -7,7 +7,7 @@ import { openFolderDialog } from "./openFolderDialog";
 // point ends in the same state: a session whose binding matches the workspace.
 
 export type ProjectChoice = {
-  /** Canonical workspace root, or null for an unbound project. */
+  /** Selected logical workspace root, or null for an unbound project. */
   workspaceRoot: string | null;
   /** Display name (basename, or "Unbound"). */
   name: string;

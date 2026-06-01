@@ -109,6 +109,7 @@ import {
   type WorkspaceEnv,
 } from "@/modules/workspace";
 import { WelcomeScreen } from "@/modules/workspace/WelcomeScreen";
+import { workspaceBindingErrorMessage } from "@/modules/workspace/workspaceStore";
 import { SessionsPanel } from "@/modules/ai/components/SessionsPanel";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
@@ -1328,6 +1329,15 @@ export default function App() {
         return false;
       }
 
+      if (nextRoot) {
+        try {
+          await useWorkspaceStore.getState().setWorkspaceRoot(nextRoot);
+        } catch (error) {
+          window.alert(workspaceBindingErrorMessage(error));
+          return false;
+        }
+      }
+
       for (const id of liveLeavesRef.current) disposeSession(id);
       searchAddons.current.clear();
       terminalRefs.current.clear();
@@ -1337,9 +1347,7 @@ export default function App() {
       setActiveEditorHandle(null);
       setActiveFolder(null);
 
-      if (nextRoot) {
-        await useWorkspaceStore.getState().setWorkspaceRoot(nextRoot);
-      } else {
+      if (!nextRoot) {
         useWorkspaceStore.getState().clearWorkspace();
       }
       resetToAgentHome();

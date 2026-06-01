@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { APPROVAL_MODES } from "../lib/permissions";
 import { useChatStore } from "../store/chatStore";
 
-// Composer access-mode chip. Per-session; resets to default on a new session.
+// Composer access-mode chip. Resets to default on new or switched sessions.
 // Modes only suppress approval prompts for otherwise-permitted calls; the
 // dangerous-command circuit breaker and out-of-workspace/secret guards still
 // apply in every mode.

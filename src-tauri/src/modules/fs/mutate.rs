@@ -1,4 +1,6 @@
-use crate::modules::workspace::{authorize_path_target, WorkspaceEnv, WorkspaceRegistry};
+use crate::modules::workspace::{
+    authorize_agent_path_target, authorize_path_target, WorkspaceEnv, WorkspaceRegistry,
+};
 
 /// Creates a new empty file. Fails if the file already exists.
 fn fs_create_file_inner(
@@ -27,7 +29,7 @@ pub fn fs_create_file(
 }
 
 /// Creates a new directory. Fails if the directory already exists.
-/// Parents are created as needed — matches the common "new folder" UX
+/// Parents are created as needed - matches the common "new folder" UX
 /// where typing "a/b/c" creates the full chain.
 fn fs_create_dir_inner(
     path: String,
@@ -52,6 +54,24 @@ pub fn fs_create_dir(
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<(), String> {
     fs_create_dir_inner(path, workspace, &registry)
+}
+
+#[tauri::command]
+pub fn agent_fs_create_dir(
+    path: String,
+    project_root: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let p = authorize_agent_path_target(&registry, &path, &project_root, &workspace)?;
+    if p.exists() {
+        return Err(format!("already exists: {}", p.display()));
+    }
+    std::fs::create_dir_all(&p).map_err(|e| {
+        log::debug!("agent_fs_create_dir({}) failed: {e}", p.display());
+        e.to_string()
+    })
 }
 
 /// Renames (or moves) a path. Refuses to overwrite an existing target.
@@ -238,7 +258,10 @@ mod tests {
         let f = outside.path().join("planted.txt");
         let err = fs_create_file_inner(s(f.clone()), None, &reg)
             .expect_err("create outside authorized root must be rejected");
-        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+        assert!(
+            err.contains("outside the authorized workspace"),
+            "got: {err}"
+        );
         assert!(!f.exists());
     }
 
@@ -251,7 +274,10 @@ mod tests {
         std::fs::write(&victim, b"keep").unwrap();
         let err = fs_delete_inner(s(victim.clone()), None, &reg)
             .expect_err("delete outside authorized root must be rejected");
-        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+        assert!(
+            err.contains("outside the authorized workspace"),
+            "got: {err}"
+        );
         assert!(victim.exists(), "rejected delete must not remove the file");
     }
 }

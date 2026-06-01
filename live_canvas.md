@@ -209,7 +209,7 @@ Done. One shared flow, three entry points.
 - Composer project chip (`ProjectChip.tsx`, new) in the AiInputBar toolbar: existing projects, "Add project (open folder)", "Don't work in a project" (unbound).
 - Explorer header: added an "Open project" folder-open icon. No-folder and broken-workspace states route through the shared flow; broken state now offers Locate folder / Open unbound copy / Remove.
 - Welcome screen: open-folder and open-recent now go through `projectFlow` (already created a session before; now DRY).
-- Unbound fail-closed: extracted `checkMutationAllowed` in `context.ts`; `write_file`, `create_directory`, `edit`, `multi_edit` use it. Unbound sessions allow chat + reads but refuse mutation ("Create TODO.md" blocked).
+- Unbound fail-closed: extracted `checkMutationAllowed` in `context.ts`; `write_file`, `create_directory`, `edit`, `multi_edit` use it. Slice 1.6 tightens unbound sessions further: chat remains available, but model-driven filesystem access requires an explicitly selected project.
 
 Did NOT repurpose the vague progress/grid icons (they are agent-panel dock toggles, not project/folder).
 
@@ -222,12 +222,12 @@ User-verify (GUI, ~3 min): composer chip open-folder; sidebar "Open project" ico
 Done. Policy classifier, not a pipeline: the model calls any tool freely; the classifier only decides whether the call needs an approval PROMPT. Deny decisions (dangerous-command circuit breaker, secret deny-list, native out-of-workspace) live in execute/Rust and are NEVER skipped by any mode.
 
 - `src/modules/ai/lib/permissions.ts` (new, pure): `ApprovalMode` (default / acceptEdits / full), `isAutoRunShell` (single safe read-only/open command, no shell operators), `editNeedsApproval`, `shellNeedsApproval`.
-- chatStore: per-session `approvalMode` (default), `setApprovalMode`; resets to default on `newSession` and `switchSession`. Exposed to tools via `ToolContext.getApprovalMode`.
+- chatStore: active-session `approvalMode` (default), `setApprovalMode`; resets to default on `newSession` and `switchSession`. Exposed to tools via `ToolContext.getApprovalMode`.
 - Tools: `write_file`, `create_directory`, `edit`, `multi_edit` use `needsApproval: () => editNeedsApproval(mode)`; `bash_run`, `bash_background` use `needsApproval: ({command}) => shellNeedsApproval(command, mode)`. AI SDK v6 supports the function form (verified in provider-utils types).
 - UI: `AccessChip.tsx` in the composer (Ask / Accept edits / Full access; Full access is amber + risky-flagged).
-- "open auto-run": `open`/`ls`/`cat`/`git status`/etc. auto-run in every mode (Claude-Code-style read-only allow-list). `open index.html` no longer needs approval — the dino-game friction.
+- Safe shell auto-run is deliberately narrow: no-argument `pwd` / `date` / `whoami`, current-directory `ls` flags, safe `git status` flags, and one simple relative `open` target such as `index.html`. Everything else still works through approval.
 
-Default = Ask (chosen). Per-session persistence (chosen). The model picking `suggest_command` over running is a model issue, unchanged by design.
+Default = Ask (chosen). Access mode resets on new or switched sessions. The model picking `suggest_command` over running is a model issue, unchanged by design.
 
 Green (clean shell): tsc 0, vitest 119 passed (13 files; +7 permission tests), verify-atlas --fast OK.
 
@@ -274,4 +274,46 @@ Done.
 
 Green (clean shell `verify-atlas.sh --all`): tsc 0, vitest 106 passed (11 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
 
-Next: Slice 1.5 serialize same-file mutations (S1).
+## Slice 1.5 status: serialize same-file mutations (S1)
+
+Done.
+
+- Added a canonical-path-keyed promise queue for direct edits, direct full-file writes, and delayed Plan Mode writes.
+- Alias paths serialize against the same native-canonical key; new files use the already-resolved target path until they exist.
+- Different files remain parallel and rejected operations release the next waiter.
+- Added four queue regressions for same-key ordering, canonical aliases, cross-file parallelism, and rejection release.
+- Hardened the approval-mode shell shortcut after source refresh: only fully bounded safe command shapes auto-run. Secret reads, wrappers, mutation flags, and compounded commands prompt.
+
+Green (clean shell final combined `verify-atlas.sh --all`): tsc 0, vitest 121 passed (13 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Next: Slice 1.6 native secret-path deny-list.
+
+## Slice 1.6 status: native agent project and secret-path boundary (S5)
+
+Done.
+
+- Added a separate native `agent_fs_*` lane for model filesystem IO. Explicitly selected projects are tracked independently from app-authorized roots, so agent tools do not inherit bootstrapped home or launch-directory access.
+- Enforced native sensitive-path refusal after canonicalization for reads, writes, creates, directory listings, grep, and glob. Manual editor/explorer `fs_*` IO remains usable for user-driven `.env` work.
+- Switched built-in model tools, Plan Mode delayed writes, and ATLAS project-memory reads to the `agentNative` facade.
+- Unbound chat sessions now refuse model-driven filesystem reads and searches as well as mutations.
+- Added native and frontend regressions for app-vs-agent root separation, `.env`, protected parents, symlink-to-secret paths, recursive filtering, and unbound reads.
+
+Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 123 passed (13 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
+
+Known limitation: this is a model-IO trust lane, not a sandbox for compromised trusted webview JavaScript. Tauri custom commands cannot distinguish the JavaScript call site inside one webview.
+
+Next: Phase 2 Slice 2.1 minimal event journal and proof receipt foundation.
+
+## Slice 2.1 status: durable proof-journal contracts
+
+Done.
+
+- Added provider-independent run, event, artifact, and verdict contracts under `src/modules/ai/proof/`.
+- Wrapped the existing Tauri Store plugin behind a tiny persistence interface and explicit `save()` calls. No database, Rust subsystem, dependency, watcher, or boot service was added.
+- Added serialized repository mutations, ordered event sequences, SHA-256 content hashes, stable artifact IDs, restart restore, final verdict persistence, bounded UTF-8 previews, bounded retention, and dropped-item counters.
+- Kept instrumentation out of this slice. Tool and lifecycle hooks enter in Slice 2.2.
+- Added six focused regressions for ordered concurrent append, multibyte truncation, restart restore, cancelled verdict, stable artifact updates, and run/event/artifact caps.
+
+Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 129 passed (14 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
+
+Next: Phase 2 Slice 2.2 hard hooks around the existing tool runtime.

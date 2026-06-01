@@ -588,6 +588,41 @@ Gate:
 
 - No lost update under concurrent agent steps.
 
+### Slice 1.6: Native agent project and secret-path boundary
+
+Active Atlas files:
+
+- `src-tauri/src/modules/workspace.rs`
+- `src-tauri/src/modules/fs/file.rs`
+- `src-tauri/src/modules/fs/tree.rs`
+- `src-tauri/src/modules/fs/mutate.rs`
+- `src-tauri/src/modules/fs/grep.rs`
+- `src-tauri/src/lib.rs`
+- `src/modules/ai/lib/native.ts`
+- `src/modules/ai/tools/`
+
+Tasks:
+
+1. Keep app-authorized roots and explicitly selected agent project roots distinct.
+2. Add narrow native `agent_fs_*` commands over the existing filesystem primitives.
+3. Require an explicitly selected project root for every agent filesystem command.
+4. Port the sensitive-path policy into a dependency-light Rust core and run it after canonicalization.
+5. Filter recursive agent grep and glob traversal so a safe root cannot leak protected descendants.
+6. Keep manual editor and explorer IO on the app-authorized lane.
+
+Tests:
+
+- App authorization alone never grants agent project access.
+- Agent read rejects `.env`, protected directories, and symlink-to-secret paths.
+- Agent write and create reject sensitive targets and protected parents.
+- Manual app IO remains usable for user-driven editing.
+- Agent grep and glob never return sensitive files.
+- `SYS-03`.
+
+Gate:
+
+- The built-in agent cannot inherit home or launch-directory access from the app registry, and native agent IPC cannot read or mutate obvious secret paths.
+
 ## 11. Phase 2: Minimal Event Journal, Hard Hooks, and Proof Receipts
 
 Goal: make trusted agent actions inspectable before adding deeper intelligence.
@@ -604,7 +639,7 @@ References:
 Planned Atlas area:
 
 - `src/modules/ai/proof/`
-- Thin Rust persistence module selected after source inspection
+- Existing `@tauri-apps/plugin-store` backend, wrapped behind a thin proof-journal persistence interface
 
 Minimum contracts:
 
@@ -1396,8 +1431,9 @@ Execute in this order:
 6. `Slice 1.3`: fix platform-aware path comparison.
 7. `Slice 1.4`: implement real stale-edit rejection.
 8. `Slice 1.5`: serialize same-file mutation.
-9. `Phase 2`: add minimal event journal and proof receipt end-to-end.
-10. Run the `M1` trusted-editing system scenarios before CodeReality work.
+9. `Slice 1.6`: split native agent project IO from app IO and enforce secret-path checks.
+10. `Phase 2`: add minimal event journal and proof receipt end-to-end.
+11. Run the `M1` trusted-editing system scenarios before CodeReality work.
 
 No CodeReality, LSP, memory-provider, skill, or MCP implementation begins until `M1` passes.
 

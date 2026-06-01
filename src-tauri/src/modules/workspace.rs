@@ -5,6 +5,8 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
+mod agent_policy;
+
 // Short TTL keeps the auth-check TOCTOU window tight while still coalescing the
 // burst of canonicalize calls within a single panel refresh (~100ms).
 const CANONICAL_TTL: Duration = Duration::from_secs(1);
@@ -18,6 +20,7 @@ struct CanonicalEntry {
 #[derive(Default)]
 pub struct WorkspaceRegistry {
     roots: Mutex<HashSet<PathBuf>>,
+    agent_roots: Mutex<HashSet<PathBuf>>,
     canonical_cache: Mutex<HashMap<PathBuf, CanonicalEntry>>,
 }
 
@@ -29,9 +32,27 @@ impl WorkspaceRegistry {
         Ok(canonical)
     }
 
+    pub fn authorize_agent_project<P: AsRef<Path>>(&self, path: P) -> std::io::Result<PathBuf> {
+        let canonical = self.authorize(path)?;
+        let mut set = self
+            .agent_roots
+            .lock()
+            .expect("agent workspace registry poisoned");
+        set.insert(canonical.clone());
+        Ok(canonical)
+    }
+
     pub fn is_authorized(&self, target: &Path) -> bool {
         let set = self.roots.lock().expect("workspace registry poisoned");
         set.iter().any(|root| target.starts_with(root))
+    }
+
+    fn is_agent_project_root(&self, target: &Path) -> bool {
+        let set = self
+            .agent_roots
+            .lock()
+            .expect("agent workspace registry poisoned");
+        set.contains(target)
     }
 
     pub fn canonicalize_cached<P: AsRef<Path>>(&self, path: P) -> std::io::Result<PathBuf> {
@@ -193,6 +214,60 @@ pub fn authorize_path_target(
     Ok(out)
 }
 
+fn require_agent_project_root(
+    registry: &WorkspaceRegistry,
+    raw: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<PathBuf, String> {
+    let resolved = resolve_path(raw, workspace);
+    let canonical = std::fs::canonicalize(&resolved)
+        .map_err(|e| format!("project root not accessible: {e}"))?;
+    if !registry.is_agent_project_root(&canonical) {
+        return Err("project root is not authorized for agent access".into());
+    }
+    Ok(canonical)
+}
+
+pub fn authorize_agent_existing_path(
+    registry: &WorkspaceRegistry,
+    raw: &str,
+    project_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<PathBuf, String> {
+    let root = require_agent_project_root(registry, project_root, workspace)?;
+    let canonical = authorize_existing_path(registry, raw, workspace)?;
+    if !canonical.starts_with(&root) {
+        return Err(format!(
+            "path is outside the bound agent project: {}",
+            canonical.display()
+        ));
+    }
+    agent_policy::check_readable(&canonical)?;
+    Ok(canonical)
+}
+
+pub fn authorize_agent_path_target(
+    registry: &WorkspaceRegistry,
+    raw: &str,
+    project_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<PathBuf, String> {
+    let root = require_agent_project_root(registry, project_root, workspace)?;
+    let target = authorize_path_target(registry, raw, workspace)?;
+    if !target.starts_with(&root) {
+        return Err(format!(
+            "path is outside the bound agent project: {}",
+            target.display()
+        ));
+    }
+    agent_policy::check_writable(&target)?;
+    Ok(target)
+}
+
+pub fn agent_path_is_readable(path: &Path) -> bool {
+    agent_policy::check_readable(path).is_ok()
+}
+
 pub fn bootstrap_registry(registry: &WorkspaceRegistry) {
     let _ = registry.authorize(resolve_launch_dir());
     if let Some(home) = dirs::home_dir() {
@@ -209,6 +284,20 @@ pub async fn workspace_authorize(
     let workspace = WorkspaceEnv::from_option(workspace);
     let resolved = resolve_path(&path, &workspace);
     let canonical = registry.authorize(&resolved).map_err(|e| e.to_string())?;
+    Ok(crate::modules::fs::to_canon(&canonical))
+}
+
+#[tauri::command]
+pub async fn workspace_authorize_agent_project(
+    path: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<String, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let resolved = resolve_path(&path, &workspace);
+    let canonical = registry
+        .authorize_agent_project(&resolved)
+        .map_err(|e| e.to_string())?;
     Ok(crate::modules::fs::to_canon(&canonical))
 }
 
@@ -828,6 +917,78 @@ mod auth_tests {
         let err = authorize_spawn_cwd(&reg, Some(&s), &WorkspaceEnv::Local)
             .expect_err("symlink-escape must be rejected");
         assert!(err.contains("outside"), "got: {err}");
+    }
+
+    #[test]
+    fn app_authorization_does_not_grant_agent_project_access() {
+        let root = tempdir("app-only");
+        let note = root.join("note.txt");
+        fs::write(&note, b"hello").expect("write note");
+        let reg = WorkspaceRegistry::default();
+        reg.authorize(&root).expect("authorize app root");
+        let note_s = note.to_string_lossy().into_owned();
+        let root_s = root.to_string_lossy().into_owned();
+
+        authorize_existing_path(&reg, &note_s, &WorkspaceEnv::Local).expect("app read allowed");
+        let err = authorize_agent_existing_path(&reg, &note_s, &root_s, &WorkspaceEnv::Local)
+            .expect_err("app root must not grant agent access");
+        assert!(
+            err.contains("not authorized for agent access"),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn manual_app_io_can_reach_env_but_agent_io_cannot() {
+        let root = tempdir("env");
+        let env_file = root.join(".env");
+        fs::write(&env_file, b"TOKEN=secret").expect("write env");
+        let reg = WorkspaceRegistry::default();
+        reg.authorize_agent_project(&root)
+            .expect("authorize agent root");
+        let env_s = env_file.to_string_lossy().into_owned();
+        let root_s = root.to_string_lossy().into_owned();
+
+        authorize_existing_path(&reg, &env_s, &WorkspaceEnv::Local).expect("manual app read");
+        let err = authorize_agent_existing_path(&reg, &env_s, &root_s, &WorkspaceEnv::Local)
+            .expect_err("agent env read must fail");
+        assert!(err.contains("sensitive-file pattern"), "got: {err}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn agent_read_rejects_symlink_to_secret_after_canonicalization() {
+        let root = tempdir("secret-link");
+        let env_file = root.join(".env");
+        fs::write(&env_file, b"TOKEN=secret").expect("write env");
+        let link = root.join("innocent");
+        std::os::unix::fs::symlink(&env_file, &link).expect("symlink");
+        let reg = WorkspaceRegistry::default();
+        reg.authorize_agent_project(&root)
+            .expect("authorize agent root");
+        let link_s = link.to_string_lossy().into_owned();
+        let root_s = root.to_string_lossy().into_owned();
+
+        let err = authorize_agent_existing_path(&reg, &link_s, &root_s, &WorkspaceEnv::Local)
+            .expect_err("agent symlink read must fail");
+        assert!(err.contains("sensitive-file pattern"), "got: {err}");
+    }
+
+    #[test]
+    fn agent_write_rejects_protected_parent() {
+        let root = tempdir("protected-parent");
+        let ssh = root.join(".ssh");
+        fs::create_dir_all(&ssh).expect("create ssh");
+        let target = ssh.join("config");
+        let reg = WorkspaceRegistry::default();
+        reg.authorize_agent_project(&root)
+            .expect("authorize agent root");
+        let target_s = target.to_string_lossy().into_owned();
+        let root_s = root.to_string_lossy().into_owned();
+
+        let err = authorize_agent_path_target(&reg, &target_s, &root_s, &WorkspaceEnv::Local)
+            .expect_err("agent protected write must fail");
+        assert!(err.contains("protected directory"), "got: {err}");
     }
 
     #[test]

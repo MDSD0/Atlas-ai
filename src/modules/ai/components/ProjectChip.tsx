@@ -14,9 +14,11 @@ import {
   openProjectFromDialog,
   startUnboundSession,
   switchToProject,
+} from "@/modules/workspace/projectFlow";
+import {
   useWorkspaceStore,
   workspaceBindingErrorMessage,
-} from "@/modules/workspace";
+} from "@/modules/workspace/workspaceStore";
 
 // Composer project chip: existing projects, add new (from scratch / existing
 // folder), and explicit unbound. All actions route through the shared

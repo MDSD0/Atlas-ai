@@ -23,6 +23,10 @@ function basename(path: string): string {
   return parts.length ? parts[parts.length - 1] : path;
 }
 
+export function workspaceBindingErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 type WorkspaceState = {
   projectId: string | null;
   projectName: string;
@@ -44,9 +48,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
   setWorkspaceRoot: async (path: string) => {
     try {
-      await native.workspaceAuthorize(path);
-    } catch {
-      // Non-fatal — workspace auth may fail for paths that don't need it.
+      await native.workspaceAuthorizeAgentProject(path);
+    } catch (error) {
+      throw new Error(
+        `Unable to open workspace "${path}": ${workspaceBindingErrorMessage(error)}`,
+      );
     }
     set({ projectId: path, projectName: basename(path), workspaceRoot: path });
     get().addRecent(path);

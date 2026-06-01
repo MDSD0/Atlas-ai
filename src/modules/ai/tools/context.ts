@@ -25,7 +25,7 @@ export type ToolContext = {
   readCache: Map<string, ReadFingerprint>;
   /** Active chat session id — used by tools that persist per-session state (todos). */
   getSessionId: () => string | null;
-  /** Per-session approval mode, read at tool-call time so changes take effect immediately. */
+  /** Active-session approval mode, read at tool-call time so changes take effect immediately. */
   getApprovalMode: () => ApprovalMode;
 };
 
@@ -108,6 +108,8 @@ function defaultBase(ctx: AtlasToolProjectContext): string | null {
 
 export const UNBOUND_MUTATION_ERROR =
   "no project is bound; refusing workspace mutation";
+export const UNBOUND_FILE_ACCESS_ERROR =
+  "no project is bound; refusing workspace file access";
 
 /**
  * Fail-closed guard for mutating tools. Unbound sessions (no workspaceRoot)
@@ -118,6 +120,13 @@ export function checkMutationAllowed(
   ctx: AtlasToolProjectContext,
 ): { error: string } | null {
   if (!ctx.workspaceRoot) return { error: UNBOUND_MUTATION_ERROR };
+  return null;
+}
+
+export function checkFileAccessAllowed(
+  ctx: AtlasToolProjectContext,
+): { error: string } | null {
+  if (!ctx.workspaceRoot) return { error: UNBOUND_FILE_ACCESS_ERROR };
   return null;
 }
 

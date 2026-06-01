@@ -30,9 +30,11 @@ import { useGlobalShortcuts } from "@/modules/shortcuts";
 import {
   openProjectFromDialog,
   startUnboundSession,
+} from "@/modules/workspace/projectFlow";
+import {
   useWorkspaceStore,
   workspaceBindingErrorMessage,
-} from "@/modules/workspace";
+} from "@/modules/workspace/workspaceStore";
 
 export type FileExplorerHandle = {
   focus: () => void;

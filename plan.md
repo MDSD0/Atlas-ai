@@ -368,7 +368,7 @@ Files changed:
 - `src/modules/ai/tools/fs.ts`, `edit.ts`: use `checkMutationAllowed` in `write_file`, `create_directory`, `edit`, `multi_edit`.
 - `src/modules/ai/tools/context.test.ts`: 2 tests for unbound mutation guard.
 
-Behavior: selecting/adding a folder creates or switches to a project-bound session; unbound creates an unbound session that allows chat but fails mutation closed; switching sessions restores the bound workspace; missing-path degraded state has Locate/Open-unbound/Remove. Branch chip + dirty-state path untouched. Vague progress/grid icons not repurposed.
+Behavior: selecting/adding a folder creates or switches to a project-bound session; unbound creates an unbound chat session without model-driven filesystem access; switching sessions restores the bound workspace; missing-path degraded state has Locate/Open-unbound/Remove. Branch chip + dirty-state path untouched. Vague progress/grid icons not repurposed.
 
 Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 112 passed (12 files; +2 unbound-guard), `verify-atlas.sh --fast` OK. GUI flows are user-verify (listed in live_canvas.md).
 
@@ -384,7 +384,7 @@ Files added:
 
 Files changed:
 
-- `src/modules/ai/store/chatStore.ts`: per-session `approvalMode` (default), reset on new/switch session, exposed via ToolContext.getApprovalMode.
+- `src/modules/ai/store/chatStore.ts`: active-session `approvalMode` (default), reset on new/switch session, exposed via ToolContext.getApprovalMode.
 - `src/modules/ai/tools/context.ts`: ToolContext.getApprovalMode.
 - `src/modules/ai/tools/fs.ts`, `edit.ts`: edit/create needsApproval = editNeedsApproval(mode).
 - `src/modules/ai/tools/shell.ts`: bash needsApproval = shellNeedsApproval(command, mode).
@@ -392,6 +392,47 @@ Files changed:
 
 Invariant preserved (plan 5.1): modes suppress prompts only; checkShellCommand circuit breaker, secret deny-list, and native S0 boundary still apply in every mode incl. full access. Model tool choice never overridden.
 
-Decisions: default = Ask; per-session persistence (resets on new/switch).
+Decisions: default = Ask; access mode resets on new/switch.
 
 Verified (clean shell): tsc 0, pnpm test 119 passed (13 files; +7), verify-atlas.sh --fast OK.
+
+## Slice 1.5 status: serialize same-file mutations
+
+Done.
+
+- Added `src/modules/ai/tools/fileMutationQueue.ts`: native-canonical-path-keyed promise queue with a resolved-path fallback for new files.
+- Wrapped direct edits, direct full-file writes, and delayed Plan Mode writes.
+- Different files remain parallel; alias paths serialize; rejection releases the next waiter.
+- Added four queue regressions.
+- Hardened the approval-mode auto-run classifier after opensrc refresh: broad read-looking shell commands now prompt unless their complete argument shape is bounded.
+
+Green (clean shell final combined `verify-atlas.sh --all`): tsc 0, vitest 121 passed (13 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+Next: Slice 1.6 native secret-path deny-list.
+
+## Slice 1.6 status: native agent project and secret-path boundary
+
+Done.
+
+- Added `agent_fs_*` native wrappers and a separate explicit agent-project root registry.
+- Added a Rust sensitive-path policy after canonicalization while leaving manual editor/explorer IO available.
+- Switched built-in model reads, searches, mutations, delayed Plan Mode writes, and project-memory reads to `agentNative`.
+- Unbound chat sessions reject all model-driven filesystem access.
+- Added regressions for app-vs-agent authorization, `.env`, protected parents, symlink-to-secret paths, filtered recursive search, and unbound reads.
+
+Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 123 passed (13 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
+
+Next: Phase 2 Slice 2.1 minimal event journal and proof receipt foundation.
+
+## Slice 2.1 status: durable proof-journal contracts
+
+Done.
+
+- Added bounded provider-independent run, event, artifact, and verdict contracts.
+- Added a serialized proof repository with ordered events, stable artifact IDs, SHA-256 content hashes, restart restore, explicit durable saves, final verdicts, and bounded retention.
+- Reused the existing Tauri Store backend behind a thin adapter. Added no database, Rust persistence module, dependency, watcher, or boot service.
+- Added six regressions for ordered append, UTF-8 truncation, restore, cancellation, artifact identity, and retention caps.
+
+Green (clean shell final `verify-atlas.sh --all`): tsc 0, vitest 129 passed (14 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
+
+Next: Phase 2 Slice 2.2 hard hooks around the existing tool runtime.

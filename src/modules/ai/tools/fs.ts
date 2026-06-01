@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { native } from "../lib/native";
+import { agentNative } from "../lib/native";
 import {
   checkReadableCanonical,
   checkWritableCanonical,
@@ -8,6 +8,7 @@ import {
 import { newQueuedEditId, usePlanStore } from "../store/planStore";
 import {
   checkMutationAllowed,
+  checkFileAccessAllowed,
   resolvePath,
   validateWithinWorkspace,
   type ToolContext,
@@ -44,14 +45,18 @@ export function buildFsTools(ctx: ToolContext) {
       }),
       execute: async ({ path, offset, limit }) => {
         const project = ctx.getProjectContext();
+        const blocked = checkFileAccessAllowed(project);
+        if (blocked) return { ...blocked, path };
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
         const reqPath = resolvePath(path, project);
-        const safety = await checkReadableCanonical(reqPath, native.canonicalize);
+        const safety = await checkReadableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, native.canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
         try {
-          const r = await native.readFile(abs);
+          const r = await agentNative.readFile(abs, projectRoot);
           if (r.kind === "binary")
             return { error: "binary file refused", path: abs, size: r.size };
           if (r.kind === "toolarge")
@@ -128,14 +133,18 @@ export function buildFsTools(ctx: ToolContext) {
       }),
       execute: async ({ path }) => {
         const project = ctx.getProjectContext();
+        const blocked = checkFileAccessAllowed(project);
+        if (blocked) return { ...blocked, path };
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
         const reqPath = resolvePath(path, project);
-        const safety = await checkReadableCanonical(reqPath, native.canonicalize);
+        const safety = await checkReadableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, native.canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
         try {
-          const entries = await native.readDir(abs);
+          const entries = await agentNative.readDir(abs, projectRoot);
           return {
             path: abs,
             entries: entries.map((e) => ({ name: e.name, kind: e.kind })),
@@ -158,11 +167,13 @@ export function buildFsTools(ctx: ToolContext) {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);
         if (blocked) return { ...blocked, path };
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
         const reqPath = resolvePath(path, project);
-        const safety = await checkWritableCanonical(reqPath, native.canonicalize);
+        const safety = await checkWritableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, native.canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
 
         if (usePlanStore.getState().active) {
@@ -170,7 +181,7 @@ export function buildFsTools(ctx: ToolContext) {
           let isNewFile = false;
           let expectedFingerprint: ReadFingerprint | undefined;
           try {
-            const r = await native.readFile(abs);
+            const r = await agentNative.readFile(abs, projectRoot);
             if (r.kind === "text") {
               original = r.content;
               expectedFingerprint = fingerprintText(original);
@@ -182,6 +193,7 @@ export function buildFsTools(ctx: ToolContext) {
             id: newQueuedEditId(),
             kind: "write_file",
             path: abs,
+            projectRoot,
             originalContent: original,
             proposedContent: content,
             isNewFile,
@@ -195,7 +207,11 @@ export function buildFsTools(ctx: ToolContext) {
         }
 
         try {
-          await withFileMutationQueue(abs, () => native.writeFile(abs, content));
+          await withFileMutationQueue(
+            abs,
+            () => agentNative.writeFile(abs, content, projectRoot),
+            canonicalize,
+          );
           ctx.readCache.set(abs, fingerprintText(content));
           return { path: abs, bytesWritten: content.length, ok: true };
         } catch (e) {
@@ -215,17 +231,20 @@ export function buildFsTools(ctx: ToolContext) {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);
         if (blocked) return { ...blocked, path };
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
         const reqPath = resolvePath(path, project);
-        const safety = await checkWritableCanonical(reqPath, native.canonicalize);
+        const safety = await checkWritableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, native.canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
         if (usePlanStore.getState().active) {
           usePlanStore.getState().enqueue({
             id: newQueuedEditId(),
             kind: "create_directory",
             path: abs,
+            projectRoot,
             originalContent: "",
             proposedContent: "",
             isNewFile: true,
@@ -234,7 +253,7 @@ export function buildFsTools(ctx: ToolContext) {
           return { path: abs, queued_for_plan_review: true, ok: true };
         }
         try {
-          await native.createDir(abs);
+          await agentNative.createDir(abs, projectRoot);
           return { path: abs, ok: true };
         } catch (e) {
           return { error: String(e), path: abs };

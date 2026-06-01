@@ -7,9 +7,13 @@ use grep_searcher::sinks::UTF8;
 use grep_searcher::{BinaryDetection, SearcherBuilder};
 use ignore::{WalkBuilder, WalkState};
 use serde::Serialize;
+use std::path::PathBuf;
 
 use super::to_canon;
-use crate::modules::workspace::{authorize_existing_path, WorkspaceEnv, WorkspaceRegistry};
+use crate::modules::workspace::{
+    agent_path_is_readable, authorize_agent_existing_path, authorize_existing_path, WorkspaceEnv,
+    WorkspaceRegistry,
+};
 
 const FILE_SIZE_CAP: u64 = 5 * 1024 * 1024;
 const DEFAULT_MAX_RESULTS: usize = 200;
@@ -53,11 +57,60 @@ pub fn fs_grep(
     workspace: Option<WorkspaceEnv>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<GrepResponse, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root_path = authorize_existing_path(&registry, &root, &workspace)?;
+    fs_grep_at(
+        pattern,
+        root,
+        root_path,
+        glob,
+        case_insensitive,
+        max_results,
+        workspace,
+        false,
+    )
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn agent_fs_grep(
+    pattern: String,
+    root: String,
+    project_root: String,
+    glob: Option<Vec<String>>,
+    case_insensitive: Option<bool>,
+    max_results: Option<usize>,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<GrepResponse, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root_path = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    fs_grep_at(
+        pattern,
+        root,
+        root_path,
+        glob,
+        case_insensitive,
+        max_results,
+        workspace,
+        true,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn fs_grep_at(
+    pattern: String,
+    root: String,
+    root_path: PathBuf,
+    glob: Option<Vec<String>>,
+    case_insensitive: Option<bool>,
+    max_results: Option<usize>,
+    workspace: WorkspaceEnv,
+    filter_sensitive: bool,
+) -> Result<GrepResponse, String> {
     if pattern.is_empty() {
         return Err("empty pattern".into());
     }
-    let workspace = WorkspaceEnv::from_option(workspace);
-    let root_path = authorize_existing_path(&registry, &root, &workspace)?;
     if !root_path.is_dir() {
         return Err(format!("not a directory: {root}"));
     }
@@ -81,6 +134,7 @@ pub fn fs_grep(
         .ignore(true)
         .parents(true)
         .follow_links(false)
+        .filter_entry(move |dent| !filter_sensitive || agent_path_is_readable(dent.path()))
         .build_parallel();
 
     let hits: Arc<Mutex<Vec<GrepHit>>> = Arc::new(Mutex::new(Vec::new()));
@@ -188,11 +242,36 @@ pub fn fs_glob(
     workspace: Option<WorkspaceEnv>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<GlobResponse, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root_path = authorize_existing_path(&registry, &root, &workspace)?;
+    fs_glob_at(pattern, root, root_path, max_results, workspace, false)
+}
+
+#[tauri::command]
+pub fn agent_fs_glob(
+    pattern: String,
+    root: String,
+    project_root: String,
+    max_results: Option<usize>,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<GlobResponse, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root_path = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    fs_glob_at(pattern, root, root_path, max_results, workspace, true)
+}
+
+fn fs_glob_at(
+    pattern: String,
+    root: String,
+    root_path: PathBuf,
+    max_results: Option<usize>,
+    workspace: WorkspaceEnv,
+    filter_sensitive: bool,
+) -> Result<GlobResponse, String> {
     if pattern.is_empty() {
         return Err("empty pattern".into());
     }
-    let workspace = WorkspaceEnv::from_option(workspace);
-    let root_path = authorize_existing_path(&registry, &root, &workspace)?;
     if !root_path.is_dir() {
         return Err(format!("not a directory: {root}"));
     }
@@ -211,6 +290,7 @@ pub fn fs_glob(
         .ignore(true)
         .parents(true)
         .follow_links(false)
+        .filter_entry(move |dent| !filter_sensitive || agent_path_is_readable(dent.path()))
         .build();
 
     let mut hits: Vec<GlobHit> = Vec::new();
@@ -259,4 +339,61 @@ fn display_path(
         }
     }
     to_canon(path)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn agent_grep_and_glob_filter_sensitive_files() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().to_path_buf();
+        std::fs::write(root.join("normal.txt"), "needle").expect("write normal");
+        std::fs::write(root.join("server.pem"), "needle").expect("write secret");
+        let root_s = root.to_string_lossy().into_owned();
+
+        let app_grep = fs_grep_at(
+            "needle".into(),
+            root_s.clone(),
+            root.clone(),
+            None,
+            None,
+            None,
+            WorkspaceEnv::Local,
+            false,
+        )
+        .expect("app grep");
+        assert_eq!(app_grep.hits.len(), 2);
+
+        let agent_grep = fs_grep_at(
+            "needle".into(),
+            root_s.clone(),
+            root.clone(),
+            None,
+            None,
+            None,
+            WorkspaceEnv::Local,
+            true,
+        )
+        .expect("agent grep");
+        assert_eq!(agent_grep.hits.len(), 1);
+        assert_eq!(agent_grep.hits[0].rel, "normal.txt");
+
+        let app_glob = fs_glob_at(
+            "**/*".into(),
+            root_s.clone(),
+            root.clone(),
+            None,
+            WorkspaceEnv::Local,
+            false,
+        )
+        .expect("app glob");
+        assert_eq!(app_glob.hits.len(), 2);
+
+        let agent_glob = fs_glob_at("**/*".into(), root_s, root, None, WorkspaceEnv::Local, true)
+            .expect("agent glob");
+        assert_eq!(agent_glob.hits.len(), 1);
+        assert_eq!(agent_glob.hits[0].rel, "normal.txt");
+    }
 }

@@ -2,7 +2,7 @@ import type { UIMessage } from "@ai-sdk/react";
 import { type ModelId } from "../config";
 import { runAgentStream, type AgentUsageDelta } from "./agent";
 import type { ProviderKeys } from "./keyring";
-import { native } from "./native";
+import { agentNative } from "./native";
 import {
   atlasContextBlock,
   type AtlasToolProjectContext,
@@ -19,7 +19,7 @@ async function readAtlasMd(workspaceRoot: string | null): Promise<string | null>
   const cached = projectMemoryCache.get(workspaceRoot);
   if (cached && Date.now() - cached.mtime < 30_000) return cached.content;
   try {
-    const r = await native.readFile(path);
+    const r = await agentNative.readFile(path, workspaceRoot);
     if (r.kind !== "text") {
       projectMemoryCache.set(workspaceRoot, { content: null, mtime: Date.now() });
       return null;

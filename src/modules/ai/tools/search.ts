@@ -1,8 +1,9 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { native } from "../lib/native";
+import { agentNative } from "../lib/native";
 import { checkReadableCanonical } from "../lib/security";
 import {
+  checkFileAccessAllowed,
   resolveSearchRoot,
   validateWithinWorkspace,
   type ToolContext,
@@ -74,25 +75,32 @@ export function buildSearchTools(ctx: ToolContext) {
       }) => {
         const r = resolveRoot(root, ctx);
         if (!r.ok) return { error: r.error };
-        const safety = await checkReadableCanonical(r.path, native.canonicalize);
+        const project = ctx.getProjectContext();
+        const blocked = checkFileAccessAllowed(project);
+        if (blocked) return blocked;
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
+        const safety = await checkReadableCanonical(r.path, canonicalize);
         if (!safety.ok) return { error: safety.reason, root: r.path };
         r.path = safety.canonical;
-        const project = ctx.getProjectContext();
         const boundary = await validateWithinWorkspace(
           r.path,
           project,
-          native.canonicalize,
+          canonicalize,
         );
         if (!boundary.ok) return { error: boundary.reason, root: r.path };
         const cap = Math.min(max_results ?? 30, 500);
         try {
-          const res = await native.grep({
-            pattern,
-            root: r.path,
-            glob,
-            caseInsensitive: case_insensitive,
-            maxResults: cap,
-          });
+          const res = await agentNative.grep(
+            {
+              pattern,
+              root: r.path,
+              glob,
+              caseInsensitive: case_insensitive,
+              maxResults: cap,
+            },
+            projectRoot,
+          );
           return {
             root: r.path,
             hits: res.hits.map((h) => ({
@@ -121,22 +129,29 @@ export function buildSearchTools(ctx: ToolContext) {
       execute: async ({ pattern, root, max_results }) => {
         const r = resolveRoot(root, ctx);
         if (!r.ok) return { error: r.error };
-        const safety = await checkReadableCanonical(r.path, native.canonicalize);
+        const project = ctx.getProjectContext();
+        const blocked = checkFileAccessAllowed(project);
+        if (blocked) return blocked;
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
+        const safety = await checkReadableCanonical(r.path, canonicalize);
         if (!safety.ok) return { error: safety.reason, root: r.path };
         r.path = safety.canonical;
-        const project = ctx.getProjectContext();
         const boundary = await validateWithinWorkspace(
           r.path,
           project,
-          native.canonicalize,
+          canonicalize,
         );
         if (!boundary.ok) return { error: boundary.reason, root: r.path };
         try {
-          const res = await native.glob({
-            pattern,
-            root: r.path,
-            maxResults: max_results,
-          });
+          const res = await agentNative.glob(
+            {
+              pattern,
+              root: r.path,
+              maxResults: max_results,
+            },
+            projectRoot,
+          );
           return {
             root: r.path,
             hits: res.hits,

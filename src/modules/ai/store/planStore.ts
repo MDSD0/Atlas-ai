@@ -1,17 +1,28 @@
 import { create } from "zustand";
-import { native } from "../lib/native";
+import { agentNative } from "../lib/native";
+import {
+  fingerprintText,
+  fingerprintsMatch,
+  STALE_READ_ERROR,
+  type ReadFingerprint,
+} from "../tools/fingerprint";
+import { withFileMutationQueue } from "../tools/fileMutationQueue";
 
 export type QueuedEdit = {
   id: string;
   /** Tool that produced the queued mutation. */
   kind: "write_file" | "edit" | "multi_edit" | "create_directory";
   path: string;
+  /** Explicitly selected project root for native agent IPC. */
+  projectRoot: string;
   /** Original file content (empty for new files / create_directory). */
   originalContent: string;
   /** Proposed full content after edit (empty for create_directory). */
   proposedContent: string;
   /** True if the file did not exist when the edit was queued. */
   isNewFile: boolean;
+  /** Reviewed source fingerprint. Checked again before delayed plan writes. */
+  expectedFingerprint?: ReadFingerprint;
   /** Human-readable description, used for create_directory. */
   description?: string;
 };
@@ -34,6 +45,17 @@ export function newQueuedEditId(): string {
   return `q-${Date.now().toString(36)}-${(nextId++).toString(36)}`;
 }
 
+async function assertQueuedEditFresh(q: QueuedEdit): Promise<void> {
+  if (!q.expectedFingerprint) return;
+  const current = await agentNative.readFile(q.path, q.projectRoot);
+  if (
+    current.kind !== "text" ||
+    !fingerprintsMatch(q.expectedFingerprint, fingerprintText(current.content))
+  ) {
+    throw new Error(STALE_READ_ERROR);
+  }
+}
+
 export const usePlanStore = create<PlanState>((set, get) => ({
   active: false,
   queue: [],
@@ -51,9 +73,16 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     for (const q of items) {
       try {
         if (q.kind === "create_directory") {
-          await native.createDir(q.path);
+          await agentNative.createDir(q.path, q.projectRoot);
         } else {
-          await native.writeFile(q.path, q.proposedContent);
+          await withFileMutationQueue(
+            q.path,
+            async () => {
+              await assertQueuedEditFresh(q);
+              await agentNative.writeFile(q.path, q.proposedContent, q.projectRoot);
+            },
+            (p) => agentNative.canonicalize(p, q.projectRoot),
+          );
         }
         results.push({ id: q.id, ok: true });
       } catch (e) {

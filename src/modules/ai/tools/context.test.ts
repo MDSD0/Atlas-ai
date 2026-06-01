@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  checkFileAccessAllowed,
   checkMutationAllowed,
   resolvePath,
+  UNBOUND_FILE_ACCESS_ERROR,
   UNBOUND_MUTATION_ERROR,
   validateWithinWorkspace,
   type AtlasToolProjectContext,
@@ -73,6 +75,19 @@ describe("Atlas unbound mutation guard", () => {
 
   it("allows mutation when a project is bound", () => {
     expect(checkMutationAllowed(ctx({ workspaceRoot: "/repo" }))).toBeNull();
+  });
+});
+
+describe("Atlas unbound file-access guard", () => {
+  it("blocks agent file access when no project is bound", () => {
+    const blocked = checkFileAccessAllowed(
+      ctx({ projectId: null, workspaceRoot: null }),
+    );
+    expect(blocked).toEqual({ error: UNBOUND_FILE_ACCESS_ERROR });
+  });
+
+  it("allows agent file access when a project is bound", () => {
+    expect(checkFileAccessAllowed(ctx({ workspaceRoot: "/repo" }))).toBeNull();
   });
 });
 

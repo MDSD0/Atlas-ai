@@ -381,6 +381,33 @@ Source-parity packet:
 - Atlas-owned integration: wrap direct edits, direct full-file writes, and delayed Plan Mode writes. Different canonical files remain parallel; rejected operations release the queue.
 - Tests required: same canonical key serializes, canonical aliases serialize, different files run concurrently, and a rejected mutation releases the next waiter.
 
+Applied:
+
+- Added `src/modules/ai/tools/fileMutationQueue.ts`: a canonical-path-keyed promise queue with a short registration queue so aliases cannot race queue creation.
+- Wrapped direct edits, direct full-file writes, and delayed Plan Mode writes. New files fall back to the already-resolved target path when native canonicalization cannot resolve them yet.
+- Added `fileMutationQueue.test.ts` for same-key ordering, canonical aliases, cross-file parallelism, and rejection release.
+
+Verified (clean shell, final combined `verify-atlas.sh --all` exit 0): tsc 0, vitest 121 passed (13 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
+## Follow-up correction: bound shell auto-run arguments
+
+Source-parity packet:
+
+- Slice: harden the approval-mode safe shell shortcut added in `d2bccb1`.
+- Atlas files inspected: `src/modules/ai/lib/permissions.ts`, `permissions.test.ts`, `src/modules/ai/tools/shell.ts`, `src/modules/ai/lib/security.ts`.
+- opensrc refreshed: `anomalyco/opencode:packages/opencode/src/tool/shell.ts`, `packages/opencode/src/permission/arity.ts`, `packages/opencode/src/permission/index.ts`. The authenticated opensrc hook resolved the active cached checkout through the GitHub CLI keyring.
+- Disposition: `ADAPT` OpenCode's parsed, pattern-oriented shell permission stance. `REJECT` first-token-only auto-run classification: arguments can turn apparently read-only tools into mutation or secret-exfiltration paths (`env rm -rf /`, `find . -delete`, `git branch -D old`, `cat ~/.ssh/id_rsa`).
+- Atlas-owned integration: keep the lightweight classifier, but auto-run only fully bounded shapes: no-argument `pwd` / `date` / `whoami`, current-directory `ls` with flags only, `git status` with safe flags only, and one simple relative `open` target. All other shell calls still work through the approval path.
+- Tests required: preserve `open index.html`, `ls -la`, and `git status --short`; reject secret reads, environment output, executable wrappers, mutating `find` / `diff` / Git shapes, external or flagged `open`, and shell compounding.
+
+Applied:
+
+- Replaced first-token-only safe-shell classification with bounded argument checks.
+- Removed automatic approval for broad read-looking commands such as `cat`, `rg`, `find`, `diff`, and `env`; those remain available through the approval prompt.
+- Added regressions for secret reads, environment output, wrappers, mutating flags, Git mutations, external or flagged `open`, and compounded commands.
+
+Verified (clean shell, final combined `verify-atlas.sh --all` exit 0): tsc 0, vitest 121 passed (13 files), build 0, cargo check/clippy 0, cargo test 106 lib + 3 harness = 109.
+
 ## Feature slice: shared project/session binding flow
 
 Source-parity packet:
@@ -389,7 +416,7 @@ Source-parity packet:
 - Atlas files inspected: `src/modules/ai/store/chatStore.ts`, `src/modules/ai/lib/sessions.ts`, `src/modules/workspace/workspaceStore.ts`, `WelcomeScreen.tsx`, `src/modules/explorer/FileExplorer.tsx`, `src/modules/ai/components/AiInputBar.tsx`, `src/modules/ai/tools/context.ts`, `fs.ts`, `edit.ts`.
 - Reference: the Codex / Claude Code session+project switcher UX (composer project chip with existing projects, add-project, and unbound; sidebar open-project) supplied by the user as the target shape. Disposition `ADAPT` the affordance shape only; Atlas owns all binding logic against its existing `useWorkspaceStore` + `chatStore` session model. No upstream code copied. opensrc not consulted: this is UI composition over existing Atlas stores with no new subsystem or protocol (recorded exception per ATLAS.md source-parity hook).
 - Atlas-owned integration: `src/modules/workspace/projectFlow.ts` is the single flow (`openProjectFromDialog`/`FromPath`, `startUnboundSession`, `switchToProject`, `listKnownProjects`). It reuses the existing `setWorkspaceRoot` (fail-closed native authorize), `newSession` (binds current root), and `switchSession` (restores bound workspace) without changing them.
-- Fail-closed: extracted `checkMutationAllowed`/`UNBOUND_MUTATION_ERROR` in `context.ts`, replacing the duplicated inline `!project.workspaceRoot` guard in `write_file`, `create_directory`, `edit`, `multi_edit`. Unbound sessions chat and read but never mutate.
+- Fail-closed: extracted `checkMutationAllowed`/`UNBOUND_MUTATION_ERROR` in `context.ts`, replacing the duplicated inline `!project.workspaceRoot` guard in `write_file`, `create_directory`, `edit`, `multi_edit`. Slice 1.6 tightens unbound sessions further: they chat without inheriting filesystem access from bootstrapped app roots.
 - Rejected: repurposing the agent-panel dock/grid icons for project actions (they are not project/folder semantics).
 - Tests: two unit tests in `context.test.ts` prove the unbound guard blocks mutation (the "Create TODO.md" case) and allows it when bound. GUI flows (composer/sidebar/welcome open, A/B session switch restoring workspaceRoot) are user-verify because they need the Tauri window.
 
@@ -399,13 +426,70 @@ Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 112 passed (12 f
 
 Source-parity packet:
 
-- Slice: per-session approval modes (default / acceptEdits / full) plus a read-only/open auto-run allow-list, so low-risk actions flow without prompts while edits, shell, and protected areas stay controlled.
+- Slice: active-session approval modes (default / acceptEdits / full) plus a bounded safe-shell auto-run allow-list, so low-risk actions flow without prompts while edits, shell, and protected areas stay controlled.
 - Atlas files inspected: `src/modules/ai/lib/security.ts` (checkShellCommand circuit breaker, checkReadable/Writable deny-lists), `src/modules/ai/tools/{fs,edit,shell,terminal,tools}.ts`, `src/modules/ai/store/chatStore.ts`, `src/modules/ai/tools/context.ts`, `node_modules/@ai-sdk/provider-utils` (needsApproval type).
 - opensrc inspected (cache): `anomalyco/opencode:packages/opencode/src/permission/index.ts` (allow/ask/deny model). Freshness: cached fallback. Primary docs referenced: Claude Code permission modes and read-only bash allow-list (default/acceptEdits/bypassPermissions, protected paths never auto-approved, rm -rf circuit breaker) as the product pattern.
 - Disposition: `ADAPT` the allow/ask/deny shape into three named modes plus a read-only command allow-list. Atlas owns the classifier; no upstream code copied.
 - Key invariant (plan section 5.1 merge-blocker preserved): a mode only suppresses the approval PROMPT for an otherwise-permitted call. The deny layer is untouched and runs inside each tool's execute (checkShellCommand) and in Rust (native out-of-workspace, S0). "Full access" skips prompts but NOT the circuit breaker, secret deny-list, or native boundary. Verified by an explicit test that compounded commands (`open x && rm -rf /`) never classify as auto-run.
 - AI SDK: `needsApproval` accepts `boolean | (input, opts) => boolean | Promise<boolean>` (confirmed in `@ai-sdk/provider-utils` types), so modes are read at tool-call time without forking the SDK. The model's tool choice is never overridden; only the prompt is gated. If the model picks a propose-only tool over running, that is the model, not the harness.
-- Atlas-owned integration: `permissions.ts` (pure), `approvalMode` in chatStore (per-session, resets on new/switch), `getApprovalMode` on ToolContext, `AccessChip.tsx` composer control.
+- Atlas-owned integration: `permissions.ts` (pure), `approvalMode` in chatStore (active session, resets on new/switch), `getApprovalMode` on ToolContext, `AccessChip.tsx` composer control.
 - Tests: 7 unit tests in `permissions.test.ts` (auto-run allow-list, operator rejection, edit-mode matrix, shell-mode matrix, compounded-command safety). GUI mode switching is user-verify (Tauri window).
 
 Verified (clean shell): `pnpm exec tsc --noEmit` 0, `pnpm test` 119 passed (13 files), `verify-atlas.sh --fast` OK.
+
+## Slice 1.6: native agent project and secret-path boundary (S5)
+
+Source-parity packet:
+
+- Slice: separate app-authorized filesystem IPC from agent project IO so the agent cannot inherit bootstrapped home or launch-directory access, and enforce secret-path checks in Rust after canonicalization.
+- Atlas files inspected: `ATLAS.md`, `ATLAS_EXECUTION_PLAN.md`, `src-tauri/src/modules/workspace.rs`, `src-tauri/src/modules/fs/{file,tree,mutate,grep,search,watch}.rs`, `src-tauri/src/lib.rs`, `src/modules/ai/lib/{native,security,transport}.ts`, `src/modules/ai/tools/{context,fs,edit,search}.ts`, `src/modules/ai/store/planStore.ts`, `src/modules/editor/lib/useDocument.ts`, and `src/modules/explorer/lib/useFileTree.ts`.
+- Primary docs refreshed: Tauri 2 `Calling Rust from the Frontend` and `Capabilities`. Tauri commands are JavaScript-invokable Rust functions and can consume managed `State`, so Atlas policy belongs in thin Rust command shells backed by the registry.
+- opensrc refreshed through the authenticated GitHub CLI keyring: `crynta/terax-ai:src/modules/ai/lib/security.ts`, `anomalyco/opencode:packages/opencode/src/agent/agent.ts`, `packages/opencode/src/tool/read.ts`, `packages/opencode/src/tool/external-directory.ts`, and `packages/opencode/src/config/permission.ts`.
+- Disposition: `ADAPT` Terax's frontend sensitive-path classifier into a small dependency-free Rust policy core. Keep the existing frontend pass as defense in depth; Rust becomes authoritative for agent file IPC.
+- Disposition: `ADAPT` OpenCode's separate read and external-directory permission stance. Atlas keeps a stricter fixed deny-list for obvious secrets and uses an explicit project-root registry rather than exposing bootstrapped app roots to agent commands.
+- Disposition: `WRAP` Tauri managed `State` and custom commands. Add narrow `agent_fs_*` shells over existing filesystem primitives instead of changing editor and explorer IO.
+- Rejected behavior: applying the native secret deny-list to all `fs_*` commands. That would close the agent gap but also prevent a user from manually opening or editing `.env` in the desktop editor. App IO and model IO are distinct trust concepts.
+- Atlas-owned integration: track explicitly selected project roots separately from app-authorized roots; require one for every `agent_fs_*` command; re-check canonical existing paths and canonical existing parents for sensitive names and directories; filter recursive agent grep/glob traversal.
+- Tests required: project roots are distinct from bootstrapped app roots; agent read rejects `.env`, protected directories, and symlink-to-secret paths; agent write/create reject sensitive targets and protected parents; manual app IO remains usable; agent grep/glob never return sensitive files.
+- Freshness: refreshed.
+
+Applied:
+
+- Added `src-tauri/src/modules/workspace/agent_policy.rs`: a dependency-free native sensitive-path policy for agent reads and writes, including `.env*`, key files, credential filenames, protected directories, Windows verbatim paths, alternate data streams, and trailing dot/space normalization.
+- Split the registry into app-authorized roots and explicit agent project roots. `workspace_authorize_agent_project` registers selected projects without granting agent access to bootstrapped home or launch roots.
+- Added `agent_fs_*` wrappers for read, write, canonicalize, create-directory, read-directory, grep, and glob. Existing `fs_*` commands remain the manual editor/explorer lane.
+- Added the frontend `agentNative` facade and switched built-in model filesystem access, transport project-memory reads, and delayed Plan Mode writes to that lane.
+- Unbound chat sessions now reject all model-driven filesystem access, not only mutations.
+- Added native and frontend regressions for app-vs-agent root separation, `.env` refusal, protected-parent refusal, symlink-to-secret refusal after canonicalization, filtered recursive grep/glob, and bound/unbound file access.
+
+Verified (clean shell, final `verify-atlas.sh --all` exit 0): tsc 0, vitest 123 passed (13 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
+
+Known limitation: Tauri custom commands identify the invoking webview, not the JavaScript call site. This lane makes built-in model IO and forged `agent_fs_*` calls fail closed, but it is not a sandbox against fully compromised trusted webview code invoking the manual app lane. The distinction is explicit and intentional.
+
+## Slice 2.1: durable run, event, artifact, and verdict contracts
+
+Source-parity packet:
+
+- Slice: define the smallest provider-independent local proof journal before instrumenting tool hooks or building receipt UI.
+- Atlas files inspected: `ATLAS.md`, `ATLAS_EXECUTION_PLAN.md`, `src/modules/ai/lib/sessions.ts`, `src/modules/ai/store/chatStore.ts`, `src/modules/settings/store.ts`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/components/AgentRunBridge.tsx`, `node_modules/@tauri-apps/plugin-store/dist-js/index.js`, and `tests/fixtures/README.md`.
+- Primary docs refreshed: Tauri 2 `@tauri-apps/plugin-store` JavaScript reference, Tauri 2 `Calling Rust from the Frontend`, Claude Code `Hooks reference`, and Claude Code `Automate workflows with hooks`. The Store reference documents `LazyStore` as a backend-persisted key-value store under `app_data_dir` and `save()` as the explicit disk flush. Claude documents distinct lifecycle events and structured post-tool success/failure inputs.
+- opensrc refreshed through the authenticated GitHub CLI keyring: `All-Hands-AI/OpenHands:openhands/app_server/event/{event_service,event_service_base,filesystem_event_service}.py`, `anomalyco/opencode:packages/opencode/src/storage/storage.ts`, `packages/opencode/src/acp/event.ts`, and `openai/codex:codex-rs/app-server-client/src/lib.rs`.
+- Disposition: `ADAPT` OpenHands' independently addressable local event persistence and OpenCode's key-addressed local structured storage into a bounded Atlas journal. Keep `Run`, `Event`, `Artifact`, and `Verdict` provider-independent.
+- Disposition: `ADAPT` Codex's lossless-vs-noisy event distinction by bounding stored payload previews and preserving final verdict state separately from event previews. Slice 2.2 will decide which hook events are authoritative; Slice 2.1 only provides the contract.
+- Disposition: `WRAP` the existing Tauri Store plugin already used by Atlas sessions and settings. Explicit `save()` after journal mutations provides durable local receipts without a new database, Rust persistence module, dependency, watcher, or boot service.
+- Rejected behavior: adding SQLite, a custom Rust JSONL subsystem, or full tool-output persistence before measured need. This slice stores bounded UTF-8 previews and hashes, retains a bounded number of runs/events/artifacts, and keeps the core testable behind a tiny persistence interface.
+- Atlas-owned integration: `src/modules/ai/proof/` contains pure contracts plus a serialized journal repository and a thin Tauri Store adapter. Instrumentation belongs to Slice 2.2, not this slice.
+- Tests required: ordered append, UTF-8 payload truncation, restart restore, cancelled verdict, stable artifact IDs, and bounded retention.
+- Freshness: refreshed.
+
+Applied:
+
+- Added `src/modules/ai/proof/contracts.ts`: provider-independent `ProofRun`, `ProofEvent`, `ProofArtifact`, and `ProofVerdict` contracts with bounded UTF-8 previews, bounded lists, SHA-256 content hashing, and stable artifact IDs.
+- Added `src/modules/ai/proof/journal.ts`: a serialized local repository with explicit durable saves, ordered event sequences, restart restore, bounded retained runs, rolling bounded events/artifacts, dropped-item counters, and final verdict persistence.
+- Added `src/modules/ai/proof/persistence.ts`: a thin `LazyStore` adapter using `atlas-ai-proof-receipts.json` with `autoSave: false`; the journal explicitly flushes each mutation through `save()`.
+- Added `src/modules/ai/proof/index.ts`: the default journal export. Nothing imports it yet, so Slice 2.1 adds no boot work, runtime hook, IPC call, or extra dependency.
+- Added `src/modules/ai/proof/journal.test.ts` with six regressions covering ordered concurrent append, UTF-8 truncation, restart restore, cancelled verdicts, stable artifact IDs, and bounded run/event/artifact retention.
+
+Verified (clean shell, final `verify-atlas.sh --all` exit 0): tsc 0, vitest 129 passed (14 files), build 0 across 3148 modules, cargo check/clippy 0, cargo test 115 lib + 3 harness = 118.
+
+Performance note: retained storage is capped at 100 runs, 500 events per run, 100 artifacts per run, and 100 items per verdict list. Preview payloads cap at 2048 UTF-8 bytes, summaries at 256 bytes, and paths or commands at 4096 bytes.

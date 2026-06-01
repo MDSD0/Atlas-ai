@@ -130,6 +130,11 @@ export const native = {
       path,
       workspace: currentWorkspaceEnv(),
     }),
+  workspaceAuthorizeAgentProject: (path: string) =>
+    invoke<string>("workspace_authorize_agent_project", {
+      path,
+      workspace: currentWorkspaceEnv(),
+    }),
   readFile: (path: string) =>
     invoke<ReadResult>("fs_read_file", {
       path,
@@ -355,6 +360,70 @@ export const native = {
     invoke<string | null>("git_remote_url", {
       repoRoot,
       name: name ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+};
+
+export const agentNative = {
+  readFile: (path: string, projectRoot: string) =>
+    invoke<ReadResult>("agent_fs_read_file", {
+      path,
+      projectRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  writeFile: (path: string, content: string, projectRoot: string) =>
+    invoke<void>("agent_fs_write_file", {
+      path,
+      content,
+      projectRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  canonicalize: (path: string, projectRoot: string) =>
+    invoke<string>("agent_fs_canonicalize", {
+      path,
+      projectRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  createDir: (path: string, projectRoot: string) =>
+    invoke<void>("agent_fs_create_dir", {
+      path,
+      projectRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  readDir: (path: string, projectRoot: string) =>
+    invoke<DirEntry[]>("agent_fs_read_dir", {
+      path,
+      projectRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  grep: (
+    params: {
+      pattern: string;
+      root: string;
+      glob?: string[];
+      caseInsensitive?: boolean;
+      maxResults?: number;
+    },
+    projectRoot: string,
+  ) =>
+    invoke<GrepResponse>("agent_fs_grep", {
+      pattern: params.pattern,
+      root: params.root,
+      projectRoot,
+      glob: params.glob ?? null,
+      caseInsensitive: params.caseInsensitive ?? null,
+      maxResults: params.maxResults ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+  glob: (
+    params: { pattern: string; root: string; maxResults?: number },
+    projectRoot: string,
+  ) =>
+    invoke<GlobResponse>("agent_fs_glob", {
+      pattern: params.pattern,
+      root: params.root,
+      projectRoot,
+      maxResults: params.maxResults ?? null,
       workspace: currentWorkspaceEnv(),
     }),
 };

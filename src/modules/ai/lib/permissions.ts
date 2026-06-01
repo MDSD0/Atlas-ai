@@ -1,6 +1,6 @@
 // Approval policy. Pure functions: given the tool category, the command, and
 // the session's approval mode, decide whether a tool call needs an approval
-// PROMPT. This never decides whether a call is *allowed* — deny decisions
+// PROMPT. This never decides whether a call is *allowed*: deny decisions
 // (dangerous shell via checkShellCommand, secret paths via checkWritable, and
 // out-of-workspace via the native boundary) live inside each tool's execute and
 // the Rust layer, and are NEVER skipped by any mode. A mode only suppresses the
@@ -32,16 +32,32 @@ export const APPROVAL_MODES: {
   },
 ];
 
-// A single safe read-only or open command with no shell compounding. These
-// auto-run in every mode (matches Claude Code's read-only bash allow-list).
-const READONLY_COMMANDS = new Set([
-  "ls", "cat", "pwd", "head", "tail", "grep", "rg", "find", "diff", "stat",
-  "echo", "which", "open", "wc", "file", "du", "tree", "date", "whoami",
-  "printenv", "env",
+const NO_ARG_COMMANDS = new Set(["pwd", "date", "whoami"]);
+const SAFE_GIT_STATUS_FLAGS = new Set([
+  "-b",
+  "-s",
+  "--branch",
+  "--ignored",
+  "--porcelain",
+  "--porcelain=v1",
+  "--porcelain=v2",
+  "--short",
+  "--show-stash",
+  "--untracked-files=all",
+  "--untracked-files=no",
+  "--untracked-files=normal",
 ]);
-const READONLY_GIT = new Set([
-  "status", "log", "diff", "show", "branch", "remote", "describe", "rev-parse",
-]);
+
+function isFlag(token: string): boolean {
+  return token.startsWith("-") && token !== "-";
+}
+
+function isSimpleRelativeOpenTarget(token: string): boolean {
+  if (!/^[a-zA-Z0-9._/-]+$/.test(token)) return false;
+  if (token.startsWith("/") || token.startsWith("~")) return false;
+  const parts = token.split("/");
+  return parts.every((part) => part !== ".." && part.length > 0);
+}
 
 /**
  * True only for a single safe command with no shell operators. Any of
@@ -53,8 +69,20 @@ export function isAutoRunShell(command: string): boolean {
   if (!c) return false;
   if (/[;&|<>`\n\r]/.test(c) || c.includes("$(")) return false;
   const tokens = c.split(/\s+/);
-  if (tokens[0] === "git") return READONLY_GIT.has(tokens[1] ?? "");
-  return READONLY_COMMANDS.has(tokens[0]);
+  const [name, ...args] = tokens;
+  if (NO_ARG_COMMANDS.has(name)) return args.length === 0;
+  if (name === "ls") return args.every(isFlag);
+  if (name === "git") {
+    return (
+      args[0] === "status" &&
+      args.slice(1).every((arg) => SAFE_GIT_STATUS_FLAGS.has(arg))
+    );
+  }
+  return (
+    name === "open" &&
+    args.length === 1 &&
+    isSimpleRelativeOpenTarget(args[0])
+  );
 }
 
 /** Edits/writes: only the default mode prompts; acceptEdits and full auto-apply. */

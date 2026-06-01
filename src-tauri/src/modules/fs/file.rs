@@ -7,7 +7,8 @@ use tauri::Emitter;
 use tempfile::NamedTempFile;
 
 use crate::modules::workspace::{
-    authorize_existing_path, authorize_path_target, WorkspaceEnv, WorkspaceRegistry,
+    authorize_agent_existing_path, authorize_agent_path_target, authorize_existing_path,
+    authorize_path_target, WorkspaceEnv, WorkspaceRegistry,
 };
 
 const MAX_READ_BYTES: u64 = 10 * 1024 * 1024; // 10 MB
@@ -52,7 +53,11 @@ fn fs_read_file_inner(
 ) -> Result<ReadResult, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let p = authorize_existing_path(registry, &path, &workspace)?;
-    let meta = std::fs::metadata(&p).map_err(|e| {
+    read_file_at(&p)
+}
+
+fn read_file_at(p: &Path) -> Result<ReadResult, String> {
+    let meta = std::fs::metadata(p).map_err(|e| {
         log::debug!("fs_read_file stat({}) failed: {e}", p.display());
         e.to_string()
     })?;
@@ -65,7 +70,7 @@ fn fs_read_file_inner(
         });
     }
 
-    let bytes = std::fs::read(&p).map_err(|e| {
+    let bytes = std::fs::read(p).map_err(|e| {
         log::debug!("fs_read_file read({}) failed: {e}", p.display());
         e.to_string()
     })?;
@@ -81,6 +86,18 @@ fn fs_read_file_inner(
         Ok(content) => Ok(ReadResult::Text { content, size }),
         Err(_) => Ok(ReadResult::Binary { size }),
     }
+}
+
+#[tauri::command]
+pub fn agent_fs_read_file(
+    path: String,
+    project_root: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<ReadResult, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let p = authorize_agent_existing_path(&registry, &path, &project_root, &workspace)?;
+    read_file_at(&p)
 }
 
 #[tauri::command]
@@ -122,16 +139,33 @@ fn fs_write_file_inner_no_emit(
 ) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let target = authorize_path_target(registry, &path, &workspace)?;
-    let original_permissions = fs::metadata(&target).ok().map(|m| m.permissions());
-    write_atomic(&target, content.as_bytes()).map_err(|e| {
+    write_file_at(&target, &content)
+}
+
+fn write_file_at(target: &Path, content: &str) -> Result<(), String> {
+    let original_permissions = fs::metadata(target).ok().map(|m| m.permissions());
+    write_atomic(target, content.as_bytes()).map_err(|e| {
         log::warn!("fs_write_file({}) failed: {e}", target.display());
         e.to_string()
     })?;
 
     if let Some(perms) = original_permissions {
-        let _ = fs::set_permissions(&target, perms);
+        let _ = fs::set_permissions(target, perms);
     }
     Ok(())
+}
+
+#[tauri::command]
+pub fn agent_fs_write_file(
+    path: String,
+    content: String,
+    project_root: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let target = authorize_agent_path_target(&registry, &path, &project_root, &workspace)?;
+    write_file_at(&target, &content)
 }
 
 fn fs_write_file_inner(
@@ -183,6 +217,18 @@ pub fn fs_canonicalize(
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<String, String> {
     fs_canonicalize_inner(path, workspace, &registry)
+}
+
+#[tauri::command]
+pub fn agent_fs_canonicalize(
+    path: String,
+    project_root: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<String, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let canon = authorize_agent_existing_path(&registry, &path, &project_root, &workspace)?;
+    Ok(super::to_canon(&canon))
 }
 
 fn fs_stat_inner(
@@ -283,7 +329,10 @@ mod tests {
             Err(e) => e,
             Ok(_) => panic!("read outside authorized root must be rejected"),
         };
-        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+        assert!(
+            err.contains("outside the authorized workspace"),
+            "got: {err}"
+        );
     }
 
     #[cfg(unix)]
@@ -301,7 +350,10 @@ mod tests {
             Err(e) => e,
             Ok(_) => panic!("symlink escape must be rejected"),
         };
-        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+        assert!(
+            err.contains("outside the authorized workspace"),
+            "got: {err}"
+        );
     }
 
     #[test]
@@ -317,7 +369,10 @@ mod tests {
             &reg,
         )
         .expect_err("write outside authorized root must be rejected");
-        assert!(err.contains("outside the authorized workspace"), "got: {err}");
+        assert!(
+            err.contains("outside the authorized workspace"),
+            "got: {err}"
+        );
         assert!(!target.exists(), "rejected write must not create the file");
     }
 

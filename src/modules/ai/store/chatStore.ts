@@ -134,7 +134,7 @@ type StoreState = {
   executionCwdMode: ExecutionCwdMode;
   setExecutionCwdMode: (mode: ExecutionCwdMode) => void;
 
-  /** Per-session approval mode. Resets to "default" on every new session. */
+  /** Active-session approval mode. Resets to "default" on new or switched sessions. */
   approvalMode: ApprovalMode;
   setApprovalMode: (mode: ApprovalMode) => void;
 

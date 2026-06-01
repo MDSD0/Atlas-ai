@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { native } from "../lib/native";
+import { agentNative } from "../lib/native";
 import { checkWritableCanonical } from "../lib/security";
 import { newQueuedEditId, usePlanStore } from "../store/planStore";
 import {
@@ -24,22 +24,26 @@ type EditResult =
 
 export async function applyEdits(
   abs: string,
+  projectRoot: string,
   edits: { old_string: string; new_string: string; replace_all?: boolean }[],
   kind: "edit" | "multi_edit",
   readCache: Map<string, ReadFingerprint>,
 ): Promise<EditResult> {
+  const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
   return withFileMutationQueue(abs, () =>
-    applyEditsUnlocked(abs, edits, kind, readCache),
+    applyEditsUnlocked(abs, projectRoot, edits, kind, readCache),
+    canonicalize,
   );
 }
 
 async function applyEditsUnlocked(
   abs: string,
+  projectRoot: string,
   edits: { old_string: string; new_string: string; replace_all?: boolean }[],
   kind: "edit" | "multi_edit",
   readCache: Map<string, ReadFingerprint>,
 ): Promise<EditResult> {
-  const r = await native.readFile(abs);
+  const r = await agentNative.readFile(abs, projectRoot);
   if (r.kind === "binary")
     return { error: "binary file refused", path: abs };
   if (r.kind === "toolarge")
@@ -120,6 +124,7 @@ async function applyEditsUnlocked(
       id: newQueuedEditId(),
       kind,
       path: abs,
+      projectRoot,
       originalContent: original,
       proposedContent: content,
       isNewFile: false,
@@ -134,7 +139,7 @@ async function applyEditsUnlocked(
   }
 
   try {
-    await native.writeFile(abs, content);
+    await agentNative.writeFile(abs, content, projectRoot);
     readCache.set(abs, fingerprintText(content));
     return {
       ok: true,
@@ -165,11 +170,13 @@ export function buildEditTools(ctx: ToolContext) {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);
         if (blocked) return { ...blocked, path };
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
         const reqPath = resolvePath(path, project);
-        const safety = await checkWritableCanonical(reqPath, native.canonicalize);
+        const safety = await checkWritableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, native.canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {
@@ -180,6 +187,7 @@ export function buildEditTools(ctx: ToolContext) {
         }
         return applyEdits(
           abs,
+          projectRoot,
           [{ old_string, new_string, replace_all }],
           "edit",
           ctx.readCache,
@@ -207,11 +215,13 @@ export function buildEditTools(ctx: ToolContext) {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);
         if (blocked) return { ...blocked, path };
+        const projectRoot = project.workspaceRoot as string;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
         const reqPath = resolvePath(path, project);
-        const safety = await checkWritableCanonical(reqPath, native.canonicalize);
+        const safety = await checkWritableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, native.canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {
@@ -220,7 +230,7 @@ export function buildEditTools(ctx: ToolContext) {
             path: abs,
           };
         }
-        return applyEdits(abs, edits, "multi_edit", ctx.readCache);
+        return applyEdits(abs, projectRoot, edits, "multi_edit", ctx.readCache);
       },
     }),
   } as const;

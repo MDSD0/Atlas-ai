@@ -2,7 +2,10 @@ use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
 
-use crate::modules::workspace::{authorize_existing_path, WorkspaceEnv, WorkspaceRegistry};
+use crate::modules::workspace::{
+    agent_path_is_readable, authorize_agent_existing_path, authorize_existing_path, WorkspaceEnv,
+    WorkspaceRegistry,
+};
 
 #[derive(Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -33,7 +36,27 @@ pub fn fs_read_dir(
 ) -> Result<Vec<DirEntry>, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
     let root = authorize_existing_path(&registry, &path, &workspace)?;
-    let read = std::fs::read_dir(&root).map_err(|e| {
+    read_dir_entries(&root, show_hidden, false)
+}
+
+#[tauri::command]
+pub fn agent_fs_read_dir(
+    path: String,
+    project_root: String,
+    workspace: Option<WorkspaceEnv>,
+    registry: tauri::State<'_, WorkspaceRegistry>,
+) -> Result<Vec<DirEntry>, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root = authorize_agent_existing_path(&registry, &path, &project_root, &workspace)?;
+    read_dir_entries(&root, false, true)
+}
+
+fn read_dir_entries(
+    root: &std::path::Path,
+    show_hidden: bool,
+    filter_sensitive: bool,
+) -> Result<Vec<DirEntry>, String> {
+    let read = std::fs::read_dir(root).map_err(|e| {
         log::debug!("fs_read_dir({}) failed: {e}", root.display());
         e.to_string()
     })?;
@@ -42,6 +65,9 @@ pub fn fs_read_dir(
         .filter_map(Result::ok)
         .filter_map(|entry| {
             let name = entry.file_name().into_string().ok()?;
+            if filter_sensitive && !agent_path_is_readable(&entry.path()) {
+                return None;
+            }
 
             // `metadata()` follows symlinks → it returns the target's stat in
             // one syscall (file_type + size + mtime all derived from it). We

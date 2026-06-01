@@ -10,7 +10,6 @@ export {
 } from "./env";
 export {
   useWorkspaceStore,
-  workspaceBindingErrorMessage,
   type RecentWorkspace,
 } from "./workspaceStore";
 export { openFolderDialog } from "./openFolderDialog";
