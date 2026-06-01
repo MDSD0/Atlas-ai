@@ -789,6 +789,14 @@ The first `M2-V` fixture gate is deliberately measurable:
 
 Until this gate passes, defer expanded receipt UX, memory-provider adoption, broad LSP adapters, skill packaging, MCP integrations, and enterprise governance surfaces. Proof remains narrow: commands, diagnostics when available, changed files, and a final verdict grounded in real exit status.
 
+Implementation checkpoint `2026-06-01`:
+
+- `Slice 3.1` landed as the shared repository traversal floor.
+- `M2-V` now wraps official Tree-sitter tag queries for JavaScript, TypeScript/TSX, Python, and Rust; builds a lazy authorized snapshot; produces relation-aware task projection under a hard budget; and exposes the result through `repo_context`.
+- The deterministic mixed-stack fixture meets the first recall, same-name decoy, ignored-leakage, parse-degradation, and token-ratio gates.
+- Existing native watcher events invalidate snapshots when delivered. CodeReality separately expires cached snapshots after `4000ms`, keeping correctness inside the `<5s` refresh bound on hosts where native events are unavailable.
+- The native grep benchmark remains favorable: `68.198333ms` for 25 Atlas iterations versus `138.564584ms` for 25 `rg` subprocess iterations. Preserve native grep.
+
 ### Slice 3.1: Shared repository ignore policy
 
 Active Atlas files:

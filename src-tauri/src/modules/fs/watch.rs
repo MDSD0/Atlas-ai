@@ -1,14 +1,15 @@
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::modules::fs::ignore_policy::is_skipped_dir as is_skipped;
 use crate::modules::fs::to_canon;
+use crate::modules::reality::RealityState;
 use crate::modules::workspace::{resolve_path, WorkspaceEnv, WorkspaceRegistry};
 
 // Quiet-gap before a batch flushes; MAX_WINDOW caps latency under a long stream.
@@ -25,6 +26,7 @@ struct WatchInner {
     // Explorer (expanded dirs) and editor (dirs of open files) can request the
     // same dir; unwatch only when the last requester releases it.
     refcounts: HashMap<PathBuf, usize>,
+    reality_roots: HashSet<PathBuf>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -56,6 +58,7 @@ fn ensure_started(state: &FsWatchState, app: &AppHandle) -> Result<(), String> {
     *guard = Some(WatchInner {
         watcher,
         refcounts: HashMap::new(),
+        reality_roots: HashSet::new(),
     });
     Ok(())
 }
@@ -86,12 +89,9 @@ fn drain_loop(rx: mpsc::Receiver<notify::Result<Event>>, app: AppHandle) {
         if paths.is_empty() {
             continue;
         }
-        let _ = app.emit(
-            "fs:changed",
-            ChangedPayload {
-                paths: paths.into_iter().collect(),
-            },
-        );
+        let paths = paths.into_iter().collect::<Vec<_>>();
+        app.state::<RealityState>().invalidate_paths(&paths);
+        let _ = app.emit("fs:changed", ChangedPayload { paths });
     }
 }
 
@@ -108,7 +108,7 @@ fn collect(set: &mut HashSet<String>, ev: notify::Result<Event>) {
 fn add_paths(inner: &mut WatchInner, paths: Vec<PathBuf>) {
     for canonical in paths {
         let current = inner.refcounts.get(&canonical).copied().unwrap_or(0);
-        if current == 0 {
+        if current == 0 && !inner.reality_roots.contains(&canonical) {
             match inner.watcher.watch(&canonical, RecursiveMode::NonRecursive) {
                 Ok(()) => {
                     inner.refcounts.insert(canonical, 1);
@@ -126,11 +126,32 @@ fn remove_paths(inner: &mut WatchInner, paths: Vec<PathBuf>) {
         let current = inner.refcounts.get(&key).copied().unwrap_or(0);
         if current <= 1 {
             inner.refcounts.remove(&key);
-            let _ = inner.watcher.unwatch(&key);
+            if !inner.reality_roots.contains(&key) {
+                let _ = inner.watcher.unwatch(&key);
+            }
         } else {
             inner.refcounts.insert(key, current - 1);
         }
     }
+}
+
+pub fn watch_reality_root(
+    state: &FsWatchState,
+    app: &AppHandle,
+    root: &Path,
+) -> Result<(), String> {
+    ensure_started(state, app)?;
+    let mut guard = state.inner.lock().expect("fs watch state poisoned");
+    let inner = guard.as_mut().expect("watcher started");
+    if inner.reality_roots.contains(root) {
+        return Ok(());
+    }
+    inner
+        .watcher
+        .watch(root, RecursiveMode::Recursive)
+        .map_err(|e| e.to_string())?;
+    inner.reality_roots.insert(root.to_path_buf());
+    Ok(())
 }
 
 // Canonical keys keep add/remove symmetric regardless of how the path was spelled.
@@ -224,5 +245,49 @@ mod tests {
         collect(&mut set, modify());
         collect(&mut set, modify());
         assert_eq!(set.len(), 1);
+    }
+
+    #[test]
+    #[ignore = "native notify delivery varies by host; CodeReality also enforces a four-second rescan bound"]
+    fn native_recursive_watch_probe_observes_nested_change_within_five_seconds() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let nested = dir.path().join("src/nested");
+        std::fs::create_dir_all(&nested).expect("create nested dir");
+        let file = nested.join("app.ts");
+        let (tx, rx) = mpsc::channel();
+        let mut watcher = RecommendedWatcher::new(
+            move |event| {
+                let _ = tx.send(event);
+            },
+            Config::default(),
+        )
+        .expect("watcher");
+        watcher
+            .watch(dir.path(), RecursiveMode::Recursive)
+            .expect("watch root");
+
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let mut attempt = 0;
+        loop {
+            attempt += 1;
+            std::fs::write(&file, format!("after-{attempt}")).expect("write edit");
+            let timeout =
+                Duration::from_millis(200).min(deadline.saturating_duration_since(Instant::now()));
+            match rx.recv_timeout(timeout) {
+                Ok(event) => {
+                    if event
+                        .expect("notify event")
+                        .paths
+                        .iter()
+                        .any(|path| path == &file)
+                    {
+                        break;
+                    }
+                }
+                Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => panic!("notify channel disconnected"),
+            }
+            assert!(Instant::now() < deadline, "nested edit event timed out");
+        }
     }
 }

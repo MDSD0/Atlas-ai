@@ -352,6 +352,9 @@ fn display_path(
 
 #[cfg(test)]
 mod tests {
+    use std::process::Command;
+    use std::time::Instant;
+
     use super::*;
 
     #[test]
@@ -410,5 +413,54 @@ mod tests {
         assert_eq!(agent_glob.hits.len(), 1);
         assert_eq!(agent_glob.hits[0].rel, "normal.txt");
         assert_eq!(agent_glob.skipped_dirs, 1);
+    }
+
+    #[test]
+    #[ignore = "run explicitly for the M2 native grep benchmark"]
+    fn benchmark_native_grep_vs_ripgrep_fixture() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path().to_path_buf();
+        std::fs::create_dir(root.join(".git")).expect("create git metadata");
+        std::fs::create_dir(root.join("src")).expect("create source dir");
+        std::fs::create_dir(root.join("dist")).expect("create generated dir");
+        std::fs::write(root.join(".gitignore"), "dist/\n").expect("write gitignore");
+        std::fs::write(root.join("src/app.ts"), "needle\n".repeat(200)).expect("write source");
+        std::fs::write(root.join("dist/generated.ts"), "needle\n".repeat(200))
+            .expect("write generated");
+        let root_s = root.to_string_lossy().into_owned();
+        let iterations = 25;
+
+        let native_start = Instant::now();
+        for _ in 0..iterations {
+            let result = fs_grep_at(
+                "needle".into(),
+                root_s.clone(),
+                root.clone(),
+                None,
+                None,
+                Some(2000),
+                WorkspaceEnv::Local,
+                false,
+            )
+            .expect("native grep");
+            assert_eq!(result.hits.len(), 200);
+        }
+        let native_elapsed = native_start.elapsed();
+
+        let rg_start = Instant::now();
+        for _ in 0..iterations {
+            let output = Command::new("rg")
+                .args(["--no-heading", "--line-number", "needle", &root_s])
+                .output()
+                .expect("run rg");
+            assert!(output.status.success());
+            assert_eq!(String::from_utf8_lossy(&output.stdout).lines().count(), 200);
+        }
+        let rg_elapsed = rg_start.elapsed();
+
+        eprintln!(
+            "native grep {:?}; rg subprocess {:?}; iterations {}",
+            native_elapsed, rg_elapsed, iterations
+        );
     }
 }

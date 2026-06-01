@@ -4,6 +4,7 @@ import { buildLanguageModel } from "../lib/agent";
 import type { ProviderKeys } from "../lib/keyring";
 import type { ToolContext } from "../tools/context";
 import { buildFsTools } from "../tools/fs";
+import { buildRealityTools } from "../tools/reality";
 import { buildSearchTools } from "../tools/search";
 import { SUBAGENTS, type SubagentType } from "./registry";
 
@@ -39,6 +40,7 @@ export async function runSubagent({
 
   const readOnly: Record<string, unknown> = {
     ...buildFsTools(toolContext),
+    ...buildRealityTools(toolContext),
     ...buildSearchTools(toolContext),
   };
   const tools: Record<string, unknown> = {};

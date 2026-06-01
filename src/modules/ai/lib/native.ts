@@ -42,6 +42,35 @@ export type GlobResponse = {
   skipped_dirs: number;
 };
 
+export type RepoContextResponse = {
+  root: string;
+  indexed_at_ms: number;
+  cache_hit: boolean;
+  watch_status: string;
+  rescan_bound_ms: number;
+  file_count: number;
+  symbol_count: number;
+  definition_count: number;
+  reference_count: number;
+  parse_failures: number;
+  skipped_dirs: number;
+  truncated: boolean;
+  max_tokens: number;
+  projected_tokens: number;
+  naive_tokens: number;
+  included_files: string[];
+  excluded_files: number;
+  degraded_files: Array<{ path: string; status: string }>;
+  matches: Array<{
+    path: string;
+    name: string;
+    kind: string;
+    line: number;
+    is_definition: boolean;
+  }>;
+  context: string;
+};
+
 export type GitRepoInfo = {
   repoRoot: string;
   branch: string;
@@ -429,6 +458,14 @@ export const agentNative = {
       root: params.root,
       projectRoot,
       maxResults: params.maxResults ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+  repoContext: (task: string, projectRoot: string, maxTokens?: number) =>
+    invoke<RepoContextResponse>("agent_reality_context", {
+      task,
+      root: projectRoot,
+      projectRoot,
+      maxTokens: maxTokens ?? null,
       workspace: currentWorkspaceEnv(),
     }),
 };

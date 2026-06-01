@@ -34,6 +34,8 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
     list_directory: (i) => `Listing ${shortPath(i.path)}`,
     grep: (i) => `Grepping ${ellipsize(String(i.pattern ?? ""), 40)}`,
     glob: (i) => `Globbing ${ellipsize(String(i.pattern ?? ""), 40)}`,
+    repo_context: (i) =>
+      `Mapping ${ellipsize(String(i.task ?? "repository"), 40)}`,
     edit: (i) => `Editing ${shortPath(i.path)}`,
     multi_edit: (i) => `Editing ${shortPath(i.path)}`,
     write_file: (i) => `Writing ${shortPath(i.path)}`,
@@ -276,7 +278,7 @@ export function buildConfiguredLanguageModel(
 }
 
 const PLAN_MODE_PROMPT = `## PLAN MODE — ACTIVE
-Mutating tools (write_file, edit, multi_edit, create_directory) will queue their changes for the user to review as a single diff. Do NOT execute bash_run or bash_background while plan mode is active — restrict yourself to reads (read_file, grep, glob, list_directory) and the queued mutations. After queueing the full set of edits, stop and return a brief summary; do not continue acting until the user has accepted/rejected.`;
+Mutating tools (write_file, edit, multi_edit, create_directory) will queue their changes for the user to review as a single diff. Do NOT execute bash_run or bash_background while plan mode is active; restrict yourself to reads (repo_context, read_file, grep, glob, list_directory) and the queued mutations. After queueing the full set of edits, stop and return a brief summary; do not continue acting until the user has accepted/rejected.`;
 
 function buildStableSystem(
   modelId: ModelId,

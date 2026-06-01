@@ -13,7 +13,13 @@ export type SubagentDef = {
   systemPrompt: string;
 };
 
-const READ_ONLY_TOOLS = ["read_file", "list_directory", "grep", "glob"];
+const READ_ONLY_TOOLS = [
+  "repo_context",
+  "read_file",
+  "list_directory",
+  "grep",
+  "glob",
+];
 
 export const SUBAGENTS: Record<SubagentType, SubagentDef> = {
   explore: {
@@ -22,7 +28,7 @@ export const SUBAGENTS: Record<SubagentType, SubagentDef> = {
     description:
       "Read-only codebase explorer. Locates files, traces references, summarizes architecture.",
     tools: READ_ONLY_TOOLS,
-    systemPrompt: `You are an exploration subagent. Your job is to answer the spawn question by READING the codebase only — no edits, no commands. Use grep/glob/list_directory/read_file. Be terse. Return a concise summary suitable for the main agent to act on (file paths, key findings, line numbers). Stop as soon as you can answer.`,
+    systemPrompt: `You are an exploration subagent. Your job is to answer the spawn question by READING the codebase only; no edits, no commands. Use repo_context once for broad questions, then grep/glob/list_directory/read_file as needed. Be terse. Return a concise summary suitable for the main agent to act on (file paths, key findings, line numbers). Stop as soon as you can answer.`,
   },
   "code-review": {
     id: "code-review",

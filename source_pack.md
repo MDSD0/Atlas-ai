@@ -547,3 +547,36 @@ Applied:
 Focused verification: `pnpm exec tsc --noEmit` 0, `git diff --check` 0, `cargo test --locked modules::fs` 26 passed.
 
 Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 136 passed (16 files), build 0 across 3155 modules, cargo check/clippy 0, cargo test 118 lib + 3 harness.
+
+## M2-V: lazy CodeReality snapshot and budgeted task projection
+
+Source-parity packet:
+
+- Slice: collapse Phase 3 inventory, first-language symbol extraction, bounded local graph use, watcher invalidation, and task projection into one measured vertical implementation.
+- Atlas files inspected: `src-tauri/Cargo.toml`, `src-tauri/src/{lib,modules/mod}.rs`, `src-tauri/src/modules/fs/{ignore_policy,watch}.rs`, `src/modules/ai/lib/native.ts`, `src/modules/ai/tools/{tools,search,context}.ts`, `src/modules/ai/agents/runSubagent.ts`, and `tests/fixtures/`.
+- Primary documentation inspected: Tree-sitter `Using Parsers`, Tree-sitter `tags` CLI documentation, `tree-sitter-tags` crate documentation, and the language-crate Rust bindings for JavaScript `0.25.0`, TypeScript/TSX `0.23.2`, Python `0.25.0`, and Rust `0.24.2`.
+- opensrc refreshed through the authenticated GitHub CLI keyring: `Aider-AI/aider`, `DeusData/codebase-memory-mcp`, `tree-sitter/tree-sitter`, `tree-sitter/tree-sitter-javascript`, `tree-sitter/tree-sitter-typescript`, `tree-sitter/tree-sitter-python`, and `tree-sitter/tree-sitter-rust`.
+- Exact upstream files inspected: `Aider-AI/aider:aider/repomap.py`; `DeusData/codebase-memory-mcp:src/{discover/discover.c,graph_buffer/graph_buffer.h,watcher/watcher.c}`; `tree-sitter/tree-sitter:crates/tags/src/tags.rs`; each grammar's `bindings/rust/lib.rs` and `queries/tags.scm`.
+- Disposition: `WRAP` `tree-sitter-tags::TagsConfiguration` and `TagsContext`, plus maintained grammar `LANGUAGE`, `TAGS_QUERY`, and available `LOCALS_QUERY` constants. `ADAPT` Aider's cached tag inventory, identifier mention boosts, related definition/reference ranking, and strict token-budget fitting. `ADAPT` codebase-memory's bounded local graph buffer and file-level invalidation, but keep Atlas's first implementation in memory and lazy.
+- Atlas-owned integration: add a Rust `reality` module with a lazy per-root cache, authorized command shell, shared-ignore walk, compact file and symbol records, watcher-triggered root invalidation, deterministic task ranking, and inspectable projection metadata. Add one read-only `repo_context` tool over the narrow native command.
+- Rejected behavior: no SQLite graph store, custom parser, custom tags query, background boot indexer, semantic embedding layer, Cypher engine, or full PageRank dependency in this milestone. They add cost before the fixture metrics justify them. No context-panel UI yet; the agent tool result is the first inspectable surface.
+- Parity tests required: official tag-query extraction for JavaScript, TypeScript/TSX, Python, and Rust; ignored/generated exclusion; strict projection budget; deterministic mentioned-symbol ranking; parse errors become explicit degraded records; watcher invalidation removes stale cached roots.
+- Freshness: refreshed upstream snapshots and registry-resolved crate sources.
+
+Follow-up freshness evidence:
+
+- Exact upstream inspected: `notify-rs/notify:notify/src/lib.rs` at registry package `notify 8.2.0`. The maintained documentation identifies `PollWatcher` as the fallback when native event delivery is unavailable and warns that filesystem backends vary.
+- Atlas decision: keep the existing shared native watcher as the low-latency invalidation path, but do not make CodeReality correctness depend on native delivery. A lazy snapshot expires after `4000ms`, so each later `repo_context` request rebuilds within the `<5s` fixture bound even on hosts where native FSEvents do not deliver.
+- Host probe: the ignored `native_recursive_watch_probe_observes_nested_change_within_five_seconds` diagnostic did not receive FSEvents in this macOS host process. It remains available for platform qualification and is intentionally not a merge-blocking unit test.
+
+Applied:
+
+- Added `src-tauri/src/modules/reality/` with an authorized, lazy per-project snapshot; shared-ignore traversal; official Tree-sitter tag extraction for JavaScript, TypeScript/TSX, Python, and Rust; compact file and symbol records; explicit degradation; deterministic relation-aware scoring; and strict token-budget projection.
+- Added a read-only `repo_context` agent tool for the normal loop and sub-agents. Prompt policy says to use current repository evidence for broad work and to let it outrank memory.
+- Reused Atlas's existing filesystem watcher for recursive project-root invalidation. The command reports `watch_status`, and the snapshot layer enforces a separate `rescan_bound_ms: 4000` correctness fallback.
+- Added the deterministic `mixed-stack` fixture with a same-name archive decoy. Its first gate proves four-language extraction, key-file recall `>=85%`, zero decoy selection, ignored/generated exclusion, and projection `<=40%` of naive context.
+- Added an ignored native-grep benchmark: 25 fixture iterations measured Atlas native grep at `68.198333ms` and an `rg` subprocess at `138.564584ms`. Preserve the existing native implementation.
+
+Focused verification: `pnpm exec tsc --noEmit` 0, `git diff --check` 0, `cargo test --locked modules::reality` 9 passed, `cargo test --locked modules::fs::watch` 1 passed + 1 host probe ignored, explicit native-grep benchmark passed.
+
+Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 136 passed (16 files), build 0 across 3156 modules, cargo check/clippy 0, cargo test 127 lib passed + 2 intentional diagnostics ignored + 3 harness passed.

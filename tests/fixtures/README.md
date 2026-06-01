@@ -15,7 +15,7 @@ Plan reference: `ATLAS_EXECUTION_PLAN.md` section 7.2.
 | `ignore-heavy` | ready | Phase 1 search, Phase 3 ignore policy |
 | `symlink-escape` | deferred | Phase 1 native fs auth (built with Slice 1.1; symlinks created at runtime, not committed) |
 | `proof-failure` | deferred | Phase 2/5 proof receipts |
-| `mixed-stack` | deferred | Phase 3 multi-language inventory |
+| `mixed-stack` | ready | Phase 3 multi-language inventory and projection |
 | `lsp-missing` | deferred | Phase 4 graceful LSP degradation |
 | `memory-stale` | deferred | Phase 6 memory invalidation |
 
