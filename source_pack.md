@@ -520,3 +520,30 @@ Source-parity packet:
 - Deferred (avoids overbuild): mini-window click-through needs the live file-open bridge (optional `onOpenFile` left unwired there); run-history list and receipt→terminal/diff deep links are later slices.
 
 Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 136 passed (16 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.
+
+## Slice 3.1: shared repository ignore policy
+
+Source-parity packet:
+
+- Slice: centralize the repository traversal policy before adding CodeReality inventory, so watcher, explorer search, native grep, glob, and the future inventory agree on one bounded tree.
+- Atlas files inspected: `src-tauri/src/modules/fs/{mod,watch,search,grep,ignore_policy}.rs`, `src/modules/ai/lib/native.ts`, `src/modules/ai/tools/search.ts`, `ATLAS.md`, and `ATLAS_EXECUTION_PLAN.md`.
+- Primary documentation inspected: `ignore` crate `WalkBuilder` docs (`ignore` 0.4.25) and Aider's repository-map documentation. `WalkBuilder` already supports `.ignore`, `.gitignore`, `.git/info/exclude`, global gitignore, hidden-file filtering, symlink policy, and `filter_entry` directory pruning.
+- opensrc refreshed through the authenticated GitHub CLI keyring: `Aider-AI/aider`, `Aider-AI/grep-ast`, `oraios/serena`, `DeusData/codebase-memory-mcp`, `QuantaAlpha/RepoMaster`, `tree-sitter/tree-sitter`, `sourcegraph/scip`, and `microsoft/language-server-protocol`.
+- Exact upstream files inspected: `DeusData/codebase-memory-mcp:src/discover/discover.c` and `Aider-AI/aider:aider/watch.py`.
+- Disposition: `WRAP` the Rust `ignore::WalkBuilder` traversal engine rather than reimplementing ignore-file semantics. `ADAPT` codebase-memory's layered approach: unconditional generated and dependency directory pruning on top of gitignore traversal, skip symlink traversal, and expose a skipped-directory count. `ADAPT` Aider's stance that watcher scope must apply the same ignore rules as the repository view.
+- Atlas-owned integration: add `src-tauri/src/modules/fs/ignore_policy.rs` as the small shared policy module. Keep existing native grep and file-walk implementations; replace their duplicated walker setup and local skip arrays with the shared adapter. Future CodeReality inventory must use the same adapter.
+- Rejected behavior: do not import codebase-memory's custom C gitignore matcher or add a new `.atlasignore` format in this slice. The existing Rust crate already owns standard ignore behavior, and a new Atlas-specific format has no measured need yet.
+- Parity tests required: known generated directories prune by basename; `.gitignore` entries prune through the shared walker; app and agent grep/glob both skip generated trees; agent grep/glob continue to remove sensitive files.
+- Freshness: refreshed upstream snapshots through `scripts/consult-opensrc.sh`; resolved opensrc snapshots do not expose Git metadata, so no snapshot commit hash is available. Official `ignore` documentation inspected at version `0.4.25`.
+
+Applied:
+
+- Added `src-tauri/src/modules/fs/ignore_policy.rs` with the shared generated/dependency directory list, the shared `WalkBuilder` adapter, the default content-size cap, and a thread-safe skipped-directory counter.
+- Replaced the watcher-local directory list and the duplicated search, list-files, grep, and glob walker configuration with the shared policy.
+- Added `skipped_dirs` to native search, list-files, grep, and glob responses. Agent grep and glob tool results now surface the count.
+- Added regressions for repository-scoped `.gitignore` handling, generated-directory pruning, monotonic skip counts, and continued agent sensitive-file filtering.
+- Patched `ATLAS_EXECUTION_PLAN.md` with the accelerated `M2-V` delivery mode: one measured CodeReality vertical slice after Slice 3.1, with explicit recall, decoy, token-budget, leakage, refresh, degradation, and grep-benchmark gates.
+
+Focused verification: `pnpm exec tsc --noEmit` 0, `git diff --check` 0, `cargo test --locked modules::fs` 26 passed.
+
+Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, vitest 136 passed (16 files), build 0 across 3155 modules, cargo check/clippy 0, cargo test 118 lib + 3 harness.

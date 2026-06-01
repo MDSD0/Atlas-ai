@@ -36,6 +36,7 @@ type SearchHit = {
 type SearchResult = {
   hits: SearchHit[];
   truncated: boolean;
+  skipped_dirs: number;
 };
 
 const MIN_QUERY_LEN = 2;

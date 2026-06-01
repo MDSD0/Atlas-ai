@@ -1,5 +1,6 @@
 pub mod file;
 pub mod grep;
+pub mod ignore_policy;
 pub mod mutate;
 pub mod search;
 pub mod tree;

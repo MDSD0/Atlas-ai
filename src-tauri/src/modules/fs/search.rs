@@ -1,6 +1,7 @@
-use ignore::WalkBuilder;
 use serde::Serialize;
+use std::sync::Arc;
 
+use super::ignore_policy::{configure_walk, is_skipped_dir, SkipCounter};
 use super::to_canon;
 use crate::modules::workspace::{authorize_existing_path, WorkspaceEnv, WorkspaceRegistry};
 
@@ -20,27 +21,13 @@ pub struct SearchResult {
     pub hits: Vec<SearchHit>,
     /// True if the scan stopped early (entry budget or hit cap reached).
     pub truncated: bool,
+    pub skipped_dirs: usize,
 }
 
 /// Hard cap on entries the walker is allowed to visit before bailing. Protects
 /// against pathological roots like $HOME where there's no .gitignore and the
 /// tree is effectively unbounded.
 const MAX_SCANNED: usize = 50_000;
-
-/// Directory names pruned unconditionally — they're rarely useful in a
-/// file-explorer search and they dominate scan time when present.
-const PRUNE_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    "target",
-    "dist",
-    "build",
-    ".next",
-    ".turbo",
-    ".cache",
-    ".venv",
-    "__pycache__",
-];
 
 #[tauri::command]
 pub fn fs_search(
@@ -56,6 +43,7 @@ pub fn fs_search(
         return Ok(SearchResult {
             hits: Vec::new(),
             truncated: false,
+            skipped_dirs: 0,
         });
     }
     let cap = limit.unwrap_or(200).min(1000);
@@ -70,24 +58,15 @@ pub fn fs_search(
     let mut scanned: usize = 0;
     let mut truncated = false;
 
-    let walker = WalkBuilder::new(&root_path)
-        .hidden(!show_hidden)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .ignore(true)
-        .parents(true)
-        .follow_links(false)
-        .filter_entry(|dent| {
-            // Prune known-heavy dirs even when no .gitignore is present (e.g.
-            // searching from $HOME).
-            if dent.depth() == 0 {
-                return true;
+    let skipped = Arc::new(SkipCounter::default());
+    let skipped_filter = skipped.clone();
+    let walker = configure_walk(&root_path, show_hidden)
+        .filter_entry(move |dent| {
+            if dent.depth() > 0 && is_skipped_dir(dent.path()) {
+                skipped_filter.record_skip();
+                return false;
             }
-            match dent.file_name().to_str() {
-                Some(name) => !PRUNE_DIRS.contains(&name),
-                None => true,
-            }
+            true
         })
         .build();
 
@@ -135,6 +114,7 @@ pub fn fs_search(
     Ok(SearchResult {
         hits: out,
         truncated,
+        skipped_dirs: skipped.skipped(),
     })
 }
 
@@ -142,6 +122,7 @@ pub fn fs_search(
 pub struct ListFilesResult {
     pub files: Vec<String>,
     pub truncated: bool,
+    pub skipped_dirs: usize,
 }
 
 #[tauri::command]
@@ -167,23 +148,16 @@ pub fn fs_list_files(
         return Err(format!("not a directory: {root}"));
     }
 
-    let walker = WalkBuilder::new(&root_path)
-        .hidden(!show_hidden)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .ignore(true)
-        .parents(true)
-        .follow_links(false)
+    let skipped = Arc::new(SkipCounter::default());
+    let skipped_filter = skipped.clone();
+    let walker = configure_walk(&root_path, show_hidden)
         .max_depth(Some(depth))
-        .filter_entry(|dent| {
-            if dent.depth() == 0 {
-                return true;
+        .filter_entry(move |dent| {
+            if dent.depth() > 0 && is_skipped_dir(dent.path()) {
+                skipped_filter.record_skip();
+                return false;
             }
-            match dent.file_name().to_str() {
-                Some(name) => !PRUNE_DIRS.contains(&name),
-                None => true,
-            }
+            true
         })
         .build();
 
@@ -217,7 +191,11 @@ pub fn fs_list_files(
     }
 
     files.sort_by_key(|a| a.to_lowercase());
-    Ok(ListFilesResult { files, truncated })
+    Ok(ListFilesResult {
+        files,
+        truncated,
+        skipped_dirs: skipped.skipped(),
+    })
 }
 
 fn display_path(

@@ -5,17 +5,17 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 use grep_regex::RegexMatcherBuilder;
 use grep_searcher::sinks::UTF8;
 use grep_searcher::{BinaryDetection, SearcherBuilder};
-use ignore::{WalkBuilder, WalkState};
+use ignore::WalkState;
 use serde::Serialize;
 use std::path::PathBuf;
 
+use super::ignore_policy::{configure_walk, is_skipped_dir, SkipCounter, DEFAULT_FILE_SIZE_CAP};
 use super::to_canon;
 use crate::modules::workspace::{
     agent_path_is_readable, authorize_agent_existing_path, authorize_existing_path, WorkspaceEnv,
     WorkspaceRegistry,
 };
 
-const FILE_SIZE_CAP: u64 = 5 * 1024 * 1024;
 const DEFAULT_MAX_RESULTS: usize = 200;
 const HARD_MAX_RESULTS: usize = 2000;
 
@@ -32,6 +32,7 @@ pub struct GrepResponse {
     pub hits: Vec<GrepHit>,
     pub truncated: bool,
     pub files_scanned: usize,
+    pub skipped_dirs: usize,
 }
 
 fn build_globset(patterns: &[String]) -> Result<Option<GlobSet>, String> {
@@ -126,15 +127,16 @@ fn fs_grep_at(
 
     let globs = build_globset(glob.as_deref().unwrap_or(&[]))?;
 
-    let walker = WalkBuilder::new(&root_path)
-        .hidden(true)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .ignore(true)
-        .parents(true)
-        .follow_links(false)
-        .filter_entry(move |dent| !filter_sensitive || agent_path_is_readable(dent.path()))
+    let skipped = Arc::new(SkipCounter::default());
+    let skipped_filter = skipped.clone();
+    let walker = configure_walk(&root_path, false)
+        .filter_entry(move |dent| {
+            if dent.depth() > 0 && is_skipped_dir(dent.path()) {
+                skipped_filter.record_skip();
+                return false;
+            }
+            !filter_sensitive || agent_path_is_readable(dent.path())
+        })
         .build_parallel();
 
     let hits: Arc<Mutex<Vec<GrepHit>>> = Arc::new(Mutex::new(Vec::new()));
@@ -173,7 +175,7 @@ fn fs_grep_at(
                 }
             }
             if let Ok(meta) = std::fs::metadata(path) {
-                if meta.len() > FILE_SIZE_CAP {
+                if meta.len() > DEFAULT_FILE_SIZE_CAP {
                     return WalkState::Continue;
                 }
             }
@@ -219,6 +221,7 @@ fn fs_grep_at(
         hits: final_hits,
         truncated: truncated.load(Ordering::Relaxed),
         files_scanned: scanned.load(Ordering::Relaxed),
+        skipped_dirs: skipped.skipped(),
     })
 }
 
@@ -232,6 +235,7 @@ pub struct GlobHit {
 pub struct GlobResponse {
     pub hits: Vec<GlobHit>,
     pub truncated: bool,
+    pub skipped_dirs: usize,
 }
 
 #[tauri::command]
@@ -282,15 +286,16 @@ fn fs_glob_at(
     gb.add(glob);
     let set = gb.build().map_err(|e| format!("globset build: {e}"))?;
 
-    let walker = WalkBuilder::new(&root_path)
-        .hidden(true)
-        .git_ignore(true)
-        .git_global(true)
-        .git_exclude(true)
-        .ignore(true)
-        .parents(true)
-        .follow_links(false)
-        .filter_entry(move |dent| !filter_sensitive || agent_path_is_readable(dent.path()))
+    let skipped = Arc::new(SkipCounter::default());
+    let skipped_filter = skipped.clone();
+    let walker = configure_walk(&root_path, false)
+        .filter_entry(move |dent| {
+            if dent.depth() > 0 && is_skipped_dir(dent.path()) {
+                skipped_filter.record_skip();
+                return false;
+            }
+            !filter_sensitive || agent_path_is_readable(dent.path())
+        })
         .build();
 
     let mut hits: Vec<GlobHit> = Vec::new();
@@ -317,7 +322,11 @@ fn fs_glob_at(
         });
     }
 
-    Ok(GlobResponse { hits, truncated })
+    Ok(GlobResponse {
+        hits,
+        truncated,
+        skipped_dirs: skipped.skipped(),
+    })
 }
 
 fn display_path(
@@ -349,8 +358,10 @@ mod tests {
     fn agent_grep_and_glob_filter_sensitive_files() {
         let dir = tempfile::tempdir().expect("tempdir");
         let root = dir.path().to_path_buf();
+        std::fs::create_dir(root.join("dist")).expect("create generated dir");
         std::fs::write(root.join("normal.txt"), "needle").expect("write normal");
         std::fs::write(root.join("server.pem"), "needle").expect("write secret");
+        std::fs::write(root.join("dist/generated.txt"), "needle").expect("write generated");
         let root_s = root.to_string_lossy().into_owned();
 
         let app_grep = fs_grep_at(
@@ -365,6 +376,7 @@ mod tests {
         )
         .expect("app grep");
         assert_eq!(app_grep.hits.len(), 2);
+        assert_eq!(app_grep.skipped_dirs, 1);
 
         let agent_grep = fs_grep_at(
             "needle".into(),
@@ -379,6 +391,7 @@ mod tests {
         .expect("agent grep");
         assert_eq!(agent_grep.hits.len(), 1);
         assert_eq!(agent_grep.hits[0].rel, "normal.txt");
+        assert_eq!(agent_grep.skipped_dirs, 1);
 
         let app_glob = fs_glob_at(
             "**/*".into(),
@@ -390,10 +403,12 @@ mod tests {
         )
         .expect("app glob");
         assert_eq!(app_glob.hits.len(), 2);
+        assert_eq!(app_glob.skipped_dirs, 1);
 
         let agent_glob = fs_glob_at("**/*".into(), root_s, root, None, WorkspaceEnv::Local, true)
             .expect("agent glob");
         assert_eq!(agent_glob.hits.len(), 1);
         assert_eq!(agent_glob.hits[0].rel, "normal.txt");
+        assert_eq!(agent_glob.skipped_dirs, 1);
     }
 }

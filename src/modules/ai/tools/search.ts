@@ -111,6 +111,7 @@ export function buildSearchTools(ctx: ToolContext) {
             })),
             truncated: res.truncated,
             files_scanned: res.files_scanned,
+            skipped_dirs: res.skipped_dirs,
           };
         } catch (e) {
           return { error: String(e), root: r.path };
@@ -156,6 +157,7 @@ export function buildSearchTools(ctx: ToolContext) {
             root: r.path,
             hits: res.hits,
             truncated: res.truncated,
+            skipped_dirs: res.skipped_dirs,
           };
         } catch (e) {
           return { error: String(e), root: r.path };

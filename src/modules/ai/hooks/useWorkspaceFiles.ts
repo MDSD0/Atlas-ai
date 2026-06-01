@@ -8,7 +8,11 @@ export type WorkspaceFilesState = {
   truncated: boolean;
 };
 
-type ListFilesResult = { files: string[]; truncated: boolean };
+type ListFilesResult = {
+  files: string[];
+  truncated: boolean;
+  skipped_dirs: number;
+};
 
 type CacheEntry = {
   files: string[];

@@ -2,7 +2,7 @@
 
 Status: canonical implementation roadmap
 
-Plan version: `2026-05-31.1`
+Plan version: `2026-06-01.1`
 
 This file is the implementation overview for Atlas after the pre-plan learning pass. It replaces the executable meaning of `plans/ATLAS_PLAN.md`, which describes an archived Python/FastAPI and Svelte direction. Preserve that legacy file as historical evidence. Do not execute it against the active React/Tauri repository.
 
@@ -761,6 +761,34 @@ References:
 - `DeusData/codebase-memory-mcp`: `ADAPT`
 - `QuantaAlpha/RepoMaster`: `STUDY`
 
+### Accelerated M2 delivery mode
+
+Status: active as of `2026-06-01`.
+
+The detailed Phase 3 slices below remain the acceptance checklist, but they are not a serial delivery queue. After Slice 3.1 lands, execute one measured `M2-V` vertical slice:
+
+1. Reuse the shared ignore policy for an authorized lazy file inventory.
+2. Parse the first four planned languages through tree-sitter wrappers.
+3. Store a bounded local symbol graph with selective queries only.
+4. Produce an Aider-style task projection under a strict token budget.
+5. Reuse existing watcher events to invalidate affected inventory, graph, and projection records.
+6. Expose the projection, freshness, omissions, and degraded states through one agent tool result before adding a larger context-panel UI.
+7. Benchmark the existing native grep path during the same milestone. Do not replace it without measured evidence.
+
+The first `M2-V` fixture gate is deliberately measurable:
+
+| Metric | Required result |
+| --- | --- |
+| Key-file recall on deterministic fixture tasks | `>= 85%` |
+| Same-name decoy selection | `0` false target edits |
+| Projected context tokens | `<= 40%` of naive eligible-file context |
+| Ignored/generated leakage | `0` files |
+| Watched source refresh | `< 5s` on the fixture harness |
+| Parse failure behavior | Explicit degraded record, no lost search/edit path |
+| Grep replacement decision | Reproducible benchmark result, preserve current grep unless evidence favors replacement |
+
+Until this gate passes, defer expanded receipt UX, memory-provider adoption, broad LSP adapters, skill packaging, MCP integrations, and enterprise governance surfaces. Proof remains narrow: commands, diagnostics when available, changed files, and a final verdict grounded in real exit status.
+
 ### Slice 3.1: Shared repository ignore policy
 
 Active Atlas files:
@@ -774,7 +802,7 @@ Tasks:
 1. Extract or centralize ignore policy used by inventory, grep, watcher, and CodeReality.
 2. Respect `.gitignore`.
 3. Exclude generated and dependency-heavy trees.
-4. Add configurable size caps.
+4. Centralize the default content-size cap and let each consumer tighten it.
 5. Record skipped counts for transparency.
 
 Tests:

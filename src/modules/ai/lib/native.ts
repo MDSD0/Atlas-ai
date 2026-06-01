@@ -32,10 +32,15 @@ export type GrepResponse = {
   hits: GrepHit[];
   truncated: boolean;
   files_scanned: number;
+  skipped_dirs: number;
 };
 
 export type GlobHit = { path: string; rel: string };
-export type GlobResponse = { hits: GlobHit[]; truncated: boolean };
+export type GlobResponse = {
+  hits: GlobHit[];
+  truncated: boolean;
+  skipped_dirs: number;
+};
 
 export type GitRepoInfo = {
   repoRoot: string;

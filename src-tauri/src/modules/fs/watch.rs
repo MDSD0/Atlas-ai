@@ -1,5 +1,5 @@
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -7,87 +7,13 @@ use std::time::{Duration, Instant};
 use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::modules::fs::ignore_policy::is_skipped_dir as is_skipped;
 use crate::modules::fs::to_canon;
 use crate::modules::workspace::{resolve_path, WorkspaceEnv, WorkspaceRegistry};
 
 // Quiet-gap before a batch flushes; MAX_WINDOW caps latency under a long stream.
 const DEBOUNCE: Duration = Duration::from_millis(150);
 const MAX_WINDOW: Duration = Duration::from_millis(1000);
-
-// Matched on the final path component. Never watched even when expanded: large
-// or generated trees where live updates cost more than they're worth.
-const SKIP_DIRS: &[&str] = &[
-    // VCS
-    ".git",
-    ".hg",
-    ".svn",
-    ".jj",
-    // JS / web
-    "node_modules",
-    "bower_components",
-    ".pnpm-store",
-    ".yarn",
-    "dist",
-    "build",
-    "out",
-    ".next",
-    ".nuxt",
-    ".svelte-kit",
-    ".astro",
-    ".vite",
-    ".turbo",
-    ".parcel-cache",
-    ".angular",
-    ".vercel",
-    ".netlify",
-    ".output",
-    ".cache",
-    // Rust
-    "target",
-    // Python
-    "__pycache__",
-    ".venv",
-    "venv",
-    ".tox",
-    ".nox",
-    ".mypy_cache",
-    ".pytest_cache",
-    ".ruff_cache",
-    ".ipynb_checkpoints",
-    ".eggs",
-    // JVM / Gradle
-    ".gradle",
-    // .NET
-    "obj",
-    // Go / PHP
-    "vendor",
-    // Elixir
-    "_build",
-    "deps",
-    // Dart / Flutter
-    ".dart_tool",
-    // Haskell
-    "dist-newstyle",
-    ".stack-work",
-    // Swift / Zig
-    ".build",
-    "zig-cache",
-    "zig-out",
-    // CMake (CLion)
-    "cmake-build-debug",
-    "cmake-build-release",
-    // IDE / coverage / infra
-    ".idea",
-    "coverage",
-    ".nyc_output",
-    ".terraform",
-];
-
-fn is_skipped(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| SKIP_DIRS.contains(&n))
-}
 
 #[derive(Default)]
 pub struct FsWatchState {
@@ -218,7 +144,8 @@ fn prepare_add(
         .filter_map(|raw| {
             let resolved = resolve_path(&raw, workspace);
             let canonical = std::fs::canonicalize(&resolved).ok()?;
-            if !canonical.is_dir() || is_skipped(&canonical) || !registry.is_authorized(&canonical) {
+            if !canonical.is_dir() || is_skipped(&canonical) || !registry.is_authorized(&canonical)
+            {
                 return None;
             }
             Some(canonical)
@@ -273,15 +200,6 @@ pub fn fs_watch_remove(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn skip_filter_matches_basename() {
-        assert!(is_skipped(Path::new("/a/b/node_modules")));
-        assert!(is_skipped(Path::new("/x/target")));
-        assert!(is_skipped(Path::new("/p/obj")));
-        assert!(!is_skipped(Path::new("/a/src")));
-        assert!(!is_skipped(Path::new("/a/node_modules/pkg")));
-    }
 
     #[test]
     fn collect_ignores_access_and_dedups() {
