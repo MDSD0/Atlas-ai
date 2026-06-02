@@ -4,6 +4,7 @@ import { buildLanguageModel } from "../lib/agent";
 import type { ProviderKeys } from "../lib/keyring";
 import type { ToolContext } from "../tools/context";
 import { buildFsTools } from "../tools/fs";
+import { buildReadOnlyMemoryTools } from "../tools/memory";
 import { buildRealityTools } from "../tools/reality";
 import { buildSearchTools } from "../tools/search";
 import { buildSemanticTools } from "../tools/semantic";
@@ -42,6 +43,7 @@ export async function runSubagent({
 
   const readOnly: Record<string, unknown> = {
     ...buildFsTools(toolContext),
+    ...buildReadOnlyMemoryTools(toolContext),
     ...buildRealityTools(toolContext),
     ...buildSearchTools(toolContext),
     ...buildSemanticTools(toolContext),

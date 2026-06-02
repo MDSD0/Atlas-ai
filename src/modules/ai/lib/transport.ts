@@ -11,6 +11,7 @@ import {
 import { proofJournal } from "../proof";
 import { RunRecorder } from "../proof/recorder";
 import { useProofStore } from "../store/proofStore";
+import { buildLocalMemoryContext } from "../memory";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -80,7 +81,11 @@ type SendOptions = {
 export function createContextAwareTransport(deps: Deps) {
   const run = async (options: SendOptions) => {
     const live = deps.getLive();
-    const projectMemory = await readAtlasMd(live.workspaceRoot);
+    const [atlasMd, localMemory] = await Promise.all([
+      readAtlasMd(live.workspaceRoot),
+      buildLocalMemoryContext(live.workspaceRoot, lastUserText(options.messages)),
+    ]);
+    const projectMemory = [atlasMd, localMemory].filter(Boolean).join("\n\n") || null;
     const contextBlock = atlasContextBlock(live.project);
     const messagesForRun = contextBlock
       ? injectEnvIntoLastUser(options.messages, contextBlock)
@@ -157,6 +162,19 @@ export function createContextAwareTransport(deps: Deps) {
       return null;
     },
   };
+}
+
+function lastUserText(messages: UIMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message.role !== "user") continue;
+    return (message.parts as ReadonlyArray<{ type: string; text?: string }>)
+      .filter((part) => part.type === "text")
+      .map((part) => part.text ?? "")
+      .join("\n")
+      .slice(0, 4096);
+  }
+  return "";
 }
 
 function injectEnvIntoLastUser(

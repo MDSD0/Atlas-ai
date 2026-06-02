@@ -15,7 +15,7 @@ import {
 } from "./context";
 import { editNeedsApproval } from "../lib/permissions";
 import { withFileMutationQueue } from "./fileMutationQueue";
-import { refreshPostEditDiagnostics } from "./postEditDiagnostics";
+import { observePostEdit } from "./postEdit";
 import { fingerprintText, type ReadFingerprint } from "./fingerprint";
 
 const READ_BYTE_CAP = 25 * 1024;
@@ -218,10 +218,7 @@ export function buildFsTools(ctx: ToolContext) {
             path: abs,
             bytesWritten: content.length,
             ok: true,
-            post_edit_diagnostics: await refreshPostEditDiagnostics(
-              projectRoot,
-              abs,
-            ),
+            ...(await observePostEdit(projectRoot, abs)),
           };
         } catch (e) {
           return { error: String(e), path: abs };

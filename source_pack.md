@@ -660,3 +660,33 @@ Applied:
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 23 passed.
 
 Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, Vitest 155 passed (21 files), production build 0 across 3160 modules, cargo check/clippy 0, cargo test 135 lib passed + 2 intentional diagnostics ignored + 3 harness passed.
+
+## Accelerated V1 Slices D-F: controlled local memory and optional provider boundary
+
+Source-parity packet:
+
+- Slice: add the smallest inspectable `LocalRecordsProvider`, stale linked records after Atlas writes, and expose an optional SimpleMem health boundary plus deterministic MemoryLab fixture without making advanced memory a boot dependency.
+- Atlas files inspected: `ATLAS.md`, `ATLAS_EXECUTION_PLAN.md`, `src/modules/ai/lib/transport.ts`, `src/modules/ai/tools/{tools,fs,edit,postEditDiagnostics}.ts`, `src/modules/ai/store/planStore.ts`, and `src/modules/ai/proof/{persistence,journal,index}.ts`.
+- Primary evidence refreshed: official Claude Code memory documentation (`https://code.claude.com/docs/en/memory`) and the SimpleMem paper (`https://arxiv.org/abs/2601.02553`). Claude distinguishes concise project instructions from machine-local cross-session notes and treats memory as context rather than enforced configuration. SimpleMem describes semantic structured compression, recursive consolidation, and adaptive query-aware retrieval.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh memory persistence simplemem`. Outbound GitHub refresh was unavailable in the sandbox, so the resolver used cached snapshots and reported that fallback explicitly.
+- opensrc inspected (cached): `aiming-lab/SimpleMem:cross/types.py`, `cross/context_injector.py`, `cross/storage_sqlite.py`, `cross/orchestrator.py`, `cross/hooks.py`, `cross/collectors.py`, `cross/tests/test_context_injector.py`, `cross/tests/test_session_lifecycle.py`, and `cross/tests/test_e2e.py`.
+- opensrc inspected (cached): `mem0ai/mem0:openclaw/recall.ts`, `openclaw/filtering.ts`, `openclaw/backend/base.ts`, `openclaw/tools/memory-add.ts`, and `openclaw/tools/memory-search.ts`.
+- Disposition: `ADAPT` SimpleMem-Cross's project-scoped provenance records and greedily token-budgeted context bundle into a tiny TypeScript ledger. Keep only explicit records, linked artifacts, timestamps, confidence, lifecycle status, and bounded recall.
+- Disposition: `ADAPT` Mem0's inspectable add/search surface, project isolation, category tags, ranking, and pre-storage filtering. Atlas adds a stricter fail-closed secret-text guard because the local ledger must never become a credential sink.
+- Disposition: `WRAP` the Tauri Store plugin already used by proof receipts. Use explicit `save()` calls, serialized writes, bounded retention, and a documented `atlas-ai-memory.json` app-data store. No database, watcher service, embedding runtime, Python install, or network call is added to the default lane.
+- Disposition: `WRAP` SimpleMem behind a loopback-only health probe and a visible optional-provider status. The cached SimpleMem snapshot now includes a heavier `cross/` facade with SQLite, LanceDB, hooks, and lifecycle orchestration. Atlas rejects that stack as the V1 default and keeps it behind an adapter boundary.
+- Repo-truth invariant: recalled records are historical hints only. Current repository evidence outranks memory. Atlas edits stale records whose linked source artifacts changed, and code-question answers still require current file inspection.
+- MemoryLab scope: a fixed local fixture measures LocalRecords retrieval, stale-fact rejection, token cost, latency, disk-shape counts, provider dependency, privacy posture, and consolidation availability. SimpleMem and Mem0 remain visible candidates rather than implied passing providers.
+- Tests required: CRUD and restart restore; project isolation; clear-project behavior; secret rejection; deterministic budgeted recall; linked-artifact stale marking; post-edit invalidation; loopback-only SimpleMem health status; MemoryLab candidate report with LocalRecords default.
+- Freshness: official web evidence refreshed on 2026-06-02; upstream source used cached opensrc fallback because sandbox network refresh was unavailable.
+
+Applied:
+
+- Added `src/modules/ai/memory/`: the provider contract, bounded `LocalRecordsProvider`, explicit-save Tauri Store adapter, advisory context renderer, loopback-only optional SimpleMem health adapter, and deterministic MemoryLab report.
+- Added inspectable main-loop memory tools for status, recall, remember, list, soft delete, clear-project, and MemoryLab. Memory mutations require approval. Read-only subagents receive only status, recall, list, and MemoryLab.
+- Reused the existing post-edit lifecycle point: direct writes, direct edits, multi-edits, and accepted Plan writes now refresh optional diagnostics and stale linked local-memory records together.
+- Added stale marking for external source changes through the existing global `fs:changed` listener. The native watcher continues to own delivery and CodeReality invalidation.
+- Extended project-memory injection with bounded LocalRecords recall. The injected block says that historical memory is advisory and current repository evidence wins for code questions.
+- Added the `memory-stale` deterministic fixture and focused regressions for restart restore, project isolation, clear-project, secret refusal, bounded recall, linked-artifact stale marking, combined post-edit observation, loopback-only SimpleMem probing, and the MemoryLab default-provider report.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, `pnpm test` 164 passed (25 files).

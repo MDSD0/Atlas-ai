@@ -816,6 +816,13 @@ The remaining V1 is delivered as ten measurable vertical slices. Optional provid
 
 Each slice records source parity before implementation, lands focused tests, runs the relevant verifier layers, and patches this queue when measured reality changes a decision.
 
+Implementation checkpoint `2026-06-02`:
+
+- `A-C` landed the selective CodeReality tools, truthful receipt floor, lazy TypeScript diagnostics client, and post-edit semantic receipts.
+- `D-F` landed the bounded `LocalRecordsProvider`, linked-artifact stale marking on direct and watcher-observed writes, advisory prompt recall, loopback-only optional SimpleMem health adapter, and deterministic MemoryLab fixture.
+- LocalRecords remains the default and adds no boot work, Python runtime, embedding model, or network dependency. Current repository evidence still outranks historical memory.
+- Next: `G` scoped local skill packages and bounded lifecycle hooks.
+
 ### Slice 3.1: Shared repository ignore policy
 
 Active Atlas files:

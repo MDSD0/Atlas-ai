@@ -17,10 +17,9 @@ import {
   type ReadFingerprint,
 } from "./fingerprint";
 import { withFileMutationQueue } from "./fileMutationQueue";
-import {
-  refreshPostEditDiagnostics,
-  type PostEditDiagnostics,
-} from "./postEditDiagnostics";
+import { observePostEdit } from "./postEdit";
+import type { PostEditDiagnostics } from "./postEditDiagnostics";
+import type { MemoryInvalidation } from "../memory";
 
 type EditResult =
   | {
@@ -29,6 +28,7 @@ type EditResult =
       bytesWritten: number;
       path: string;
       post_edit_diagnostics?: PostEditDiagnostics;
+      memory_invalidation?: MemoryInvalidation;
     }
   | { error: string; path: string; code?: "stale_read" };
 
@@ -156,7 +156,7 @@ async function applyEditsUnlocked(
       replacements: totalReplacements,
       bytesWritten: content.length,
       path: abs,
-      post_edit_diagnostics: await refreshPostEditDiagnostics(projectRoot, abs),
+      ...(await observePostEdit(projectRoot, abs)),
     };
   } catch (err) {
     return { error: String(err), path: abs };

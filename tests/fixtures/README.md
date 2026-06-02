@@ -17,7 +17,7 @@ Plan reference: `ATLAS_EXECUTION_PLAN.md` section 7.2.
 | `proof-failure` | deferred | Phase 2/5 proof receipts |
 | `mixed-stack` | ready | Phase 3 multi-language inventory and projection |
 | `lsp-missing` | deferred | Phase 4 graceful LSP degradation |
-| `memory-stale` | deferred | Phase 6 memory invalidation |
+| `memory-stale` | ready | Phase 6 memory invalidation |
 
 Deferred fixtures are created with the slice that first needs them, so their shape
 matches a designed test instead of a guess.

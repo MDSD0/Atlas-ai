@@ -375,3 +375,15 @@ Done. The durable receipts are now visible.
 Green (clean shell verify-atlas.sh --all): tsc 0, vitest 136 passed (16 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.
 
 Phase 2 complete (event journal + hard hooks + proof UI). Next: Phase 3 Slice 3.1 shared repository ignore policy (CodeReality V0).
+
+## Accelerated V1 Slices D-F status: controlled memory batch
+
+Done.
+
+- LocalRecords remains the default: app-data JSON through the existing Tauri Store plugin, explicit saves, bounded records, no boot work, no Python, no embeddings, and no network.
+- Memory is advisory context only. Current repository evidence outranks recalled records.
+- Linked source artifacts stale their records after successful Atlas writes, including delayed Plan writes.
+- SimpleMem stays optional behind a loopback-only health probe. Atlas never installs or starts it implicitly.
+- MemoryLab starts with a deterministic local fixture and reports advanced providers as candidates until they produce measured results.
+
+Next: Accelerated V1 Slice G scoped skill packages and bounded lifecycle hooks.

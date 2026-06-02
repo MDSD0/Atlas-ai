@@ -32,6 +32,7 @@ import {
 import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { redactSensitive } from "@/modules/ai/lib/redact";
 import { native } from "@/modules/ai/lib/native";
+import { invalidateMemoryForPaths } from "@/modules/ai/memory";
 import { useAgentsStore } from "@/modules/ai/store/agentsStore";
 import { useSnippetsStore } from "@/modules/ai/store/snippetsStore";
 import {
@@ -568,6 +569,8 @@ export default function App() {
     let alive = true;
     let unlisten: (() => void) | undefined;
     void listenFsChanged((paths) => {
+      const root = useWorkspaceStore.getState().workspaceRoot;
+      if (root) void invalidateMemoryForPaths(root, paths);
       const changed = new Set(paths.map((p) => p.replace(/\\/g, "/")));
       for (const t of tabsRef.current) {
         if (t.kind !== "editor") continue;
