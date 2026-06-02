@@ -417,3 +417,14 @@ Done.
 - Metrics stay local and explicit: no exporter, collector, network dependency, or background service.
 
 Next: Accelerated V1 Slice J release qualification.
+
+## Accelerated V1 Slice J status: release qualification
+
+Done.
+
+- `verify-atlas.sh --all` now includes deterministic golden eval, desktop contract smoke, and approved dependency review after the existing frontend, build, and Rust gates.
+- The golden fixture proves the narrow bug-fix path with real command exits `1 -> 0` in a temp copy.
+- CI runs eval, desktop contract smoke, and dependency review. Existing native CI continues to compile Ubuntu, macOS, and Windows.
+- This macOS host passes every automated gate. Interactive desktop qualification remains a manual release checklist on all three platforms; Tauri documents no WKWebView WebDriver path for macOS.
+
+Accelerated V1 queue `A-J`: complete.

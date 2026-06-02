@@ -766,3 +766,35 @@ Applied:
 - No collector, OTLP exporter, network call, dependency, background watcher, or boot-time work was added.
 
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 12 passed.
+
+## Accelerated V1 Slice J: scripted evals and release qualification
+
+Source-parity packet:
+
+- Slice: finish the V1 queue with executable eval, desktop-contract smoke, dependency review, CI qualification steps, a golden fixture, and an honest release report.
+- Atlas files inspected: `scripts/verify-atlas.sh`, `.github/workflows/{ci,release}.yml`, `package.json`, `src-tauri/{Cargo.toml,tauri.conf.json,src/lib.rs}`, `tests/fixtures/README.md`, and `src/modules/ai/components/AiMiniWindow.tsx`.
+- Primary evidence refreshed: official Tauri v2 testing documentation (`https://v2.tauri.app/develop/tests/`) and GitHub Actions matrix documentation (`https://docs.github.com/actions/using-jobs/using-a-matrix-for-your-jobs`). Tauri documents unit and mock-runtime testing, plus WebDriver support on Linux and Windows; desktop WebDriver is not available on macOS because WKWebView has no driver tool.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh eval workflow validation release desktop smoke fixture`. Outbound refresh was unavailable, so the resolver used cached snapshots explicitly.
+- opensrc inspected (cached): `SWE-agent/mini-swe-agent:tests/environments/test_local.py` and `tests/run/test_local.py`. It preserves structured command return codes and runs a deterministic model trajectory against a real local environment.
+- opensrc inspected (cached): `earendil-works/pi:.github/workflows/ci.yml`. It keeps a conventional install, build, check, and test gate in CI.
+- opensrc inspected (cached): `tauri-apps/tauri:crates/tauri/src/test/{mod,mock_runtime}.rs`, `crates/tauri/test/fixture/`, and `.github/workflows/test-core.yml`. Tauri keeps small fixtures and layered native tests rather than pretending one UI automation layer proves every platform.
+- Disposition: `ADAPT` mini-SWE-agent's deterministic real-environment posture into a tiny golden repository: first prove the narrow test fails, make the expected one-line correction in a temp copy, prove the test passes, and report definition/reference evidence.
+- Disposition: `ADAPT` Tauri's layered qualification posture: keep Rust and frontend checks, add a static desktop-contract smoke on every host, preserve the existing native OS matrix, and publish a manual interactive desktop checklist. Do not claim automated macOS WKWebView interaction.
+- Dependency review: compare direct runtime manifests against a checked-in approved release baseline so shallow CI clones remain deterministic. The reviewed accelerated-queue delta is Rust `url = "2"` from lazy LSP URL handling. It is already transitive in the desktop graph and adds no boot service.
+- Tests required: golden fail-then-fix pass, one-line correction, definition/reference evidence, desktop contract assertions, dependency delta allow-list, CI invocation, and `verify-atlas.sh --all` coverage.
+
+Applied:
+
+- Replaced the `--desktop` and `--eval` placeholders in `scripts/verify-atlas.sh` with executable checks, added `--deps`, and included all three in `--all`.
+- Added `tests/fixtures/golden-v1/` and `scripts/run-v1-evals.mjs`. The script copies the intentionally buggy fixture into a temp directory, proves the narrow test exits `1`, applies one line, proves the same test exits `0`, and reports definition/reference evidence.
+- Added `scripts/desktop-smoke.mjs`. It verifies the Tauri build contract, core native commands, registered subsystem tool lanes, and mounted proof receipt without claiming unavailable macOS WKWebView automation.
+- Added `tests/fixtures/release-v1/dependency-baseline.json` and `scripts/review-dependencies.mjs`. The release baseline is clone-local and shallow-CI safe. It fails on unreviewed direct runtime dependency drift.
+- Added `scripts/release-qualify.sh`, CI qualification steps, and `RELEASE_QUALIFICATION.md` with the manual interactive desktop checklist and platform limits.
+
+Measured verification on macOS:
+
+- `git diff --check` 0.
+- `bash scripts/verify-atlas.sh --eval` passed in `2.20s`: golden narrow test exit `1 -> 0`, one-line correction, one definition and one reference.
+- `bash scripts/verify-atlas.sh --desktop` passed in `1.37s`: static desktop contract on `darwin`; interactive macOS automation remains manual because WKWebView has no WebDriver.
+- `bash scripts/verify-atlas.sh --deps` passed: `81` frontend and `32` Rust direct runtime dependencies match the approved baseline; Rust `url` is reviewed and already transitive.
+- Clean-shell `bash scripts/release-qualify.sh` passed: TypeScript 0, Vitest `180` passed, production build `3188` modules, Cargo check 0, Clippy 0, Rust `135` passed plus `2` intentional diagnostic ignores, fixture harness `3` passed, eval passed, desktop contract passed, dependency review passed.

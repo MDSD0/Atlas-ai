@@ -2,8 +2,9 @@
 # Atlas verification gate. Modes:
 #   --fast     frontend typecheck + unit tests (quick loop)
 #   --native   rust check + clippy + tests
-#   --desktop  packaged desktop smoke (not implemented yet)
-#   --eval     scripted agent evals (not implemented yet)
+#   --desktop  desktop contract smoke
+#   --eval     deterministic golden eval
+#   --deps     accelerated dependency review
 #   --all      everything required before merge
 # See ATLAS_EXECUTION_PLAN.md section 7.3.
 set -euo pipefail
@@ -49,6 +50,18 @@ native() {
   run cargo test --locked --manifest-path src-tauri/Cargo.toml
 }
 
+desktop() {
+  run node scripts/desktop-smoke.mjs
+}
+
+evals() {
+  run node scripts/run-v1-evals.mjs
+}
+
+deps() {
+  run node scripts/review-dependencies.mjs
+}
+
 case "$mode" in
   --fast)
     frontend
@@ -57,18 +70,24 @@ case "$mode" in
     native
     ;;
   --desktop)
-    printf 'desktop smoke layer not implemented yet (planned: tests/desktop).\n' >&2
+    desktop
     ;;
   --eval)
-    printf 'agent eval layer not implemented yet (planned: tests/evals).\n' >&2
+    evals
+    ;;
+  --deps)
+    deps
     ;;
   --all)
     frontend
     build
     native
+    evals
+    desktop
+    deps
     ;;
   *)
-    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--all]\n' >&2
+    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--deps|--all]\n' >&2
     exit 2
     ;;
 esac

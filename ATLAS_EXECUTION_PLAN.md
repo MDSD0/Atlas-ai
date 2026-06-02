@@ -824,7 +824,9 @@ Implementation checkpoint `2026-06-02`:
 - `G` landed persisted prompt-only local skill packages plus bounded in-process lifecycle hooks. Skills can narrow suggested tools but cannot register tools or weaken policy. Hook execution is timeout-isolated and visible in proof events.
 - `H` landed an optional inert MCP policy boundary with disabled-by-default stdio configs, deny-first tools, approval-gated bounded calls, and GitHub plus Playwright connector studies. No server process starts and no SDK dependency is imported until a connector is explicitly adopted against a stable release.
 - `I` landed bounded local run/tool metrics and an on-demand context inspector over reality, LSP, memory, skills, MCP, and latest proof state. Metrics remain local and explicit with no exporter or background collector.
-- Next: `J` scripted evals, desktop smoke, golden fixture, dependency review, and release qualification report.
+- `J` landed executable golden eval, desktop contract smoke, clone-local approved dependency review, CI qualification steps, and a release report with an explicit manual interactive desktop checklist.
+- Clean-shell `scripts/release-qualify.sh` passes on macOS: TypeScript 0, Vitest `180`, production build `3188` modules, Cargo check and Clippy 0, Rust `135` plus `2` intentional diagnostic ignores, fixture harness `3`, golden eval, desktop contract smoke, and dependency review.
+- Accelerated V1 queue `A-J`: complete. Interactive macOS, Linux, and Windows release signoff remains a platform checklist rather than an automated macOS WKWebView claim.
 
 ### Slice 3.1: Shared repository ignore policy
 

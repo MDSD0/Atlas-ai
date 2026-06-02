@@ -36,6 +36,15 @@ jobs:
       - name: Build frontend
         run: pnpm build
 
+      - name: V1 golden eval
+        run: bash scripts/verify-atlas.sh --eval
+
+      - name: Desktop contract smoke
+        run: bash scripts/verify-atlas.sh --desktop
+
+      - name: Accelerated dependency review
+        run: bash scripts/verify-atlas.sh --deps
+
   rust:
     runs-on: ubuntu-22.04
     steps:
