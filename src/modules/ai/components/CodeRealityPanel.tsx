@@ -32,9 +32,12 @@ export function formatRealityStats(snap: RepoContextResponse): RealityStat[] {
   );
   return [
     {
-      label: "Files indexed",
+      label: "Files scanned",
       value: snap.file_count.toLocaleString(),
-      hint: `${snap.excluded_files.toLocaleString()} excluded by size/binary`,
+      hint:
+        snap.parse_failures > 0
+          ? `${snap.parse_failures.toLocaleString()} unparsed (binary/large/unsupported)`
+          : "all parseable files read",
     },
     {
       label: "Symbols",

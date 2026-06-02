@@ -31,7 +31,7 @@ function snap(patch: Partial<RepoContextResponse> = {}): RepoContextResponse {
 describe("formatRealityStats", () => {
   it("reports inventory counts with thousands separators", () => {
     const stats = formatRealityStats(snap());
-    expect(stats[0]).toMatchObject({ label: "Files indexed", value: "1,284" });
+    expect(stats[0]).toMatchObject({ label: "Files scanned", value: "1,284" });
     expect(stats[1]).toMatchObject({ label: "Symbols", value: "9,842" });
   });
 
