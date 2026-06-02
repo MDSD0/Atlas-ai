@@ -17,9 +17,19 @@ import {
   type ReadFingerprint,
 } from "./fingerprint";
 import { withFileMutationQueue } from "./fileMutationQueue";
+import {
+  refreshPostEditDiagnostics,
+  type PostEditDiagnostics,
+} from "./postEditDiagnostics";
 
 type EditResult =
-  | { ok: true; replacements: number; bytesWritten: number; path: string }
+  | {
+      ok: true;
+      replacements: number;
+      bytesWritten: number;
+      path: string;
+      post_edit_diagnostics?: PostEditDiagnostics;
+    }
   | { error: string; path: string; code?: "stale_read" };
 
 export async function applyEdits(
@@ -146,6 +156,7 @@ async function applyEditsUnlocked(
       replacements: totalReplacements,
       bytesWritten: content.length,
       path: abs,
+      post_edit_diagnostics: await refreshPostEditDiagnostics(projectRoot, abs),
     };
   } catch (err) {
     return { error: String(err), path: abs };

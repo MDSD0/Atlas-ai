@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   canonicalize: vi.fn(async (path: string) => path),
   readFile: vi.fn(),
   writeFile: vi.fn(),
+  lspDiagnostics: vi.fn(),
 }));
 
 vi.mock("../lib/native", () => ({
@@ -13,6 +14,7 @@ vi.mock("../lib/native", () => ({
     createDir: mocks.createDir,
     readFile: mocks.readFile,
     writeFile: mocks.writeFile,
+    lspDiagnostics: mocks.lspDiagnostics,
   },
 }));
 
@@ -36,6 +38,14 @@ describe("plan edit freshness", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     usePlanStore.setState({ active: false, queue: [] });
+    mocks.lspDiagnostics.mockResolvedValue({
+      provider: "typescript",
+      status: "fresh",
+      file: "/repo/value.ts",
+      diagnostics: [],
+      waited_ms: 1,
+      detail: "fresh",
+    });
   });
 
   it("rejects a changed file before applying a reviewed edit", async () => {
@@ -69,6 +79,10 @@ describe("plan edit freshness", () => {
       "/repo/value.ts",
       "export const VALUE = 3;\n",
       "/repo",
+    );
+    expect(mocks.lspDiagnostics).toHaveBeenCalledWith(
+      "/repo",
+      "/repo/value.ts",
     );
   });
 });

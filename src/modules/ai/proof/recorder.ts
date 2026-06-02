@@ -4,6 +4,10 @@ import type {
   ProofRunStatus,
   ProofVerdictStatus,
 } from "@/modules/ai/proof/contracts";
+import {
+  semanticEvidenceFromToolResult,
+  summarizeDiagnosticEvidence,
+} from "@/modules/ai/proof/diagnostics";
 
 // Compact, synchronous view of a run for the UI. Built from state the recorder
 // already accumulates, so the receipt strip never has to reload the journal.
@@ -14,6 +18,7 @@ export type ReceiptSummary = {
   eventCount: number;
   changedFiles: string[];
   checks: string[];
+  diagnostics: string[];
   failures: string[];
   startedAt: number;
   finishedAt: number | null;
@@ -112,6 +117,7 @@ export class RunRecorder {
   private readonly changedFiles = new Set<string>();
   private readonly failures: string[] = [];
   private readonly shellChecks: string[] = [];
+  private readonly diagnostics: string[] = [];
   private eventCount = 0;
   private status: ProofRunStatus = "running";
   private finishedAt: number | null = null;
@@ -146,6 +152,7 @@ export class RunRecorder {
       eventCount: this.eventCount,
       changedFiles: [...this.changedFiles],
       checks: [...this.shellChecks],
+      diagnostics: [...this.diagnostics],
       failures: [...this.failures],
       startedAt: this.run.startedAt,
       finishedAt: this.finishedAt,
@@ -198,6 +205,11 @@ export class RunRecorder {
         ),
       );
     }
+    this.diagnostics.push(
+      ...summarizeDiagnosticEvidence(
+        semanticEvidenceFromToolResult(record.toolName, record.output),
+      ),
+    );
     this.emit();
   }
 
@@ -224,6 +236,7 @@ export class RunRecorder {
       status,
       changedFiles: [...this.changedFiles],
       checks: this.shellChecks,
+      diagnostics: this.diagnostics,
       unresolvedFailures: this.failures,
     });
     this.status = verdict.status;

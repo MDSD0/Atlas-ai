@@ -7,6 +7,7 @@ import {
   type ReadFingerprint,
 } from "../tools/fingerprint";
 import { withFileMutationQueue } from "../tools/fileMutationQueue";
+import { refreshPostEditDiagnostics } from "../tools/postEditDiagnostics";
 
 export type QueuedEdit = {
   id: string;
@@ -80,6 +81,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
             async () => {
               await assertQueuedEditFresh(q);
               await agentNative.writeFile(q.path, q.proposedContent, q.projectRoot);
+              await refreshPostEditDiagnostics(q.projectRoot, q.path);
             },
             (p) => agentNative.canonicalize(p, q.projectRoot),
           );

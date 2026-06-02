@@ -10,6 +10,7 @@ function summary(patch: Partial<ReceiptSummary> = {}): ReceiptSummary {
     eventCount: 0,
     changedFiles: [],
     checks: [],
+    diagnostics: [],
     failures: [],
     startedAt: 0,
     finishedAt: null,

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   canonicalize: vi.fn(async (path: string) => path),
   readFile: vi.fn(),
   writeFile: vi.fn(),
+  lspDiagnostics: vi.fn(),
 }));
 
 vi.mock("../lib/native", () => ({
@@ -13,6 +14,7 @@ vi.mock("../lib/native", () => ({
     canonicalize: mocks.canonicalize,
     readFile: mocks.readFile,
     writeFile: mocks.writeFile,
+    lspDiagnostics: mocks.lspDiagnostics,
   },
 }));
 
@@ -33,6 +35,14 @@ describe("agent edit freshness", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.planActive = false;
+    mocks.lspDiagnostics.mockResolvedValue({
+      provider: "typescript",
+      status: "fresh",
+      file: "/repo/value.ts",
+      diagnostics: [],
+      waited_ms: 1,
+      detail: "fresh",
+    });
   });
 
   it("rejects an external modification before writing", async () => {
@@ -80,8 +90,16 @@ describe("agent edit freshness", () => {
         "edit",
         readCache,
       ),
-    ).resolves.toMatchObject({ ok: true, path });
+    ).resolves.toMatchObject({
+      ok: true,
+      path,
+      post_edit_diagnostics: {
+        provider: "typescript",
+        status: "fresh",
+      },
+    });
     expect(mocks.writeFile).toHaveBeenCalledWith(path, proposed, "/repo");
+    expect(mocks.lspDiagnostics).toHaveBeenCalledWith("/repo", path);
     expect(readCache.get(path)).toEqual(fingerprintText(proposed));
   });
 

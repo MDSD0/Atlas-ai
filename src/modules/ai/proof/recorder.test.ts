@@ -43,7 +43,24 @@ describe("RunRecorder", () => {
     await rec.recordTool({
       toolName: "edit",
       input: { path: "/repo/a.ts" },
-      output: { ok: true, replacements: 1, bytesWritten: 2, path: "/repo/a.ts" },
+      output: {
+        ok: true,
+        replacements: 1,
+        bytesWritten: 2,
+        path: "/repo/a.ts",
+        post_edit_diagnostics: {
+          provider: "typescript",
+          status: "fresh",
+          file: "/repo/a.ts",
+          diagnostics: [
+            {
+              range: { start: { line: 2, character: 4 } },
+              source: "ts",
+              message: "sample warning",
+            },
+          ],
+        },
+      },
     });
     await rec.recordTool({
       toolName: "bash_run",
@@ -64,6 +81,9 @@ describe("RunRecorder", () => {
     ]);
     expect(run?.verdict?.checks.items.map((c) => c.preview)).toEqual([
       "npm test (exit 0)",
+    ]);
+    expect(run?.verdict?.diagnostics.items.map((d) => d.preview)).toEqual([
+      "/repo/a.ts:3:5 ts: sample warning",
     ]);
     // The mutation produced a changed-file artifact.
     expect(run?.artifacts.map((a) => a.pathOrCommand.preview)).toEqual([
@@ -186,5 +206,28 @@ describe("RunRecorder", () => {
     expect(run?.status).toBe("incomplete");
     expect(run?.verdict?.changedFiles.originalCount).toBe(1);
     expect(run?.verdict?.checks.originalCount).toBe(0);
+  });
+
+  it("attaches explicit semantic-tool evidence", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "lsp_diagnostics",
+      input: { path: "/repo/a.ts" },
+      output: {
+        provider: "typescript",
+        status: "pending",
+        file: "/repo/a.ts",
+        diagnostics: [],
+        detail: "bounded wait expired",
+      },
+    });
+    await rec.finish();
+
+    const run = await journal.getRun(rec.runId);
+    expect(run?.verdict?.diagnostics.items[0].preview).toContain("pending");
   });
 });

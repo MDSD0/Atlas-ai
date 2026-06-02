@@ -635,3 +635,28 @@ Applied:
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused semantic Vitest 3 passed, `cargo check --locked --lib` 0, `cargo clippy --all-targets --locked -- -D warnings` 0, `cargo test --locked lsp::` 8 passed.
 
 Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, Vitest 147 passed (19 files), production build 0 across 3158 modules, cargo check/clippy 0, cargo test 135 lib passed + 2 intentional diagnostics ignored + 3 harness passed.
+
+## Accelerated V1 Slice C: post-edit diagnostic refresh and receipt attachment
+
+Source-parity packet:
+
+- Slice: refresh optional TypeScript diagnostics after a successful file mutation and attach bounded semantic evidence to the existing proof receipt.
+- Atlas files inspected: `src/modules/ai/tools/{fs,edit,semantic}.ts`, `src/modules/ai/store/planStore.ts`, `src/modules/ai/proof/{contracts,journal,recorder}.ts`, `src/modules/ai/components/ReceiptStrip.tsx`, and `src/modules/ai/lib/{agent,transport}.ts`.
+- Primary documentation refreshed by web search: official LSP documentation for JSON-RPC language-server features and official Claude Code hooks documentation for `PostToolUse`, `PostToolUseFailure`, and `PostToolBatch`. The hook docs state that post-tool hooks run after the action and may add context; Atlas adapts that lifecycle point inside its existing tool wrapper and recorder path.
+- opensrc hook attempted: `bash scripts/consult-opensrc.sh lsp evidence tools agent-loop`. Restricted DNS prevented npm and GitHub refresh, so this slice uses the already inspected local cache paths from Slice B and records the fallback rather than bypassing the hook.
+- Cached upstream files reused: `anomalyco/opencode:packages/opencode/src/lsp/{lsp,client}.ts`; `microsoft/language-server-protocol:_specifications/lsp/3.17/{specification.md,general/initialize.md}`; `SWE-agent/mini-swe-agent:tests/environments/test_local.py`; `All-Hands-AI/OpenHands:openhands/app_server/event/{event_service,event_service_base,filesystem_event_service}.py`.
+- Disposition: `ADAPT` post-tool lifecycle feedback into the existing Atlas mutation output. A successful write refreshes optional TypeScript diagnostics; the existing recorder observes that output and attaches bounded evidence. `REJECT` a second runtime, background boot service, hard dependency on LSP health, or turning unavailable semantics into a mutation failure.
+- Atlas-owned integration: add a small best-effort post-edit diagnostic helper, invoke it after direct and delayed writes, summarize semantic evidence in the proof layer, persist it through the existing verdict diagnostics field, and expose it in the compact receipt strip.
+- Tests required: TypeScript vs non-TypeScript refresh routing, unavailable fallback, mutation output attachment, explicit `lsp_diagnostics` attachment, verdict persistence, and receipt-summary/UI visibility.
+
+Applied:
+
+- Added `tools/postEditDiagnostics.ts` as a small best-effort adapter. TypeScript-family writes invoke the lazy LSP client; unsupported files return `not_applicable`; unavailable semantics remain non-fatal.
+- Attached post-edit diagnostic envelopes to direct `write_file`, `edit`, and `multi_edit` results. Accepted Plan Mode writes refresh the same optional semantic cache after the delayed mutation.
+- Added `proof/diagnostics.ts` to summarize nested mutation evidence and explicit `lsp_diagnostics` results into bounded, one-based receipt lines.
+- Extended `RunRecorder`, verdict persistence, `ReceiptSummary`, and `ReceiptStrip` with semantic evidence. The recorder still observes the existing tool-result hook only.
+- Added focused regressions for helper routing and fallback, direct edit attachment, delayed plan refresh, nested and explicit evidence extraction, one-based summary formatting, verdict persistence, and receipt-summary compatibility.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 23 passed.
+
+Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, Vitest 155 passed (21 files), production build 0 across 3160 modules, cargo check/clippy 0, cargo test 135 lib passed + 2 intentional diagnostics ignored + 3 harness passed.

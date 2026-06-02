@@ -273,6 +273,18 @@ Implemented.
 
 Next: Accelerated V1 Slice C post-edit diagnostic refresh and proof-receipt attachment.
 
+## Accelerated V1 Slice C status: post-edit semantic receipts
+
+Implemented.
+
+- Successful TypeScript-family writes now request optional diagnostics after the mutation.
+- Unsupported files return `not_applicable`; missing or broken semantic providers remain visible and non-fatal.
+- Direct mutation outputs carry the semantic envelope, and delayed Plan Mode writes refresh the same cache after acceptance.
+- The existing proof recorder attaches bounded semantic summaries to verdicts and the compact receipt strip.
+- No second agent loop, boot service, or required LSP dependency was added.
+
+Next: Accelerated V1 Slice D LocalRecords memory provider.
+
 ## Slice 1.3 status: platform-correct path containment (S1)
 
 Done.

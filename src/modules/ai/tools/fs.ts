@@ -15,6 +15,7 @@ import {
 } from "./context";
 import { editNeedsApproval } from "../lib/permissions";
 import { withFileMutationQueue } from "./fileMutationQueue";
+import { refreshPostEditDiagnostics } from "./postEditDiagnostics";
 import { fingerprintText, type ReadFingerprint } from "./fingerprint";
 
 const READ_BYTE_CAP = 25 * 1024;
@@ -213,7 +214,15 @@ export function buildFsTools(ctx: ToolContext) {
             canonicalize,
           );
           ctx.readCache.set(abs, fingerprintText(content));
-          return { path: abs, bytesWritten: content.length, ok: true };
+          return {
+            path: abs,
+            bytesWritten: content.length,
+            ok: true,
+            post_edit_diagnostics: await refreshPostEditDiagnostics(
+              projectRoot,
+              abs,
+            ),
+          };
         } catch (e) {
           return { error: String(e), path: abs };
         }

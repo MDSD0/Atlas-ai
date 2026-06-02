@@ -5,6 +5,7 @@ import {
   Ban as CancelIcon,
   FileText as FileIcon,
   Terminal as TerminalIcon,
+  TriangleAlert as DiagnosticIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ReceiptSummary } from "../proof/recorder";
@@ -97,6 +98,21 @@ export function ReceiptStrip({ sessionId, onOpenFile }: Props) {
             >
               <TerminalIcon size={11} strokeWidth={1.5} className="shrink-0" />
               <span className="truncate font-mono">{cmd}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {summary.diagnostics.length > 0 && (
+        <ul className="mt-0.5 flex flex-col gap-0.5">
+          {summary.diagnostics.map((diagnostic, i) => (
+            <li
+              key={`${diagnostic}-${i}`}
+              title={diagnostic}
+              className="flex items-start gap-1.5 px-1 py-0.5 text-[11px] text-amber-500"
+            >
+              <DiagnosticIcon size={11} strokeWidth={1.5} className="mt-[2px] shrink-0" />
+              <span className="min-w-0 flex-1 break-words">{diagnostic}</span>
             </li>
           ))}
         </ul>
