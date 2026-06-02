@@ -123,6 +123,13 @@ export type LspSemanticResponse = {
   detail: string;
 };
 
+export type McpStdioCallResponse = {
+  transport: "stdio_rmcp_1_7";
+  serverInfo: unknown;
+  reusedClient: boolean;
+  output: unknown;
+};
+
 export type GitRepoInfo = {
   repoRoot: string;
   branch: string;
@@ -519,6 +526,20 @@ export const agentNative = {
       projectRoot,
       maxTokens: maxTokens ?? null,
       workspace: currentWorkspaceEnv(),
+    }),
+  mcpStdioCall: (request: {
+    serverId: string;
+    command: string;
+    args: string[];
+    toolName: string;
+    input: Record<string, unknown>;
+  }) =>
+    invoke<McpStdioCallResponse>("agent_mcp_stdio_call", {
+      request,
+    }),
+  mcpStdioClose: (serverId?: string) =>
+    invoke<number>("agent_mcp_stdio_close", {
+      serverId: serverId ?? null,
     }),
   lspStatus: (projectRoot: string, file?: string) =>
     invoke<LspProviderInfo[]>("agent_lsp_status", {

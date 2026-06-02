@@ -516,3 +516,17 @@ Done at focused-check layer; full release qualification follows before checkpoin
 - Clean-shell release qualification green: Vitest `204`, build `3195` modules, Rust `142 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, and graph preflight.
 
 Next: corrective Slice C4 pinned MCP stdio transport adapter behind the disabled-by-default policy boundary.
+
+## Post-V1 corrective Slice C4 status: official RMCP stdio transport
+
+Done at focused-check layer; full release qualification follows before checkpoint.
+
+- Wrapped official `rmcp 1.7.0` with only its client and child-process transport features.
+- MCP servers still default disabled and tools still default denied. Nothing starts at boot.
+- Approved MCP calls now cross one native Tauri command into a lazy cached RMCP stdio client. Reconfigure, disable, and remove close the cached child.
+- Native validation repeats the critical bounds and secret refusal before spawning. Output is byte-bounded before IPC.
+- Added a real stdio fixture that refuses tool calls before initialization, counts calls to prove reuse, and closes cleanly.
+- Focused green: diff check 0, tsc 0, Vitest `205`, native MCP tests `2`, Clippy 0, desktop contract, and dependency review.
+- Clean-shell release qualification green: build `3196` modules, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, and graph preflight.
+
+Next: corrective Slice C5 external benchmark sample adapters and real desktop interaction qualification where supported.

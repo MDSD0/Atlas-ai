@@ -67,4 +67,23 @@ describe("McpBoundary", () => {
       serverId: "fixture", toolName: "inspect", input: [] as unknown as Record<string, unknown>,
     })).rejects.toThrow("must be an object");
   });
+
+  it("refuses secret material and oversized inputs before invocation", async () => {
+    let calls = 0;
+    const boundary = new McpBoundary(await configured(), async () => {
+      calls += 1;
+      return "no";
+    });
+    await expect(boundary.callTool({
+      serverId: "fixture",
+      toolName: "inspect",
+      input: { token: "ghp_abcdefghijklmnopqrstuvwxyzABCDEFGHIJ" },
+    })).rejects.toThrow("possible secret");
+    await expect(boundary.callTool({
+      serverId: "fixture",
+      toolName: "inspect",
+      input: { text: "x".repeat(40_000) },
+    })).rejects.toThrow("exceeds");
+    expect(calls).toBe(0);
+  });
 });

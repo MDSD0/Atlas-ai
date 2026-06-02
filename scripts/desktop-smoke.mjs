@@ -18,6 +18,8 @@ for (const command of [
   "agent_lsp_status",
   "agent_lsp_diagnostics",
   "agent_lsp_semantic",
+  "agent_mcp_stdio_call",
+  "agent_mcp_stdio_close",
   "shell_run_command",
 ]) {
   assert.match(native, new RegExp(command));
@@ -45,6 +47,7 @@ console.log(JSON.stringify({
     "native project binding",
     "repository reality command",
     "graceful LSP commands",
+    "lazy RMCP stdio commands",
     "shell command lane",
     "memory MCP and metrics tool registration",
     "proof receipt mount",

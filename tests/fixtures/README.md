@@ -16,6 +16,7 @@ Plan reference: `ATLAS_EXECUTION_PLAN.md` section 7.2.
 | `symlink-escape` | deferred | Phase 1 native fs auth (built with Slice 1.1; symlinks created at runtime, not committed) |
 | `proof-failure` | deferred | Phase 2/5 proof receipts |
 | `mixed-stack` | ready | Phase 3 multi-language inventory and projection |
+| `mcp-stdio` | ready | Corrective C4 RMCP initialize, tool call, reuse, and close |
 | `lsp-missing` | deferred | Phase 4 graceful LSP degradation |
 | `memory-stale` | ready | Phase 6 memory invalidation |
 | `golden-v1` | ready | Phase 10 deterministic release demo |

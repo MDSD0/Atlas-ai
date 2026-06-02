@@ -905,3 +905,31 @@ Applied:
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, reality Rust tests `12` passed, Clippy 0, and `bash scripts/verify-atlas.sh --graph` passed with honest absent-provider output.
 
 Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `204` passed across `38` files, production build `3195` modules, Cargo check 0, Clippy 0, Rust `142` passed plus `3` intentional ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed, and the Codebase-Memory optional-provider preflight passed.
+
+## Corrective Slice C4: pinned MCP stdio transport
+
+Source-parity packet:
+
+- Slice: replace the inert MCP invocation stub with a real lazy stdio client while preserving the existing disabled-by-default registry, deny-by-default tool policy, approval checks, payload bounds, and secret refusal.
+- Atlas files inspected: `src/modules/ai/mcp/{contracts,boundary,index,registry}.ts`, `src/modules/ai/tools/mcp.ts`, `src/modules/ai/lib/native.ts`, `src-tauri/src/modules/{lsp/client,proc}.rs`, `src-tauri/src/{lib.rs,modules/mod.rs}`, and the desktop and dependency qualification scripts.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh mcp protocol stdio transport initialize tools call typescript sdk stable conformance`, then fetched `github:modelcontextprotocol/rust-sdk` and `crates:rmcp` through opensrc. Added the official Rust SDK to `docs/opensrc-references.tsv` so later MCP slices refresh it automatically.
+- Primary documentation refreshed: official MCP `2025-11-25` lifecycle and stdio transport documentation, official TypeScript SDK client guide, official Rust SDK repository, and crates.io metadata for `rmcp`.
+- opensrc inspected: `modelcontextprotocol/typescript-sdk:docs/client.md`; `modelcontextprotocol/rust-sdk:{README.md,crates/rmcp/src/transport/child_process.rs,crates/rmcp/src/service.rs,examples/clients/src/git_stdio.rs}`; and `openai/codex:codex-rs/rmcp-client/src/{stdio_server_launcher,rmcp_client}.rs`.
+- Version finding: crates.io reports official `rmcp 1.7.0`. Its narrow `client + transport-child-process` features provide initialized stdio client service, child cleanup, and tool calls without the SDK's server macros, HTTP, OAuth, or schema layers.
+- Runtime finding: the Atlas MCP boundary lives in the WebView and cannot spawn a stdio process directly. Atlas already uses native Tauri commands for authorized process work and keeps a lazy LSP process cache. The smallest safe adapter is one native RMCP client cache behind a Tauri command, invoked only after the frontend registry and approval policy pass.
+- Codex finding: the upstream Codex launcher isolates process placement behind an RMCP transport and keeps lifecycle work in the MCP client. Atlas needs only the local child-process branch for this slice. Remote execution, server environment overlays, OAuth, resources, prompts, elicitation, and HTTP transports remain deferred.
+- Disposition: `WRAP` official `rmcp 1.7.0` with default features off and only `client,transport-child-process`. `ADAPT` Codex's launcher/client separation into one Atlas-native lazy stdio state plus explicit close. `REJECT` hand-written MCP framing, shell interpolation, automatic server installation, boot-time process starts, credentials in persisted config, and broad MCP prompt injection.
+- Tests required: disabled and deny policy before native invocation, bounded secret-free call input, real initialize-before-call stdio fixture, cached client reuse, explicit close, transport failure visibility, desktop command registration, and reviewed dependency delta.
+
+Applied:
+
+- Added official `rmcp = "1.7"` with default features disabled and only `client,transport-child-process`.
+- Added `src-tauri/src/modules/mcp.rs`: a lazy native RMCP stdio client cache keyed by configured server id and command signature. It validates server ids, commands, args, tool names, JSON object inputs, payload sizes, control characters, and likely secret material before spawning. Tool output is byte-bounded before it crosses IPC.
+- The native state connects only after an approved frontend call, reuses a healthy initialized child for later calls, evicts the child after a transport error or timeout, and exposes explicit close for reconfigure, disable, and remove operations.
+- Wired the existing frontend `McpBoundary` to the native adapter after its disabled, deny, ask, input-shape, secret, size, concurrency, timeout, and output-bound checks. Persisted servers still default disabled and persisted tools still default denied.
+- Added `tests/fixtures/mcp-stdio/fixture-server.mjs`. The fixture rejects `tools/call` until RMCP sends initialization and reports an incrementing call count so the native test proves lifecycle order, real invocation, cached reuse, and explicit close.
+- Updated desktop smoke, dependency baseline, fixture inventory, and MCP status wording. The status now reports `stdio_rmcp_1_7` and `configured_enabled_lazy_stdio` instead of a deferred transport.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, Vitest `205` passed across `38` files, native MCP tests `2` passed, Clippy 0, desktop contract smoke passed, and dependency review passed with `33` approved direct Rust runtime dependencies.
+
+Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `205` passed across `38` files, production build `3196` modules, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed, and the Codebase-Memory optional-provider preflight passed.

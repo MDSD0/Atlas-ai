@@ -1,5 +1,6 @@
 import {
   MCP_SERVER_LIMIT,
+  MCP_PROTOCOL_VERSION,
   type ConfigureMcpServerInput,
   type McpServerConfig,
   validateMcpServerInput,
@@ -62,13 +63,13 @@ export class McpRegistry {
   async status() {
     const servers = await this.list();
     return {
-      protocolVersion: "2025-11-25",
+      protocolVersion: MCP_PROTOCOL_VERSION,
       state: servers.some((server) => server.enabled)
-        ? "configured_enabled_transport_deferred"
+        ? "configured_enabled_lazy_stdio"
         : servers.length > 0
           ? "configured_disabled"
           : "disabled",
-      transport: "deferred",
+      transport: "stdio_rmcp_1_7",
       servers: servers.map(({ id, name, enabled, defaultToolPolicy }) => ({
         id,
         name,

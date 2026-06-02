@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import {
   MCP_CONNECTOR_STUDIES,
+  closeMcpStdioClient,
   mcpBoundary,
   mcpRegistry,
 } from "@/modules/ai/mcp";
@@ -26,7 +27,7 @@ export function buildMcpTools() {
       execute: async () => ({ studies: MCP_CONNECTOR_STUDIES }),
     }),
     mcp_configure: tool({
-      description: "Persist an inert stdio MCP server configuration. This never starts a server.",
+      description: "Persist an opt-in stdio MCP server configuration. This never starts a server; the RMCP transport connects lazily after an approved call.",
       inputSchema: z.object({
         id: z.string(),
         name: z.string(),
@@ -39,17 +40,19 @@ export function buildMcpTools() {
       needsApproval: true,
       execute: async ({ default_tool_policy, ...input }) => {
         try {
-          return await mcpRegistry.configure({
+          const configured = await mcpRegistry.configure({
             ...input,
             defaultToolPolicy: default_tool_policy,
           });
+          await closeMcpStdioClient(configured.id).catch(() => undefined);
+          return configured;
         } catch (error) {
           return { error: String(error) };
         }
       },
     }),
     mcp_enable: tool({
-      description: "Enable an inert MCP server configuration. The V1 transport adapter remains deliberately deferred.",
+      description: "Enable an MCP server configuration. The RMCP stdio client still starts lazily only after an approved tool call.",
       inputSchema: z.object({ id: z.string() }),
       needsApproval: true,
       execute: async ({ id }) => ({ id, enabled: await mcpRegistry.setEnabled(id, true) }),
@@ -58,16 +61,24 @@ export function buildMcpTools() {
       description: "Disable an MCP server configuration.",
       inputSchema: z.object({ id: z.string() }),
       needsApproval: true,
-      execute: async ({ id }) => ({ id, disabled: await mcpRegistry.setEnabled(id, false) }),
+      execute: async ({ id }) => {
+        const disabled = await mcpRegistry.setEnabled(id, false);
+        await closeMcpStdioClient(id).catch(() => undefined);
+        return { id, disabled };
+      },
     }),
     mcp_remove: tool({
       description: "Remove an MCP server configuration.",
       inputSchema: z.object({ id: z.string() }),
       needsApproval: true,
-      execute: async ({ id }) => ({ id, removed: await mcpRegistry.remove(id) }),
+      execute: async ({ id }) => {
+        const removed = await mcpRegistry.remove(id);
+        await closeMcpStdioClient(id).catch(() => undefined);
+        return { id, removed };
+      },
     }),
     mcp_call: tool({
-      description: "Invoke one explicitly configured MCP tool through the bounded policy boundary. Slice H leaves the process transport unattached.",
+      description: "Invoke one explicitly configured MCP tool through the bounded policy boundary and lazy RMCP stdio transport.",
       inputSchema: z.object({
         server_id: z.string(),
         tool_name: z.string(),

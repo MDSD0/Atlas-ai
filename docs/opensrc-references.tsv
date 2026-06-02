@@ -21,6 +21,7 @@ tier	topics	repo	purpose
 4	skills,examples	github:vercel-labs/skills	Skill packaging examples
 4	agents,examples	github:vercel-labs/open-agents	Agent examples and patterns
 4	mcp,protocol,typescript	github:modelcontextprotocol/typescript-sdk	MCP TypeScript protocol implementation reference
+4	mcp,protocol,rust,stdio	github:modelcontextprotocol/rust-sdk	Official RMCP Rust client transport reference
 4	mcp,protocol,python	github:modelcontextprotocol/python-sdk	MCP Python protocol implementation reference
 4	mcp,connectors,examples	github:modelcontextprotocol/servers	MCP connector examples
 4	mcp,github,connector	github:github/github-mcp-server	GitHub MCP connector reference

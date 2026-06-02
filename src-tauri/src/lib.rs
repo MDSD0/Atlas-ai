@@ -1,6 +1,6 @@
 mod modules;
 
-use modules::{agent, fs, git, lsp, net, pty, reality, secrets, shell, workspace};
+use modules::{agent, fs, git, lsp, mcp, net, pty, reality, secrets, shell, workspace};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_window_state::StateFlags;
@@ -120,6 +120,7 @@ pub fn run() {
         .manage(fs::watch::FsWatchState::default())
         .manage(reality::RealityState::default())
         .manage(lsp::LspState::default())
+        .manage(mcp::McpState::default())
         .manage({
             let registry = workspace::WorkspaceRegistry::default();
             workspace::bootstrap_registry(&registry);
@@ -162,6 +163,8 @@ pub fn run() {
             lsp::agent_lsp_status,
             lsp::agent_lsp_diagnostics,
             lsp::agent_lsp_semantic,
+            mcp::agent_mcp_stdio_call,
+            mcp::agent_mcp_stdio_close,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,

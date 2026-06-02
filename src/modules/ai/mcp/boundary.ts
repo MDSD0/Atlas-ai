@@ -2,9 +2,9 @@ import {
   MCP_MAX_CONCURRENT_CALLS,
   MCP_OUTPUT_BYTES,
   MCP_TIMEOUT_MS,
-  isPlainMcpInput,
   type McpCallInput,
   type McpServerConfig,
+  validateMcpCallInput,
   validateMcpToolName,
 } from "@/modules/ai/mcp/contracts";
 import type { McpRegistry } from "@/modules/ai/mcp/registry";
@@ -30,7 +30,7 @@ export class McpBoundary {
     if (!server) throw new Error(`MCP server not found: ${call.serverId}`);
     if (!server.enabled) throw new Error(`MCP server disabled: ${server.id}`);
     const toolName = validateMcpToolName(call.toolName);
-    if (!isPlainMcpInput(call.input)) throw new Error("MCP tool input must be an object");
+    const input = validateMcpCallInput(call.input);
     const policy = server.tools[toolName] ?? server.defaultToolPolicy;
     if (policy === "deny") throw new Error(`MCP tool denied: ${toolName}`);
     if (policy === "ask" && call.approved !== true) {
@@ -46,7 +46,7 @@ export class McpBoundary {
     this.inFlight += 1;
     try {
       const result = await Promise.race([
-        this.invoker(server, toolName, call.input),
+        this.invoker(server, toolName, input),
         new Promise<never>((_, reject) => {
           setTimeout(() => reject(new Error(`MCP tool timed out after ${this.timeoutMs}ms`)), this.timeoutMs);
         }),

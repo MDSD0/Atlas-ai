@@ -5,6 +5,7 @@ export const MCP_STORE_PATH = "atlas-ai-mcp.json";
 export const MCP_SERVER_LIMIT = 20;
 export const MCP_ARGS_LIMIT = 20;
 export const MCP_ARG_BYTES = 512;
+export const MCP_INPUT_BYTES = 32 * 1024;
 export const MCP_OUTPUT_BYTES = 8192;
 export const MCP_TIMEOUT_MS = 5000;
 export const MCP_MAX_CONCURRENT_CALLS = 2;
@@ -99,4 +100,23 @@ export function isPlainMcpInput(
   input: unknown,
 ): input is Record<string, unknown> {
   return input !== null && typeof input === "object" && !Array.isArray(input);
+}
+
+export function validateMcpCallInput(
+  input: unknown,
+): Record<string, unknown> {
+  if (!isPlainMcpInput(input)) throw new Error("MCP tool input must be an object");
+  let encoded: string;
+  try {
+    encoded = JSON.stringify(input);
+  } catch {
+    throw new Error("MCP tool input must be JSON serializable");
+  }
+  if (new TextEncoder().encode(encoded).byteLength > MCP_INPUT_BYTES) {
+    throw new Error(`MCP tool input exceeds ${MCP_INPUT_BYTES} bytes`);
+  }
+  if (redactSensitive(encoded) !== encoded) {
+    throw new Error("MCP tool input contains possible secret material");
+  }
+  return input;
 }

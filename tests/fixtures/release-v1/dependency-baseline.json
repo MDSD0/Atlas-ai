@@ -96,6 +96,7 @@
     "notify",
     "portable-pty",
     "reqwest",
+    "rmcp",
     "serde",
     "serde_json",
     "shared_child",
@@ -124,6 +125,13 @@
       "reason": "lazy LSP file URI conversion",
       "startupEffect": "none: diagnostics process remains lazy and optional",
       "graphEffect": "already present transitively in the desktop dependency graph"
+    },
+    {
+      "dependency": "rmcp",
+      "manifest": "src-tauri/Cargo.toml",
+      "reason": "official MCP stdio client lifecycle and child-process transport",
+      "startupEffect": "none: configured MCP servers remain disabled by default and connect lazily after approved calls",
+      "graphEffect": "default features disabled; only client and transport-child-process enabled"
     }
   ]
 }
