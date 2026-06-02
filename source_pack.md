@@ -717,3 +717,28 @@ Applied:
 - Added focused regressions for package CRUD, invalid metadata, permission narrowing, ordered hooks, disabled hooks, timeout/failure isolation, and before/execute/after ordering.
 
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 14 passed.
+
+## Accelerated V1 Slice H: optional disabled-by-default MCP boundary
+
+Source-parity packet:
+
+- Slice: add an inspectable MCP policy boundary and connector studies without making MCP part of Atlas core or attaching an unreviewed process transport.
+- Atlas files inspected: `src/modules/ai/tools/{tools,skills,subagent}.ts`, `src/modules/ai/agents/runSubagent.ts`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/lib/redact.ts`, and the existing memory and skill persistence adapters.
+- Primary evidence refreshed: official MCP `2025-11-25` lifecycle, tools, and resources specifications (`https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle`, `https://modelcontextprotocol.io/specification/2025-11-25/server/tools`, and `https://modelcontextprotocol.io/specification/2025-11-25/server/resources`). Initialization and capability negotiation precede normal operation. Tool clients should validate inputs, enforce access controls and timeouts, sanitize output, and expose confirmation for sensitive operations.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh mcp protocol typescript connectors`. Outbound refresh was unavailable, so the resolver used cached snapshots explicitly.
+- opensrc inspected (cached): `modelcontextprotocol/typescript-sdk:docs/client.md`, `packages/client/src/client/{client,stdio}.ts`, and `packages/client/package.json`. The cached `main` snapshot is `@modelcontextprotocol/client 2.0.0-alpha.2`, so it is a study reference rather than a blindly imported runtime dependency.
+- opensrc inspected (cached): `github/github-mcp-server:docs/{server-configuration,toolsets-and-icons}.md`. The server supports selective tools and toolsets, exclusions, read-only mode, lockdown mode, and scope filtering.
+- opensrc inspected (cached): `microsoft/playwright-mcp:README.md`. Its own guidance distinguishes MCP persistent-state workflows from the more token-efficient CLI plus skill path for coding agents.
+- Disposition: `ADAPT` the SDK's lazy connection and bounded-request posture into a small Atlas policy boundary. Persist only inert stdio configuration; default every server disabled; default every tool denied; require explicit approval for `ask`; cap calls, concurrent work, arguments, and output; and keep failures visible.
+- Disposition: `STUDY` GitHub and Playwright connectors. Do not auto-enable either connector, persist credentials, spawn a process, import an alpha SDK snapshot, or add MCP resources to the prompt in Slice H.
+- Tests required: disabled default, persisted registry CRUD, secret refusal, deny and ask policy enforcement, lazy invocation, timeout, crash visibility, output bounding, malformed input refusal, and connector-study defaults.
+
+Applied:
+
+- Added `src/modules/ai/mcp/`: inert stdio configuration contracts, explicit-save persistence, serialized registry CRUD, a bounded lazy invocation policy boundary, and inspectable connector-study records.
+- MCP servers default disabled and tools default denied. Calls enforce tool-name and object-input validation, policy checks, explicit `ask` approval, concurrency limits, timeout limits, and bounded outputs.
+- Added inspectable agent tools for status, list, studies, configure, enable, disable, remove, and call. All mutation and invocation tools require approval. Read-only subagents receive status, list, and studies only.
+- Kept the product honest: no server process starts, no SDK dependency is added, no credentials are persisted, and the runtime boundary returns a visible deferred-transport error until a connector is explicitly adopted.
+- Added focused regressions for disabled default, registry lifecycle, secret refusal, deny and ask enforcement, lazy call, timeout, crash, output bounding, malformed input, and connector-study defaults.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 6 passed.

@@ -822,7 +822,8 @@ Implementation checkpoint `2026-06-02`:
 - `D-F` landed the bounded `LocalRecordsProvider`, linked-artifact stale marking on direct and watcher-observed writes, advisory prompt recall, loopback-only optional SimpleMem health adapter, and deterministic MemoryLab fixture.
 - LocalRecords remains the default and adds no boot work, Python runtime, embedding model, or network dependency. Current repository evidence still outranks historical memory.
 - `G` landed persisted prompt-only local skill packages plus bounded in-process lifecycle hooks. Skills can narrow suggested tools but cannot register tools or weaken policy. Hook execution is timeout-isolated and visible in proof events.
-- Next: `H` optional disabled-by-default MCP boundary.
+- `H` landed an optional inert MCP policy boundary with disabled-by-default stdio configs, deny-first tools, approval-gated bounded calls, and GitHub plus Playwright connector studies. No server process starts and no SDK dependency is imported until a connector is explicitly adopted against a stable release.
+- Next: `I` local metrics and compact context inspector.
 
 ### Slice 3.1: Shared repository ignore policy
 

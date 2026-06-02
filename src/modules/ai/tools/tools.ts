@@ -2,6 +2,7 @@ import { buildManagedAgentTools } from "./agent";
 import { buildEditTools } from "./edit";
 import { buildFsTools } from "./fs";
 import { buildMemoryTools } from "./memory";
+import { buildMcpTools } from "./mcp";
 import { buildRealityTools } from "./reality";
 import { buildSearchTools } from "./search";
 import { buildSemanticTools } from "./semantic";
@@ -44,6 +45,7 @@ export function buildTools(ctx: import("./context").ToolContext) {
     ...buildFsTools(ctx),
     ...buildEditTools(ctx),
     ...buildMemoryTools(ctx),
+    ...buildMcpTools(),
     ...buildSearchTools(ctx),
     ...buildRealityTools(ctx),
     ...buildSemanticTools(ctx),

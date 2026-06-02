@@ -397,3 +397,13 @@ Done.
 - In-process lifecycle hooks are bounded, timeout-isolated, failure-isolated, and recorded through the existing proof journal.
 
 Next: Accelerated V1 Slice H optional MCP boundary.
+
+## Accelerated V1 Slice H status: optional MCP policy boundary
+
+Done.
+
+- MCP is an optional, inert local configuration lane. Servers default disabled, tools default denied, calls are bounded, and credentials are refused from persisted config.
+- GitHub and Playwright remain connector studies only. Nothing auto-installs, starts, or expands prompt context.
+- The first process transport adapter is deliberately deferred until a connector is explicitly adopted against a stable SDK release.
+
+Next: Accelerated V1 Slice I local metrics and compact context inspector.

@@ -5,6 +5,7 @@ import type { ProviderKeys } from "../lib/keyring";
 import type { ToolContext } from "../tools/context";
 import { buildFsTools } from "../tools/fs";
 import { buildReadOnlyMemoryTools } from "../tools/memory";
+import { buildReadOnlyMcpTools } from "../tools/mcp";
 import { buildReadOnlySkillTools } from "../tools/skills";
 import { buildRealityTools } from "../tools/reality";
 import { buildSearchTools } from "../tools/search";
@@ -45,6 +46,7 @@ export async function runSubagent({
   const baseReadOnly: Record<string, unknown> = {
     ...buildFsTools(toolContext),
     ...buildReadOnlyMemoryTools(toolContext),
+    ...buildReadOnlyMcpTools(),
     ...buildRealityTools(toolContext),
     ...buildSearchTools(toolContext),
     ...buildSemanticTools(toolContext),
