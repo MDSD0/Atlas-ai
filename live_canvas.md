@@ -597,3 +597,18 @@ Done at merge-gate layer; packaged-host inspection follows.
 Packaged macOS click evidence green: bound the real Atlas repository, opened Reality Memory, and observed `local_records`, `0` active records, `0` stale records, `Filesystem surface disabled`, `Work packets (0)`, and both empty states together. The disabled default is truthful and the inspection created no `.atlas/memory` artifacts.
 
 Next: continue the final-memo audit for remaining locally solvable harness gaps.
+
+## Post-V1 corrective Slice C9 status: truthful packed-context ledger
+
+Done at merge-gate layer; packaged-host inspection is host-blocked.
+
+- Added an ephemeral latest-packed context ledger keyed by project. It stores source labels and estimates only; it does not persist prompt bodies, tool outputs, raw transcripts, or secrets.
+- The ledger accounts for Atlas system prompt, project framing, `ATLAS.md`, `MEMORY.md`, LocalRecords recall, active packet, optional SimpleMem context, skill prompts, agent persona, custom instructions, plan mode, `<atlas_context>`, retained compacted conversation history, retained tool results, and wrapped tool schemas.
+- Tool-schema estimates reuse the Vercel AI SDK's public `asSchema(tool.inputSchema).jsonSchema` boundary. The same wrapped tool set is estimated and sent to `streamText`.
+- Reality Context now shows the last packed request, per-source estimates, model window, pressure state, and compaction state. The existing native repository context is separately labeled `Task subgraph preview - not auto-injected`.
+- UTF-8 bytes / `4` is explicitly labeled as an estimate; provider framing and provider billing tokenization can differ.
+- Focused green: diff check 0, TypeScript 0, packed-context Vitest `3`, full Vitest `226` across `46` files, warning-free build `3209` modules, and desktop contract smoke.
+- Clean-shell release qualification green with `CARGO_BUILD_JOBS=1`: Cargo check and Clippy 0, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, graph preflight, SWE-bench preflight, Terminal-Bench preflight, and signed-release preflight.
+- Packaged-host follow-up blocked by host Gatekeeper pressure: two low-priority single-worker debug rebuild attempts were terminated while `/usr/libexec/syspolicyd` consumed more than four CPU cores and roughly `12-15%` of host RAM. The second attempt completed the updated frontend build and reached native wrapper compilation. No build process remained afterward, and the older pre-C9 `.app` was not reused as evidence.
+
+Next: continue the final-memo audit, then retry the fresh debug package and click-check Context when the host pressure clears.

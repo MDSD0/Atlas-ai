@@ -1071,3 +1071,38 @@ Packaged-host follow-up:
 
 - Debug `.app` rebuild produced the macOS application bundle and updater tarball, then stopped at the expected local signing boundary because `TAURI_SIGNING_PRIVATE_KEY` is intentionally absent from the shell.
 - Click-driven packaged macOS evidence: bound the real Atlas repository, opened Reality, selected Memory, and observed `local_records`, `0` active records, `0` stale records, `Filesystem surface disabled`, `Work packets (0)`, and both empty-state messages in the combined inspector. No `.atlas/memory` repository artifacts were created during inspection.
+
+## Corrective Slice C9: truthful packed-context ledger
+
+Source-parity packet:
+
+- Slice: expose the model's last packed Atlas request as a bounded metadata ledger with per-source token estimates. Keep the native repository projection visible beside it, but do not imply that the projection is injected unless it appears in retained tool results.
+- Atlas files inspected: `src/modules/ai/lib/{agent,compact,transport}.ts`, `src/modules/ai/components/{HarnessInspector,AiMiniWindow}.tsx`, `src/modules/ai/{memory,skills,workPackets}/`, `src/modules/ai/tools/{context,tools}.ts`, and `src/modules/ai/store/{chatStore,realityStore}.ts`.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh context inspector token budget compaction prompt skills pi claude-code` under a bounded timeout; the authenticated cache remained available for direct source inspection. A separate `opensrc path ai` fetch was stopped after the local installed package source proved sufficient; no opensrc process was left running.
+- Primary documentation refreshed: official Claude Code memory documentation (`https://docs.claude.com/en/docs/claude-code/memory`), Pi compaction documentation (`https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/compaction.md`), and the installed Vercel AI SDK source used by Atlas.
+- opensrc inspected: `earendil-works/pi:packages/coding-agent/{docs/compaction.md,src/core/system-prompt.ts,src/core/agent-session.ts,src/core/footer-data-provider.ts}`.
+- AI SDK inspected: `ai/src/prompt/prepare-tools-and-tool-choice.ts` and `@ai-sdk/provider-utils/src/{index,schema}.ts`. The SDK prepares each function tool with name, description, and `asSchema(tool.inputSchema).jsonSchema` before provider invocation. Atlas can reuse that public export for an honest schema-size estimate.
+- Pi finding: project context files are assembled into the system prompt at one explicit boundary, session stats expose token totals, and compaction retains full durable history outside the reduced model view. Atlas should measure its existing composition boundary and keep history content out of the inspector.
+- Claude finding: loaded memory files are inspectable through `/memory`, while nested guidance loads only when relevant. Atlas should make loaded context sources visible without turning the inspector into a prompt dump.
+- Atlas finding: `transport.ts` assembles project guidance, `agent.ts` assembles the stable system prompt and compacted history, and `HarnessInspector.tsx` currently reports only native repository-projection tokens. The smallest safe adapter is an ephemeral latest-packed metadata ledger captured immediately before `streamText`.
+- Disposition: `WRAP` the AI SDK's public schema conversion for tool-definition estimates. `ADAPT` Pi's explicit prompt-construction and context-usage visibility into a bounded Atlas metadata ledger. `EXPOSE` the existing native task subgraph as a separate preview with an honest not-auto-injected label. `REJECT` storing prompt bodies, tool outputs, secrets, raw transcripts, provider-specific tokenizer dependencies, a second prompt engine, and claims that character-based estimates are exact provider billing tokens.
+- Tests required: per-source byte and token estimates, tool-schema accounting through the SDK boundary, retained tool-result accounting, session-binding separation, secret non-retention, project isolation, pressure classification, null-before-first-turn UI behavior, and explicit repository-preview labeling.
+
+Applied:
+
+- Added an ephemeral latest-packed context ledger keyed by project. Snapshots retain only source labels, byte counts, token estimates, pressure state, compaction state, model id, session id, and the active-file path binding; prompt bodies and tool outputs are discarded after counting.
+- Reused the AI SDK's public `asSchema` conversion to estimate the wrapped tool definitions Atlas actually passes to `streamText`. Tool names, descriptions, and JSON Schemas contribute to context pressure instead of disappearing behind a coarse tool count.
+- Split retained compacted model history into conversation payload and tool-result payload estimates. The injected `<atlas_context>` binding is accounted separately so active workspace paths are visible without double-counting the latest user prompt.
+- Preserved the existing stable system text while exposing its sources independently: selected Atlas system prompt, project-context framing, `ATLAS.md`, `MEMORY.md`, LocalRecords recall, active work packet, optional SimpleMem context, enabled local skill prompts, active agent persona, custom instructions, and plan-mode prompt.
+- Built tools once per run, wrapped them with the existing lifecycle observer once, used the same wrapped set for schema estimation and model execution, and made ledger capture best-effort so inspection cannot break an agent turn.
+- Extended the Reality Context tab with `Last packed model input`, per-source estimates, healthy/warning/critical pressure, compaction visibility, model window, and an explicit estimate disclaimer. Kept the native task subgraph in a separate `Task subgraph preview - not auto-injected` section.
+- Extended desktop smoke with the context-capture and honest-preview-label contract.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused packed-context Vitest `3` passed, full Vitest `226` passed across `46` files, production build `3209` modules warning-free, and desktop contract smoke passed.
+
+Full clean-shell qualification: `scripts/release-qualify.sh` exit `0` with `CARGO_BUILD_JOBS=1`; TypeScript 0, Vitest `226` passed across `46` files, production build `3209` modules warning-free, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional benchmark, watcher, or host-smoke ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed at `81` frontend and `33` Rust direct runtime dependencies, graph preflight passed, SWE-bench preflight passed, Terminal-Bench preflight passed, and signed-release preflight passed. The single-worker setting keeps local Gatekeeper pressure from obscuring native results; the MCP stdio fixture passed with the production Node runtime restored to `PATH`.
+
+Packaged-host follow-up:
+
+- A fresh debug `.app` rebuild was attempted twice at low priority with `CARGO_BUILD_JOBS=1`. The first attempt was terminated before output while `/usr/libexec/syspolicyd` consumed nearly five cores and about `15%` of host RAM. After the daemon briefly settled, the second attempt completed the updated `3209`-module frontend build and advanced through the native macOS wrapper compile before the host terminated it mid-crate while `syspolicyd` again consumed more than four cores and about `12%` of RAM.
+- No Cargo, Rust, or Tauri child process remained afterward. The existing debug `.app` predates C9, so it was intentionally not used as packaged evidence for the new inspector. Packaged Context click evidence remains pending a host window in which macOS Gatekeeper pressure allows the fresh bundle to finish.

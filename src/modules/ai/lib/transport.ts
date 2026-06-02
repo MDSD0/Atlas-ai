@@ -19,6 +19,7 @@ import {
 } from "../memory";
 import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
 import { buildActiveWorkPacketContext } from "../workPackets";
+import { contextLedger, type PackedContextSource } from "../contextLedger";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -101,8 +102,47 @@ export function createContextAwareTransport(deps: Deps) {
       buildActiveWorkPacketContext(live.workspaceRoot),
       buildLocalSkillsContext(),
     ]);
+    const projectSources: PackedContextSource[] = [
+      {
+        id: "atlas_md",
+        label: "ATLAS.md",
+        source: "workspace ATLAS.md",
+        content: atlasMd,
+      },
+      {
+        id: "memory_index",
+        label: "MEMORY.md",
+        source: ".atlas/memory/MEMORY.md",
+        content: fileMemory,
+      },
+      {
+        id: "local_memory",
+        label: "LocalRecords recall",
+        source: "app-local typed memory",
+        content: localMemory,
+      },
+      {
+        id: "active_work_packet",
+        label: "Active work packet",
+        source: "app-local resumable packet",
+        content: activeWorkPacket,
+      },
+      {
+        id: "simplemem_context",
+        label: "SimpleMem context",
+        source: "optional loopback SimpleMem Cross sidecar",
+        content: simpleMem?.context,
+      },
+      {
+        id: "skill_prompts",
+        label: "Skill prompts",
+        source: "enabled app-local skill packages",
+        content: localSkills,
+      },
+    ];
     const projectMemory =
-      [atlasMd, fileMemory, localMemory, activeWorkPacket, simpleMem?.context, localSkills]
+      projectSources
+        .map((source) => source.content)
         .filter(Boolean)
         .join("\n\n") || null;
     const contextBlock = atlasContextBlock(live.project);
@@ -189,6 +229,16 @@ export function createContextAwareTransport(deps: Deps) {
         openrouterModelId: deps.getOpenrouterModelId?.(),
         planMode: deps.getPlanMode?.(),
         projectMemory,
+        contextLedger: live.workspaceRoot
+          ? {
+              projectId: live.workspaceRoot,
+              sessionId: deps.toolContext.getSessionId() ?? "unknown",
+              activeFile: live.activeFile,
+              sessionBinding: contextBlock,
+              projectSources,
+            }
+          : undefined,
+        onContextPacked: (snapshot) => contextLedger.capture(snapshot),
         uiMessages: messagesForRun,
         abortSignal: options.abortSignal,
       });

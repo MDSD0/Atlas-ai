@@ -8,6 +8,8 @@ const config = JSON.parse(read("src-tauri/tauri.conf.json"));
 const native = read("src-tauri/src/lib.rs");
 const tools = read("src/modules/ai/tools/tools.ts");
 const memoryTools = read("src/modules/ai/tools/memory.ts");
+const transport = read("src/modules/ai/lib/transport.ts");
+const harnessInspector = read("src/modules/ai/components/HarnessInspector.tsx");
 const miniWindow = read("src/modules/ai/components/AiMiniWindow.tsx");
 
 assert.equal(config.build.devUrl, "http://localhost:1420");
@@ -47,6 +49,9 @@ for (const memorySurfaceTool of [
 ]) {
   assert.match(memoryTools, new RegExp(memorySurfaceTool));
 }
+assert.match(transport, /onContextPacked/);
+assert.match(harnessInspector, /Last packed model input/);
+assert.match(harnessInspector, /Task subgraph preview - not auto-injected/);
 assert.match(miniWindow, /<ReceiptStrip/);
 
 console.log(JSON.stringify({
@@ -64,6 +69,7 @@ console.log(JSON.stringify({
     "lazy RMCP stdio commands",
     "shell command lane",
     "memory MCP metrics work packet and filesystem surface tool registration",
+    "packed context ledger and honest repository preview label",
     "proof receipt mount",
   ],
 }, null, 2));

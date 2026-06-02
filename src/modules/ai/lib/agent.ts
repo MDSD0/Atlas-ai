@@ -21,6 +21,11 @@ import {
   type ModelId,
   type ProviderId,
 } from "../config";
+import {
+  buildPackedContextSnapshot,
+  type PackedContextSnapshot,
+  type PackedContextSource,
+} from "../contextLedger";
 import { buildTools, type ToolContext } from "../tools/tools";
 import { wrapToolsWithLifecycle } from "../tools/lifecycle";
 import type { AtlasLifecycleEvent } from "../skills";
@@ -345,7 +350,8 @@ function buildStableSystem(
   persona: { name: string; instructions: string } | null,
   customInstructions: string | undefined,
   projectMemory: string | null,
-): string {
+  projectSources: readonly PackedContextSource[] = [],
+): { text: string; sources: PackedContextSource[] } {
   const base = selectSystemPrompt(getModel(modelId).id);
   const personaBlock = persona?.instructions.trim()
     ? `\n\n## ACTIVE AGENT — ${persona.name}\n${persona.instructions.trim()}`
@@ -357,7 +363,43 @@ function buildStableSystem(
     projectMemory && projectMemory.trim().length > 0
       ? `\n\n## PROJECT — ATLAS.md\n${projectMemory.trim()}`
       : "";
-  return `${base}${memoryBlock}${personaBlock}${customBlock}`;
+  const loadedProjectSources = projectSources.filter((source) =>
+    source.content?.trim(),
+  );
+  return {
+    text: `${base}${memoryBlock}${personaBlock}${customBlock}`,
+    sources: [
+      {
+        id: "system_prompt",
+        label: "System prompt",
+        source: "Atlas selected system prompt",
+        content: base,
+      },
+      {
+        id: "project_context_overhead",
+        label: "Project-context framing",
+        source: "Atlas stable-system packer",
+        content: memoryBlock
+          ? `\n\n## PROJECT — ATLAS.md\n${"\n\n".repeat(
+              Math.max(0, loadedProjectSources.length - 1),
+            )}`
+          : null,
+      },
+      ...projectSources,
+      {
+        id: "agent_persona",
+        label: "Agent persona",
+        source: "active Atlas agent profile",
+        content: personaBlock || null,
+      },
+      {
+        id: "custom_instructions",
+        label: "Custom instructions",
+        source: "user settings",
+        content: customBlock || null,
+      },
+    ],
+  };
 }
 
 // OpenAI / Gemini / DeepSeek apply prefix caching automatically; only
@@ -431,6 +473,14 @@ export type RunAgentOptions = {
   openrouterModelId?: string;
   planMode?: boolean;
   projectMemory?: string | null;
+  contextLedger?: {
+    projectId: string;
+    sessionId: string;
+    activeFile: string | null;
+    sessionBinding: string;
+    projectSources: readonly PackedContextSource[];
+  };
+  onContextPacked?: (snapshot: PackedContextSnapshot) => void;
   uiMessages: UIMessage[];
   abortSignal?: AbortSignal;
 };
@@ -455,6 +505,7 @@ export async function runAgentStream(opts: RunAgentOptions) {
     opts.agentPersona ?? null,
     opts.customInstructions,
     opts.projectMemory ?? null,
+    opts.contextLedger?.projectSources,
   );
 
   const history = await convertToModelMessages(opts.uiMessages);
@@ -465,29 +516,50 @@ export async function runAgentStream(opts: RunAgentOptions) {
   });
   const compact = compactModelMessagesDetailed(
     prunedHistory,
-    getModelContextLimit(
-      getModel(modelId).id,
-      opts.openaiCompatibleContextLimit,
-    ),
+    getModelContextLimit(getModel(modelId).id, opts.openaiCompatibleContextLimit),
   );
   const compactedHistory = compact.messages;
   if (compact.compacted) {
     opts.onCompact?.({ droppedCount: compact.droppedCount });
   }
 
-  const messages: ModelMessage[] = [{ role: "system", content: stableSystem }];
+  const messages: ModelMessage[] = [
+    { role: "system", content: stableSystem.text },
+  ];
   if (opts.planMode) {
     messages.push({ role: "system", content: PLAN_MODE_PROMPT });
   }
   messages.push(...compactedHistory);
 
   const finalMessages = applyCacheBreakpoints(messages, provider);
+  const tools = wrapToolsWithLifecycle(
+    buildTools(opts.toolContext),
+    opts.onLifecycleEvent,
+  );
+  if (opts.contextLedger && opts.onContextPacked) {
+    await buildPackedContextSnapshot({
+      ...opts.contextLedger,
+      modelId,
+      contextLimit: getModelContextLimit(
+        getModel(modelId).id,
+        opts.openaiCompatibleContextLimit,
+      ),
+      stableSources: stableSystem.sources,
+      planModePrompt: opts.planMode ? PLAN_MODE_PROMPT : null,
+      compactedHistory,
+      compacted: compact.compacted,
+      droppedCount: compact.droppedCount,
+      tools,
+    })
+      .then(opts.onContextPacked)
+      .catch(() => {});
+  }
 
   let stepsSeen = 0;
   return streamText({
     model,
     messages: finalMessages,
-    tools: wrapToolsWithLifecycle(buildTools(opts.toolContext), opts.onLifecycleEvent),
+    tools,
     stopWhen: stepCountIs(MAX_AGENT_STEPS),
     abortSignal: opts.abortSignal,
     onStepFinish: (step) => {

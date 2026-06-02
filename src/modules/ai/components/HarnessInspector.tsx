@@ -24,6 +24,10 @@ import type { ProofRun } from "../proof/contracts";
 import { proofJournal } from "../proof";
 import { skillRegistry } from "../skills";
 import { useChatStore } from "../store/chatStore";
+import {
+  useContextLedgerStore,
+  type PackedContextSnapshot,
+} from "../contextLedger";
 import type { RepoContextResponse } from "../lib/native";
 import type { RealityStat } from "./CodeRealityPanel";
 import { summarizeReliability } from "./reliabilitySummary";
@@ -190,14 +194,83 @@ function MapTab({
 function ContextTab({
   snapshot,
   task,
+  packed,
 }: {
   snapshot: RepoContextResponse;
   task: string;
+  packed: PackedContextSnapshot | null;
 }) {
   return (
     <div className="flex flex-col gap-3 text-[11px]">
       <div>
-        <div className="font-medium text-foreground/90">Task subgraph</div>
+        <div className="font-medium text-foreground/90">
+          Last packed model input
+        </div>
+        {packed ? (
+          <>
+            <div className="mt-1 divide-y divide-border/50 border-y border-border/60">
+              <div className="flex justify-between py-1.5">
+                <span className="text-muted-foreground">Estimated input</span>
+                <span>
+                  {packed.estimatedTokens.toLocaleString()} /{" "}
+                  {packed.contextLimit.toLocaleString()} tokens
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-muted-foreground">Pressure</span>
+                <span>{packed.pressure}</span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-muted-foreground">Model</span>
+                <span>{packed.modelId}</span>
+              </div>
+              <div className="flex justify-between py-1.5">
+                <span className="text-muted-foreground">Compaction</span>
+                <span>
+                  {packed.compacted
+                    ? `${packed.droppedCount} observation(s) elided`
+                    : "not needed"}
+                </span>
+              </div>
+            </div>
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {packed.items.map((item) => (
+                <li
+                  key={item.id}
+                  className="border-b border-border/50 pb-1.5 text-[10px]"
+                >
+                  <div className="flex justify-between gap-2">
+                    <span className="text-foreground/85">{item.label}</span>
+                    <span className="tabular-nums text-muted-foreground">
+                      {item.status === "loaded"
+                        ? `${item.tokenEstimate.toLocaleString()} tokens`
+                        : "not loaded"}
+                    </span>
+                  </div>
+                  <div className="break-words text-muted-foreground">
+                    source: {item.source}
+                    {item.detail ? ` - ${item.detail}` : ""}
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              captured {when(packed.capturedAt)} - estimates use UTF-8 bytes / 4;
+              provider framing and billing tokenization can differ. Bodies are
+              not stored in this ledger.
+            </div>
+          </>
+        ) : (
+          <div className="mt-1 text-[10px] text-muted-foreground">
+            No packed request recorded for this project yet. Send an Atlas
+            agent message to capture one.
+          </div>
+        )}
+      </div>
+      <div className="border-t border-border/60 pt-2">
+        <div className="font-medium text-foreground/90">
+          Task subgraph preview - not auto-injected
+        </div>
         <div className="mt-1 break-words text-muted-foreground">{task}</div>
       </div>
       <div className="divide-y divide-border/50 border-y border-border/60">
@@ -493,6 +566,9 @@ export function HarnessInspector({
   onFocusTask: (task: string) => void;
 }) {
   const activeSessionId = useChatStore((state) => state.activeSessionId);
+  const packedContext = useContextLedgerStore(
+    (state) => state.latestByProject[workspaceRoot] ?? null,
+  );
   const [tab, setTab] = useState<InspectorTab>("map");
   const [query, setQuery] = useState("");
   const [proofRuns, setProofRuns] = useState<ProofRun[]>([]);
@@ -597,7 +673,9 @@ export function HarnessInspector({
           submit={submit}
         />
       )}
-      {tab === "context" && <ContextTab snapshot={snapshot} task={task} />}
+      {tab === "context" && (
+        <ContextTab snapshot={snapshot} task={task} packed={packedContext} />
+      )}
       {tab === "proof" && !loading && <ProofTab runs={sessionRuns} />}
       {tab === "memory" && !loading && <MemoryTab data={memory} />}
       {tab === "extensions" && !loading && <ExtensionsTab data={extensions} />}
