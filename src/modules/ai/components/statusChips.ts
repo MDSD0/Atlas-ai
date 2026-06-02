@@ -11,19 +11,32 @@ export type StatusChip = {
 
 const LIVE = new Set(["available", "connected"]);
 
+function lspState(p: LspProviderInfo): { suffix: string; tone: StatusChip["tone"] } {
+  if (p.status === "broken") return { suffix: "broken", tone: "warn" };
+  // Installed but Atlas does not deliver diagnostics for it yet: be honest —
+  // "detected", never "on". Only TypeScript is wired today.
+  if (LIVE.has(p.status) && !p.diagnostics_enabled) {
+    return { suffix: "detected", tone: "muted" };
+  }
+  if (LIVE.has(p.status)) return { suffix: "on", tone: "ok" };
+  return { suffix: "off", tone: "muted" };
+}
+
 /**
- * One chip per language server, plus an overall note. A provider only reads as
- * "on" when its native probe says available/connected — a discovered-but-not-
- * running server reads as off, never as a semantic guarantee.
+ * One chip per language server. These describe semantic DIAGNOSTICS, not
+ * indexing — the repo map indexes TS/JS/TSX/Python/Rust regardless. A provider
+ * reads "on" only when it is live AND Atlas actually delivers its diagnostics;
+ * an installed-but-deferred server reads "detected", a missing one "off", never
+ * a semantic guarantee. The "diag:" prefix keeps it distinct from indexing.
  */
 export function lspChips(providers: LspProviderInfo[] | null): StatusChip[] {
   if (!providers || providers.length === 0) {
-    return [{ label: "LSP: none", tone: "muted" }];
+    return [{ label: "diag: none", tone: "muted" }];
   }
-  return providers.map((p) => ({
-    label: `${p.language}: ${LIVE.has(p.status) ? "on" : "off"}`,
-    tone: LIVE.has(p.status) ? "ok" : p.status === "broken" ? "warn" : "muted",
-  }));
+  return providers.map((p) => {
+    const { suffix, tone } = lspState(p);
+    return { label: `diag ${p.language}: ${suffix}`, tone };
+  });
 }
 
 /**

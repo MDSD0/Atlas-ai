@@ -26,6 +26,10 @@ pub struct LspProviderInfo {
     pub id: &'static str,
     pub language: &'static str,
     pub status: LspProviderStatus,
+    /// Whether Atlas actually delivers diagnostics for this provider today. A
+    /// provider can be installed (`status: available`) yet deferred, so the UI
+    /// must not present a detected-but-deferred server as a live feature.
+    pub diagnostics_enabled: bool,
     pub executable: &'static str,
     pub resolved_path: Option<String>,
     pub detail: String,
@@ -279,6 +283,7 @@ fn provider_statuses(
                 } else {
                     LspProviderStatus::Unavailable
                 },
+                diagnostics_enabled: provider.diagnostics_enabled,
                 executable: provider.executable,
                 resolved_path: resolved.as_deref().map(crate::modules::fs::to_canon),
                 detail: if let Some(detail) = broken {

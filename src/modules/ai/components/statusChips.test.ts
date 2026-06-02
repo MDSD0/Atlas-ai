@@ -8,6 +8,7 @@ function provider(patch: Partial<LspProviderInfo> = {}): LspProviderInfo {
     id: "typescript",
     language: "typescript",
     status: "available",
+    diagnostics_enabled: true,
     executable: "typescript-language-server",
     resolved_path: "/usr/bin/typescript-language-server",
     detail: "",
@@ -17,26 +18,39 @@ function provider(patch: Partial<LspProviderInfo> = {}): LspProviderInfo {
 
 describe("lspChips", () => {
   it("reads 'none' when no provider is discovered", () => {
-    expect(lspChips(null)).toEqual([{ label: "LSP: none", tone: "muted" }]);
-    expect(lspChips([])).toEqual([{ label: "LSP: none", tone: "muted" }]);
+    expect(lspChips(null)).toEqual([{ label: "diag: none", tone: "muted" }]);
+    expect(lspChips([])).toEqual([{ label: "diag: none", tone: "muted" }]);
   });
 
-  it("marks an available/connected provider on", () => {
+  it("marks a live provider on only when diagnostics are actually delivered", () => {
     expect(lspChips([provider({ status: "available" })])).toEqual([
-      { label: "typescript: on", tone: "ok" },
+      { label: "diag typescript: on", tone: "ok" },
     ]);
     expect(lspChips([provider({ status: "connected" })])).toEqual([
-      { label: "typescript: on", tone: "ok" },
+      { label: "diag typescript: on", tone: "ok" },
     ]);
   });
 
-  it("never claims on for discovered-but-not-running or broken servers", () => {
+  it("reads 'detected' for an installed server whose diagnostics are deferred", () => {
+    // e.g. rust-analyzer present on PATH but Atlas does not wire its diagnostics
+    expect(
+      lspChips([
+        provider({
+          language: "rust",
+          status: "available",
+          diagnostics_enabled: false,
+        }),
+      ])[0],
+    ).toMatchObject({ label: "diag rust: detected", tone: "muted" });
+  });
+
+  it("never claims on for missing or broken servers", () => {
     expect(lspChips([provider({ status: "unavailable" })])[0]).toMatchObject({
-      label: "typescript: off",
+      label: "diag typescript: off",
       tone: "muted",
     });
     expect(lspChips([provider({ status: "broken" })])[0]).toMatchObject({
-      label: "typescript: off",
+      label: "diag typescript: broken",
       tone: "warn",
     });
   });

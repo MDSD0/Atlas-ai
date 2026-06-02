@@ -455,3 +455,18 @@ Also fixed panel label honesty: "Files indexed" -> "Files scanned" (file_count i
 Green (clean shell verify-atlas.sh --all): tsc 0, vitest 193 passed (35 files), build 0, cargo check/clippy 0, cargo test 135 + 3 harness.
 
 Verified panel renders in-app (user screenshot): 5 files / 98 symbols / 95% context saving on a small folder - numbers confirmed accurate against the Rust projection source.
+
+## UI/UX polish 3: honest diagnostics chips (indexing vs LSP)
+
+User confusion ("typescript: off, rust: on - does it not index TS?") exposed two honesty bugs:
+- The chips conflated INDEXING (tree-sitter: ts/tsx/js/py/rust, all working - 26,823 symbols on the Atlas repo) with LSP DIAGNOSTICS (separate optional accelerator).
+- "rust: on" overclaimed: rust-analyzer/pyright are detected on PATH but have diagnostics_enabled=false, so Atlas does not actually deliver their diagnostics. Only typescript is wired. Status was set purely on binary-found, ignoring diagnostics_enabled.
+
+Fix:
+- lsp.rs: LspProviderInfo now carries diagnostics_enabled (sourced from the provider table).
+- statusChips: a provider reads "on" only when live AND diagnostics_enabled; installed-but-deferred reads "detected" (muted), missing "off", broken "broken". Prefix changed to "diag <lang>:" so it cannot be mistaken for indexing.
+- CodeRealityPanel footer now states "indexes ts · tsx · js · py · rust · diagnostics are separate" to make the distinction explicit.
+
+So on the Atlas repo the honest reading is: indexing covers TS+Rust (working); diagnostics are TS-only (typescript-language-server not installed here -> off), rust-analyzer detected-but-deferred.
+
+Green (clean shell verify-atlas.sh --all): tsc 0, vitest 194 passed (35 files), build 0, cargo check/clippy 0, cargo test 135 + 3 harness (incl. 8 lsp tests).

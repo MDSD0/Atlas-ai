@@ -192,6 +192,9 @@ export function CodeRealityPanel() {
       </div>
 
       <div className="shrink-0 border-t border-border/60 px-3 py-2">
+        <div className="mb-1.5 text-[10px] text-muted-foreground/70">
+          indexes ts · tsx · js · py · rust · diagnostics are separate (below)
+        </div>
         <div className="flex flex-wrap gap-1">
           {[...lspChips(lsp), ...memoryChips(memory)].map((chip) => (
             <span

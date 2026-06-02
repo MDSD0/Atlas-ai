@@ -75,6 +75,8 @@ export type LspProviderInfo = {
   id: string;
   language: string;
   status: "available" | "unavailable" | "connected" | "broken";
+  /** Whether Atlas actually delivers diagnostics for this provider today. */
+  diagnostics_enabled: boolean;
   executable: string;
   resolved_path: string | null;
   detail: string;
