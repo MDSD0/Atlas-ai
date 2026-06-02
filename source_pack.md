@@ -976,3 +976,35 @@ Measured verification on macOS:
 - Focused production build passed across `3195` modules with the previous Rollup cycle and ineffective-dynamic-import warnings removed.
 - Full clean-shell `scripts/release-qualify.sh` exit `0`: TypeScript 0, Vitest `205` passed across `38` files, production build `3195` modules, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional benchmark, watcher, or host-smoke ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed at `81` frontend and `33` Rust direct runtime dependencies, graph preflight passed, SWE-bench preflight passed, Terminal-Bench preflight passed, and signed-release preflight passed.
 - External sample execution remains an explicit release signoff: start Docker Desktop, set `SWE_BENCH_ROOT` for the official SWE-bench checkout, install the official Harbor CLI, and run both adapters with `--run-sample`.
+
+## Corrective Slice C6: visible harness reality inspector
+
+Source-parity packet:
+
+- Slice: turn the existing tool-only harness evidence into a compact inspectable desktop surface without adding a second indexer, background service, or visualization dependency.
+- Atlas files inspected: `src-tauri/src/modules/reality/{ranking,projection}.rs`, `src/modules/ai/components/{CodeRealityPanel,ReceiptStrip}.tsx`, `src/modules/ai/store/{realityStore,proofStore}.ts`, `src/modules/ai/{proof,memory,skills,mcp,metrics}/`, and `src/modules/git-history/GraphRail.tsx`.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh graph ui context inspector proof timeline memory skills mcp metrics`; the curated graph cache remained available for direct source inspection.
+- Primary documentation refreshed: official Aider repository-map documentation (`https://aider.chat/docs/repomap.html`), official Codebase-Memory MCP repository (`https://github.com/DeusData/codebase-memory-mcp`), and official MCP documentation (`https://modelcontextprotocol.io/docs`).
+- opensrc inspected: `DeusData/codebase-memory-mcp:graph-ui/src/components/{GraphScene,GraphTab,EdgeLines,NodeCloud,FilterPanel}.tsx`, `graph-ui/src/lib/types.ts`, and `src/ui/layout3d.{c,h}`.
+- Upstream finding: Codebase-Memory emits bounded overview and detail graph responses with explicit nodes, edges, filters, and server-side caps. Its browser UI uses a heavyweight Three.js scene with physics-style camera behavior, bloom, and 3D controls.
+- Atlas finding: the native Aider-style ranker already computes the file-level definition/reference relationships required for a useful repository map, but discards them after PageRank. Atlas also already owns a small inline SVG graph idiom in Git history and durable bounded proof, memory, skills, MCP, and metrics stores.
+- Disposition: `ADAPT` Codebase-Memory's bounded node/edge overview and selective-inspection shape. `ADAPT` Atlas's existing inline SVG approach for a deterministic lightweight map. `EXPOSE` a capped relation list from the existing native ranker. `REJECT` Three.js, bloom, physics, automatic external indexing, external persistence, and a second graph runtime.
+- UI posture: extend the existing Reality sidebar with compact tabs for map, context, proof, memory, extensions, and reliability. Load durable stores only when their tab is selected. Keep the map task-scoped, bounded, and refresh-on-demand.
+- Tests required: deterministic capped native relations, projection visibility, stable bounded map construction, task-scoped refresh, and reliability aggregation.
+
+Applied:
+
+- Extended the native Aider-style file ranker with a deterministic top-`100` relationship list. Each relationship carries source file, target file, symbol, and accumulated weight. The PageRank input and strict context budget remain unchanged.
+- Added the relationship list to the native projection and frontend IPC contract. The map reads this existing projection only; it does not index files, start a process, or persist a second graph.
+- Added a dependency-free inline SVG repository overview capped at `24` nodes and `40` visible edges. Search submits a focused task projection through the existing repository-context command, while click selection exposes the visible symbol relationships for a file.
+- Replaced the stats-card-only Reality view with compact Map, Context, Proof, Memory, Extensions, and Reliability tabs. Proof events and bounded payload previews are expandable; memory provenance and stale state are visible; skills expose enablement, estimated prompt cost, tools, and hooks; MCP exposes transport, protocol, enablement, and policy; reliability aggregates durable verdicts and local measurements.
+- Kept non-map inspector reads lazy and on-demand. No optional provider starts when the panel opens.
+- Added focused native and frontend regressions for ranked relationship visibility, deterministic bounded map construction, task-scoped refresh, stale focused-response rejection, and reliability aggregation.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, Vitest `13` passed across the `4` touched frontend suites, native reality tests `12` passed, and Clippy 0.
+
+Measured verification on macOS:
+
+- Full clean-shell `scripts/release-qualify.sh` exit `0`: TypeScript 0, Vitest `210` passed across `40` files, production build `3199` modules, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional benchmark, watcher, or host-smoke ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed at `81` frontend and `33` Rust direct runtime dependencies, graph preflight passed, SWE-bench preflight passed, Terminal-Bench preflight passed, and signed-release preflight passed.
+- Debug `.app` rebuild produced the macOS app bundle and updater tarball, then stopped at the expected local signing boundary because `TAURI_SIGNING_PRIVATE_KEY` is intentionally absent from the shell.
+- Click-driven packaged-host evidence: Reality loaded the Atlas repository with `667` files, `28,142` symbols, `13,124` weighted links, `24` rank passes, a bounded SVG map, task-search control, selected-file relation detail, task context budget, included files, proof empty state, local-memory empty state, disabled MCP state with `stdio_rmcp_1_7` and protocol `2025-11-25`, and populated local reliability measurements. No new updater failure was appended during package launch.

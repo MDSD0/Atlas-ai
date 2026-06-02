@@ -22,6 +22,7 @@ function snap(patch: Partial<RepoContextResponse> = {}): RepoContextResponse {
     ranking_strategy: "aider_weighted_pagerank",
     graph_edge_count: 2048,
     rank_iterations: 24,
+    graph_relations: [],
     included_files: [],
     excluded_files: 3120,
     degraded_files: [],

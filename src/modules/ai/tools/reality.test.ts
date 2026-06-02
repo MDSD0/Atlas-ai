@@ -25,6 +25,9 @@ const RESPONSE: RepoContextResponse = {
   ranking_strategy: "aider_weighted_pagerank",
   graph_edge_count: 3,
   rank_iterations: 24,
+  graph_relations: [
+    { source: "/repo/b.ts", target: "/repo/a.ts", symbol: "Widget", weight: 10 },
+  ],
   included_files: ["/repo/a.ts", "/repo/b.ts"],
   excluded_files: 1,
   degraded_files: [{ path: "/repo/c.ts", status: "parse_failed" }],

@@ -1619,3 +1619,17 @@ Atlas is launch-candidate ready only when:
 - Click-driven packaged macOS evidence covers launch, native workspace binding, terminal working directory, Reality state, source-control truthfulness, Settings, and silent updater boot behavior.
 - The release workflow requires signed updater assets plus `latest.json`; `v0.7.3` predates that fix and is not a launchable updater release.
 - Final release signoff still requires explicit Docker-backed SWE-bench and Terminal-Bench sample runs, a new signed draft release, and Linux plus Windows interactive checks.
+
+### Slice C6: visible harness reality inspector
+
+- Expose a capped file-relationship list from the existing Aider-style ranker. Do not add a second graph index or visualization runtime.
+- Extend the Reality sidebar with a bounded SVG map and task-focused refresh.
+- Add lazy compact tabs for context, durable proof events, memory provenance, skills, MCP state, and local reliability measurements.
+- Keep all optional providers inert until explicitly invoked.
+- Verify native relationship determinism, projection visibility, map bounds, stale focused-response rejection, reliability aggregation, production build, and packaged-host rendering.
+
+### Corrective C6 evidence recorded
+
+- Clean-shell `scripts/release-qualify.sh` passes with Vitest `210`, warning-free production build `3199`, Rust `144 + 3` intentional ignores, fixture harness `3`, golden eval, desktop contract, dependency review, graph preflight, both external benchmark preflights, and signed-release preflight.
+- Click-driven packaged macOS evidence covers the bounded relationship map, task-focused context, proof, memory, extensions, MCP status, and local reliability tabs.
+- No optional service started while walking the inspector tabs, and no new updater failure was appended during package launch.

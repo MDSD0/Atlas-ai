@@ -11,9 +11,10 @@ export type RealityStatus = "idle" | "loading" | "ready" | "unavailable";
 type RealityState = {
   status: RealityStatus;
   root: string | null;
+  task: string;
   snapshot: RepoContextResponse | null;
   error: string | null;
-  refresh: (workspaceRoot: string | null) => Promise<void>;
+  refresh: (workspaceRoot: string | null, task?: string) => Promise<void>;
   reset: () => void;
 };
 
@@ -25,29 +26,45 @@ const INVENTORY_MAX_TOKENS = 2000;
 export const useRealityStore = create<RealityState>((set, get) => ({
   status: "idle",
   root: null,
+  task: INVENTORY_TASK,
   snapshot: null,
   error: null,
 
-  refresh: async (workspaceRoot) => {
+  refresh: async (workspaceRoot, task = get().task) => {
     if (!workspaceRoot) {
-      set({ status: "idle", root: null, snapshot: null, error: null });
+      set({
+        status: "idle",
+        root: null,
+        task: INVENTORY_TASK,
+        snapshot: null,
+        error: null,
+      });
       return;
     }
-    set({ status: "loading", root: workspaceRoot, error: null });
+    const normalizedTask = task.trim() || INVENTORY_TASK;
+    set({ status: "loading", root: workspaceRoot, task: normalizedTask, error: null });
     try {
       const snapshot = await agentNative.repoContext(
-        INVENTORY_TASK,
+        normalizedTask,
         workspaceRoot,
         INVENTORY_MAX_TOKENS,
       );
-      // Guard against a stale response arriving after the workspace changed.
-      if (get().root !== workspaceRoot) return;
+      // Guard against a stale response arriving after the workspace or focused
+      // task changed.
+      if (get().root !== workspaceRoot || get().task !== normalizedTask) return;
       set({ status: "ready", snapshot, error: null });
     } catch (e) {
-      if (get().root !== workspaceRoot) return;
+      if (get().root !== workspaceRoot || get().task !== normalizedTask) return;
       set({ status: "unavailable", snapshot: null, error: String(e) });
     }
   },
 
-  reset: () => set({ status: "idle", root: null, snapshot: null, error: null }),
+  reset: () =>
+    set({
+      status: "idle",
+      root: null,
+      task: INVENTORY_TASK,
+      snapshot: null,
+      error: null,
+    }),
 }));

@@ -1,17 +1,15 @@
 import { useEffect } from "react";
 import {
   RefreshCw as RefreshIcon,
-  FileCode as FileCodeIcon,
   Boxes as SymbolIcon,
-  EyeOff as SkippedIcon,
   TriangleAlert as DegradedIcon,
-  Gauge as TokenIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 import type { RepoContextResponse } from "../lib/native";
 import { useRealityStore } from "../store/realityStore";
 import { useStatusStore } from "../store/statusStore";
+import { HarnessInspector } from "./HarnessInspector";
 import { lspChips, memoryChips, type StatusChip } from "./statusChips";
 
 // CodeReality panel: the visible repository "brain". Shows what Atlas indexed,
@@ -66,8 +64,6 @@ export function freshnessLabel(snap: RepoContextResponse): string {
   return `${Math.round(seconds / 60)}m ago`;
 }
 
-const STAT_ICONS = [FileCodeIcon, SymbolIcon, SkippedIcon, TokenIcon];
-
 const CHIP_TONE: Record<StatusChip["tone"], string> = {
   ok: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
   warn: "border-amber-500/30 bg-amber-500/10 text-amber-500",
@@ -78,6 +74,7 @@ export function CodeRealityPanel() {
   const workspaceRoot = useWorkspaceStore((s) => s.workspaceRoot);
   const status = useRealityStore((s) => s.status);
   const snapshot = useRealityStore((s) => s.snapshot);
+  const task = useRealityStore((s) => s.task);
   const error = useRealityStore((s) => s.error);
   const refresh = useRealityStore((s) => s.refresh);
   const lsp = useStatusStore((s) => s.lsp);
@@ -136,30 +133,13 @@ export function CodeRealityPanel() {
 
         {snapshot && (
           <>
-            <div className="grid grid-cols-2 gap-2">
-              {formatRealityStats(snapshot).map((stat, i) => {
-                const Icon = STAT_ICONS[i] ?? FileCodeIcon;
-                return (
-                  <div
-                    key={stat.label}
-                    className="flex flex-col gap-0.5 rounded-lg border border-border/50 bg-card/50 p-2"
-                  >
-                    <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                      <Icon size={11} strokeWidth={1.5} />
-                      {stat.label}
-                    </div>
-                    <div className="text-sm font-semibold tabular-nums text-foreground">
-                      {stat.value}
-                    </div>
-                    {stat.hint && (
-                      <div className="text-[10px] text-muted-foreground/80">
-                        {stat.hint}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <HarnessInspector
+              snapshot={snapshot}
+              stats={formatRealityStats(snapshot)}
+              workspaceRoot={workspaceRoot}
+              task={task}
+              onFocusTask={(focusedTask) => void refresh(workspaceRoot, focusedTask)}
+            />
 
             {snapshot.degraded_files.length > 0 && (
               <div className="mt-3">

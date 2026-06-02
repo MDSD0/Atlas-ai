@@ -61,6 +61,12 @@ export type RepoContextResponse = {
   ranking_strategy: string;
   graph_edge_count: number;
   rank_iterations: number;
+  graph_relations: Array<{
+    source: string;
+    target: string;
+    symbol: string;
+    weight: number;
+  }>;
   included_files: string[];
   excluded_files: number;
   degraded_files: Array<{ path: string; status: string }>;

@@ -545,3 +545,24 @@ Done at merge-gate layer; external release signoff remains explicit.
 Corrective slices `C1-C5`: complete at merge-gate layer.
 
 Remaining release signoff: publish a new signed draft release and confirm updater assets, run both explicit Docker-backed external samples, and execute Linux plus Windows interactive checks.
+
+## Post-V1 corrective Slice C6 status: visible harness reality inspector
+
+Done at focused-check layer; broader qualification and packaged-host inspection follow.
+
+- Native repository context now exposes a deterministic top-`100` relationship list from the existing Aider-style file ranker.
+- Reality now has compact Map, Context, Proof, Memory, Extensions, and Reliability tabs instead of a stats-only panel.
+- The map is a lightweight inline SVG capped at `24` nodes and `40` visible edges. Search requests a fresh task-specific projection; click selection reveals symbol relationships.
+- Context shows the active task subgraph, budget, included files, and bounded preview.
+- Proof shows durable runs, expandable events, and bounded payload previews.
+- Memory shows local provider counts, provenance, artifacts, and stale reasons.
+- Extensions shows local skills plus MCP transport, protocol, enablement, and policy state.
+- Reliability shows proof-based verified ratio and bounded local measurements.
+- Non-map store reads remain lazy. No optional service starts when Reality opens.
+- Focused green: diff check 0, TypeScript 0, Vitest `13` passed across `4` touched suites, native reality tests `12`, and Clippy 0.
+
+Full clean-shell qualification green: TypeScript 0, Vitest `210` passed across `40` files, build `3199` modules, Cargo check and Clippy 0, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, graph preflight, SWE-bench preflight, Terminal-Bench preflight, and signed-release preflight.
+
+Packaged macOS click evidence green: the real Atlas repository rendered `667` files, `28,142` symbols, `13,124` weighted links, a bounded `24`-node SVG overview, task context, empty-session proof, local-memory state, disabled MCP transport state, and populated reliability metrics. Startup stayed silent with no new updater failure.
+
+Next: continue the final-memo audit for remaining locally solvable harness gaps, then finish external and cross-platform release signoff where prerequisites permit it.

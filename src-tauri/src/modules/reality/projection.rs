@@ -4,7 +4,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use super::index::{RealitySnapshot, SymbolRecord};
-use super::ranking::{rank_files, RANK_ITERATIONS};
+use super::ranking::{rank_files, RankedFileRelation, RANK_ITERATIONS};
 
 const MAX_MATCHES: usize = 100;
 const MAX_DEGRADED_FILES: usize = 100;
@@ -45,6 +45,7 @@ pub struct RealityContextResponse {
     pub ranking_strategy: String,
     pub graph_edge_count: usize,
     pub rank_iterations: usize,
+    pub graph_relations: Vec<RankedFileRelation>,
     pub included_files: Vec<String>,
     pub excluded_files: usize,
     pub degraded_files: Vec<DegradedFile>,
@@ -171,6 +172,7 @@ pub fn project(
         ranking_strategy: "aider_weighted_pagerank".to_string(),
         graph_edge_count: graph_ranking.edge_count,
         rank_iterations: RANK_ITERATIONS,
+        graph_relations: graph_ranking.relations,
         included_files: included_files.clone(),
         excluded_files: ranked.len().saturating_sub(included_files.len()),
         degraded_files,
@@ -290,6 +292,12 @@ mod tests {
             .matches
             .iter()
             .any(|symbol| symbol.path == "cart.ts" && symbol.is_definition));
+        assert!(result
+            .graph_relations
+            .iter()
+            .any(|relation| relation.source == "caller.ts"
+                && relation.target == "cart.ts"
+                && relation.symbol == "calculateTotal"));
     }
 
     #[test]

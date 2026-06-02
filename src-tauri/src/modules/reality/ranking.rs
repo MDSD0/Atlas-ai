@@ -1,15 +1,27 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::path::Path;
 
+use serde::Serialize;
+
 use super::index::{FileRecord, SymbolRecord};
 
 const DAMPING: f64 = 0.85;
+const MAX_RELATIONS: usize = 100;
 pub const RANK_ITERATIONS: usize = 24;
+
+#[derive(Clone, Debug, Serialize)]
+pub struct RankedFileRelation {
+    pub source: String,
+    pub target: String,
+    pub symbol: String,
+    pub weight: f64,
+}
 
 #[derive(Clone, Debug)]
 pub struct FileGraphRanking {
     pub scores: HashMap<String, f64>,
     pub edge_count: usize,
+    pub relations: Vec<RankedFileRelation>,
 }
 
 pub fn rank_files(
@@ -42,6 +54,7 @@ pub fn rank_files(
     }
 
     let mut edges: BTreeMap<String, BTreeMap<String, f64>> = BTreeMap::new();
+    let mut relations: BTreeMap<(String, String, String), f64> = BTreeMap::new();
     let mut edge_count = 0;
     for (identifier, definers) in &definitions {
         let Some(referencers) = references.get(identifier) else {
@@ -62,20 +75,41 @@ pub fn rank_files(
         );
         for (referencer, reference_count) in referencers {
             for definer in definers {
-                add_edge(
-                    &mut edges,
-                    referencer,
-                    definer,
-                    multiplier * (*reference_count as f64).sqrt(),
-                );
+                let weight = multiplier * (*reference_count as f64).sqrt();
+                add_edge(&mut edges, referencer, definer, weight);
+                *relations
+                    .entry((
+                        referencer.clone(),
+                        definer.clone(),
+                        display_name.to_string(),
+                    ))
+                    .or_default() += weight;
                 edge_count += 1;
             }
         }
     }
+    let mut relations: Vec<RankedFileRelation> = relations
+        .into_iter()
+        .map(|((source, target, symbol), weight)| RankedFileRelation {
+            source,
+            target,
+            symbol,
+            weight,
+        })
+        .collect();
+    relations.sort_by(|a, b| {
+        b.weight
+            .total_cmp(&a.weight)
+            .then_with(|| a.source.cmp(&b.source))
+            .then_with(|| a.target.cmp(&b.target))
+            .then_with(|| a.symbol.cmp(&b.symbol))
+    });
+    relations.truncate(MAX_RELATIONS);
 
     FileGraphRanking {
         scores: weighted_page_rank(&paths, &edges, mentioned_identifiers),
         edge_count,
+        relations,
     }
 }
 
@@ -221,6 +255,10 @@ mod tests {
 
         assert!(ranked.scores["invoice.ts"] > ranked.scores["noise.ts"]);
         assert_eq!(ranked.edge_count, 1);
+        assert_eq!(ranked.relations.len(), 1);
+        assert_eq!(ranked.relations[0].source, "entry.ts");
+        assert_eq!(ranked.relations[0].target, "invoice.ts");
+        assert_eq!(ranked.relations[0].symbol, "calculateInvoiceTotal");
     }
 
     #[test]
