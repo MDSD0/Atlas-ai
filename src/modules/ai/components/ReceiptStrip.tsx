@@ -35,16 +35,23 @@ function basename(p: string): string {
 }
 
 /**
- * Whether a receipt is worth showing. A just-started run with no recorded
- * activity is noise; surface the strip only once something happened or the run
- * has finished (so passed/failed/cancelled verdicts always show).
+ * Whether a receipt is worth showing. A receipt is evidence of actions, so it
+ * appears only when the agent actually did something — ran a tool, changed a
+ * file, ran a check, hit a diagnostic, or failed. A pure-chat turn (no tools)
+ * has nothing to prove and must not render "Incomplete · 0 actions" noise. This
+ * holds regardless of status: an empty finished run is still nothing to show.
  */
 export function shouldShowReceipt(
   summary: ReceiptSummary | undefined,
 ): summary is ReceiptSummary {
   if (!summary) return false;
-  if (summary.status !== "running") return true;
-  return summary.eventCount > 0 || summary.changedFiles.length > 0;
+  return (
+    summary.eventCount > 0 ||
+    summary.changedFiles.length > 0 ||
+    summary.checks.length > 0 ||
+    summary.diagnostics.length > 0 ||
+    summary.failures.length > 0
+  );
 }
 
 // Compact proof receipt for the latest run of a session. Failures stay expanded

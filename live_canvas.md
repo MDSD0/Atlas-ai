@@ -428,3 +428,18 @@ Done.
 - This macOS host passes every automated gate. Interactive desktop qualification remains a manual release checklist on all three platforms; Tauri documents no WKWebView WebDriver path for macOS.
 
 Accelerated V1 queue `A-J`: complete.
+
+## UI/UX polish 1: receipt noise + CodeReality panel
+
+Locked thesis: Atlas is a repo-grounded coding harness (CodeReality + tiny verification receipt + SimpleMem-behind-provider). UI work = make the existing brain visible, not build a cockpit.
+
+- ReceiptStrip: a receipt is now evidence of actions. `shouldShowReceipt` hides any run with zero events/changes/checks/diagnostics/failures regardless of status, killing the "Incomplete - 0 actions" noise on pure-chat turns. Tests updated.
+- CodeRealityPanel (new sidebar view "Reality"): renders the native projection - files indexed, symbols (defs/refs), ignored dirs, and context saving (projected vs naive tokens) - plus freshness, watch status, degraded parses, truncation. Re-index button. Pure formatRealityStats/freshnessLabel helpers unit-tested.
+- realityStore: on-demand fetch keyed to workspaceRoot, stale-response guard.
+- Wired into SidebarRail (Files | Reality | Source Control | Sessions) + App.tsx view switch + persisted view guard.
+
+Data was already produced by the native agent_reality_context; this exposes it. No new backend.
+
+Green (clean shell verify-atlas.sh --all): tsc 0, vitest 186 passed (34 files), build 0, cargo check/clippy 0, cargo test 135 + 3 harness.
+
+Next UI: diff-review accept/reject polish, honest status chips (LSP TS-only, Memory local). Then the fixture go/no-go measurement (key-file recall, wrong-file edits, token saving).

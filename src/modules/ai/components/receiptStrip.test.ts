@@ -29,10 +29,23 @@ describe("shouldShowReceipt", () => {
     expect(shouldShowReceipt(summary({ changedFiles: ["/a.ts"] }))).toBe(true);
   });
 
-  it("always shows a finished verdict, even with no events", () => {
-    expect(shouldShowReceipt(summary({ status: "passed" }))).toBe(true);
-    expect(shouldShowReceipt(summary({ status: "failed" }))).toBe(true);
-    expect(shouldShowReceipt(summary({ status: "incomplete" }))).toBe(true);
-    expect(shouldShowReceipt(summary({ status: "cancelled" }))).toBe(true);
+  it("hides a finished run that recorded no actions (pure-chat turn)", () => {
+    // A receipt is evidence of actions; an empty finished run has nothing to
+    // prove and must not render "Incomplete - 0 actions" noise.
+    expect(shouldShowReceipt(summary({ status: "incomplete" }))).toBe(false);
+    expect(shouldShowReceipt(summary({ status: "cancelled" }))).toBe(false);
+    expect(shouldShowReceipt(summary({ status: "passed" }))).toBe(false);
+  });
+
+  it("shows a finished verdict once it carries evidence", () => {
+    expect(
+      shouldShowReceipt(summary({ status: "failed", failures: ["boom"] })),
+    ).toBe(true);
+    expect(
+      shouldShowReceipt(summary({ status: "passed", checks: ["npm test (exit 0)"] })),
+    ).toBe(true);
+    expect(
+      shouldShowReceipt(summary({ status: "passed", changedFiles: ["/a.ts"] })),
+    ).toBe(true);
   });
 });

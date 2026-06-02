@@ -1,4 +1,4 @@
-import { Folder as FolderGitTwoIcon, FolderTree as FolderTreeIcon, MessageSquare as MessageMultiple01Icon } from "lucide-react";
+import { Folder as FolderGitTwoIcon, FolderTree as FolderTreeIcon, MessageSquare as MessageMultiple01Icon, Boxes as RealityIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 
@@ -25,6 +25,7 @@ type Props = {
 export function SidebarRail({ activeView, onSelectView, changedCount, workspaceRoot }: Props) {
   const items: RailItem[] = [
     { id: "explorer", label: "Files", icon: FolderTreeIcon, requiresWorkspace: true },
+    { id: "reality", label: "Reality", icon: RealityIcon, requiresWorkspace: true },
     {
       id: "source-control",
       label: "Source Control",

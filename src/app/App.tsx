@@ -112,6 +112,7 @@ import {
 import { WelcomeScreen } from "@/modules/workspace/WelcomeScreen";
 import { workspaceBindingErrorMessage } from "@/modules/workspace/workspaceStore";
 import { SessionsPanel } from "@/modules/ai/components/SessionsPanel";
+import { CodeRealityPanel } from "@/modules/ai/components/CodeRealityPanel";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -162,6 +163,7 @@ function readSidebarView(): SidebarViewId {
     const stored = window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY);
     if (
       stored === "explorer" ||
+      stored === "reality" ||
       stored === "source-control" ||
       stored === "sessions"
     )
@@ -1613,6 +1615,8 @@ export default function App() {
                         onOpenMarkdownPreview={openMarkdownPreview}
                         onFolderSelected={setActiveFolder}
                       />
+                    ) : sidebarView === "reality" ? (
+                      <CodeRealityPanel />
                     ) : sidebarView === "sessions" ? (
                       <SessionsPanel />
                     ) : (
