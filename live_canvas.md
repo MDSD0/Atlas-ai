@@ -443,3 +443,15 @@ Data was already produced by the native agent_reality_context; this exposes it. 
 Green (clean shell verify-atlas.sh --all): tsc 0, vitest 186 passed (34 files), build 0, cargo check/clippy 0, cargo test 135 + 3 harness.
 
 Next UI: diff-review accept/reject polish, honest status chips (LSP TS-only, Memory local). Then the fixture go/no-go measurement (key-file recall, wrong-file edits, token saving).
+
+## UI/UX polish 2: honest capability chips in CodeReality
+
+- statusStore: probes real LSP providers (agent_lsp_status) + SimpleMem health on demand, keyed to workspace.
+- statusChips.ts (pure, tested): lspChips reports each language server on/off/broken from its native probe (never claims "on" for discovered-but-not-running); memoryChips always shows local memory active, shows SimpleMem only when enabled (on if health passed, off/warn if unreachable, hidden if disabled/opt-in-not-started).
+- CodeRealityPanel footer renders the chips. Directly + honestly answers "is LSP working?" and "is SimpleMem working?" - chosen home over the composer to avoid chip clutter.
+
+Also fixed panel label honesty: "Files indexed" -> "Files scanned" (file_count includes unparsed binary/large/unsupported); hint now reports parse_failures.
+
+Green (clean shell verify-atlas.sh --all): tsc 0, vitest 193 passed (35 files), build 0, cargo check/clippy 0, cargo test 135 + 3 harness.
+
+Verified panel renders in-app (user screenshot): 5 files / 98 symbols / 95% context saving on a small folder - numbers confirmed accurate against the Rust projection source.

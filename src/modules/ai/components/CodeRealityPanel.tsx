@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/modules/workspace";
 import type { RepoContextResponse } from "../lib/native";
 import { useRealityStore } from "../store/realityStore";
+import { useStatusStore } from "../store/statusStore";
+import { lspChips, memoryChips, type StatusChip } from "./statusChips";
 
 // CodeReality panel: the visible repository "brain". Shows what Atlas indexed,
 // what it skipped, how many symbols it extracted, and the token saving of the
@@ -66,16 +68,26 @@ export function freshnessLabel(snap: RepoContextResponse): string {
 
 const STAT_ICONS = [FileCodeIcon, SymbolIcon, SkippedIcon, TokenIcon];
 
+const CHIP_TONE: Record<StatusChip["tone"], string> = {
+  ok: "border-emerald-500/30 bg-emerald-500/10 text-emerald-500",
+  warn: "border-amber-500/30 bg-amber-500/10 text-amber-500",
+  muted: "border-border/50 bg-card/50 text-muted-foreground",
+};
+
 export function CodeRealityPanel() {
   const workspaceRoot = useWorkspaceStore((s) => s.workspaceRoot);
   const status = useRealityStore((s) => s.status);
   const snapshot = useRealityStore((s) => s.snapshot);
   const error = useRealityStore((s) => s.error);
   const refresh = useRealityStore((s) => s.refresh);
+  const lsp = useStatusStore((s) => s.lsp);
+  const memory = useStatusStore((s) => s.memory);
+  const refreshStatus = useStatusStore((s) => s.refresh);
 
   useEffect(() => {
     void refresh(workspaceRoot);
-  }, [workspaceRoot, refresh]);
+    void refreshStatus(workspaceRoot);
+  }, [workspaceRoot, refresh, refreshStatus]);
 
   if (!workspaceRoot) {
     return (
@@ -177,6 +189,22 @@ export function CodeRealityPanel() {
             </div>
           </>
         )}
+      </div>
+
+      <div className="shrink-0 border-t border-border/60 px-3 py-2">
+        <div className="flex flex-wrap gap-1">
+          {[...lspChips(lsp), ...memoryChips(memory)].map((chip) => (
+            <span
+              key={chip.label}
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[10px] font-medium",
+                CHIP_TONE[chip.tone],
+              )}
+            >
+              {chip.label}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   );
