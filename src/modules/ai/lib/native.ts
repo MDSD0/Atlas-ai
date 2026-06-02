@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { currentWorkspaceEnv } from "@/modules/workspace";
+import { currentWorkspaceEnv } from "@/modules/workspace/env";
 
 export type ReadResult =
   | { kind: "text"; content: string; size: number }

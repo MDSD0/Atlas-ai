@@ -11,7 +11,7 @@ import {
 
 
 import { invoke } from "@tauri-apps/api/core";
-import { currentWorkspaceEnv } from "@/modules/workspace";
+import { currentWorkspaceEnv } from "@/modules/workspace/env";
 import { motion } from "motion/react";
 import {
   forwardRef,

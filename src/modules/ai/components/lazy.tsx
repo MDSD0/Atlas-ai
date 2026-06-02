@@ -1,6 +1,10 @@
 import { lazy, Suspense } from "react";
 import type { AgentRunBridgeProps } from "./AgentRunBridge";
 import type { SelectionAskAiProps } from "./SelectionAskAi";
+import {
+  AiInputBar as AiInputBarDirect,
+  AiInputBarConnect as AiInputBarConnectDirect,
+} from "./AiInputBar";
 
 const AgentRunBridgeInner = lazy(() =>
   import("./AgentRunBridge").then((m) => ({ default: m.AgentRunBridge })),
@@ -12,16 +16,6 @@ const AiMiniWindowInner = lazy(() =>
 
 const AiDockedPanelInner = lazy(() =>
   import("./AiMiniWindow").then((m) => ({ default: m.AiDockedPanel })),
-);
-
-const AiInputBarModule = () => import("./AiInputBar");
-
-const AiInputBarInner = lazy(() =>
-  AiInputBarModule().then((m) => ({ default: m.AiInputBar })),
-);
-
-const AiInputBarConnectInner = lazy(() =>
-  AiInputBarModule().then((m) => ({ default: m.AiInputBarConnect })),
 );
 
 const SelectionAskAiInner = lazy(() =>
@@ -53,19 +47,11 @@ export function AiDockedPanel() {
 }
 
 export function AiInputBar() {
-  return (
-    <Suspense fallback={null}>
-      <AiInputBarInner />
-    </Suspense>
-  );
+  return <AiInputBarDirect />;
 }
 
 export function AiInputBarConnect({ onAdd }: { onAdd: () => void }) {
-  return (
-    <Suspense fallback={null}>
-      <AiInputBarConnectInner onAdd={onAdd} />
-    </Suspense>
-  );
+  return <AiInputBarConnectDirect onAdd={onAdd} />;
 }
 
 export function SelectionAskAi(props: SelectionAskAiProps) {

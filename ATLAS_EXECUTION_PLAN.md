@@ -1597,7 +1597,9 @@ The accelerated V1 queue is a verified foundation, not the final coding harness.
 
 ### Slice C5: External qualification
 
-- Add sample adapters for at least one coding benchmark and one terminal-oriented benchmark without turning upstream benchmark infrastructure into product runtime.
+- Add explicit sample adapters for SWE-bench's official gold smoke and Harbor's official Terminal-Bench 2.0 oracle path without turning upstream benchmark infrastructure into product runtime.
+- Keep both external adapters preflight-only by default. Never install tools, start Docker, or run expensive samples implicitly.
+- Bound the Terminal-Bench smoke to one task through Harbor's source-defined `-l/--n-tasks` flag.
 - Keep deterministic Atlas fixtures as merge gates.
 - Add click-driven desktop qualification where supported and retain an honest manual checklist where platform automation is unavailable.
 
@@ -1610,3 +1612,10 @@ Atlas is launch-candidate ready only when:
 3. Every optional provider reports real capability state and degrades independently.
 4. The full clean-shell release qualification passes.
 5. External benchmark samples and desktop interaction evidence are recorded.
+
+### Corrective C5 evidence recorded
+
+- Clean-shell `scripts/release-qualify.sh` passes with both side-effect-free external preflights and the signed-release contract.
+- Click-driven packaged macOS evidence covers launch, native workspace binding, terminal working directory, Reality state, source-control truthfulness, Settings, and silent updater boot behavior.
+- The release workflow requires signed updater assets plus `latest.json`; `v0.7.3` predates that fix and is not a launchable updater release.
+- Final release signoff still requires explicit Docker-backed SWE-bench and Terminal-Bench sample runs, a new signed draft release, and Linux plus Windows interactive checks.

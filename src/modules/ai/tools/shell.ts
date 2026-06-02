@@ -4,7 +4,7 @@ import { native } from "../lib/native";
 import { checkShellCommand } from "../lib/security";
 import { shellNeedsApproval } from "../lib/permissions";
 import { resolvePath, type ToolContext } from "./context";
-import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace";
+import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace/env";
 
 /**
  * Per-session lazy shell-session id. The agent gets one persistent shell per

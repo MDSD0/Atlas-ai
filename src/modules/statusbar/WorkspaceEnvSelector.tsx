@@ -11,7 +11,7 @@ import {
   LOCAL_WORKSPACE,
   useWorkspaceEnvStore,
   type WorkspaceEnv,
-} from "@/modules/workspace";
+} from "@/modules/workspace/env";
 
 
 

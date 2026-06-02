@@ -46,6 +46,10 @@ tier	topics	repo	purpose
 7	lsp,editor,ide	github:microsoft/vscode	Deferred editor and LSP integration study reference
 7	tauri,frontend,scaffold	github:tauri-apps/create-tauri-app	Tauri scaffold pattern reference
 7	tauri,rust,ipc,frontend	github:tauri-apps/tauri	Active desktop runtime dependency reference
+7	tauri,release,updater,workflow	github:tauri-apps/tauri-action	Official desktop release and updater metadata workflow reference
+7	benchmark,eval,docker,harness	github:SWE-bench/SWE-bench	Official reproducible external coding-harness evaluation reference
+7	benchmark,eval,docker,terminal,harness	github:harbor-framework/harbor	Official Terminal-Bench 2.0 evaluation harness reference
+7	benchmark,eval,docker,terminal,dataset	github:harbor-framework/terminal-bench-2	Official Terminal-Bench 2.0 dataset reference
 7	editor,codemirror,frontend	github:codemirror/dev	Active editor dependency reference
 7	terminal,xterm,frontend	github:xtermjs/xterm.js	Active terminal renderer dependency reference
 7	frontend,reactivity,legacy-ui	github:sveltejs/svelte	Legacy-plan UI reference only; active Atlas uses React

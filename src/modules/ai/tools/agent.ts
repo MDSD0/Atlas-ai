@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { useManagedAgentsStore } from "@/modules/agents/store/managedAgentsStore";
-import { writeToSession } from "@/modules/terminal";
+import { writeToSession } from "@/modules/terminal/lib/useTerminalSession";
 import type { ToolContext } from "./context";
 
 // Claude Code's TUI treats a trailing CR in the same write chunk as the text

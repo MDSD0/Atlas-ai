@@ -39,7 +39,7 @@ import type {
   ExecutionCwdMode,
   ToolContext,
 } from "../tools/tools";
-import { useWorkspaceStore } from "@/modules/workspace";
+import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 
 type Live = {
   getCwd: () => string | null;

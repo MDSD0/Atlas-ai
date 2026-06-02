@@ -45,6 +45,18 @@ jobs:
       - name: Accelerated dependency review
         run: bash scripts/verify-atlas.sh --deps
 
+      - name: Optional graph provider preflight
+        run: bash scripts/verify-atlas.sh --graph
+
+      - name: External benchmark preflight
+        run: bash scripts/verify-atlas.sh --bench
+
+      - name: Terminal benchmark preflight
+        run: bash scripts/verify-atlas.sh --terminal-bench
+
+      - name: Signed release contract preflight
+        run: bash scripts/verify-atlas.sh --release
+
   rust:
     runs-on: ubuntu-22.04
     steps:
@@ -62,6 +74,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
 
       - uses: swatinem/rust-cache@v2
         with:

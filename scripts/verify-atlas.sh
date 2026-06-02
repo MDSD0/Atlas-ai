@@ -6,6 +6,9 @@
 #   --eval     deterministic golden eval
 #   --deps     accelerated dependency review
 #   --graph    optional graph-provider preflight
+#   --bench    optional SWE-bench host preflight
+#   --terminal-bench optional Terminal-Bench Harbor host preflight
+#   --release  signed release contract preflight
 #   --all      everything required before merge
 # See ATLAS_EXECUTION_PLAN.md section 7.3.
 set -euo pipefail
@@ -67,6 +70,18 @@ graph() {
   run node scripts/codebase-memory-preflight.mjs
 }
 
+bench() {
+  run node scripts/external-benchmark-preflight.mjs
+}
+
+terminal_bench() {
+  run node scripts/terminal-benchmark-preflight.mjs
+}
+
+release() {
+  run node scripts/release-preflight.mjs
+}
+
 case "$mode" in
   --fast)
     frontend
@@ -86,6 +101,15 @@ case "$mode" in
   --graph)
     graph
     ;;
+  --bench)
+    bench
+    ;;
+  --terminal-bench)
+    terminal_bench
+    ;;
+  --release)
+    release
+    ;;
   --all)
     frontend
     build
@@ -94,9 +118,12 @@ case "$mode" in
     desktop
     deps
     graph
+    bench
+    terminal_bench
+    release
     ;;
   *)
-    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--deps|--graph|--all]\n' >&2
+    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--deps|--graph|--bench|--terminal-bench|--release|--all]\n' >&2
     exit 2
     ;;
 esac

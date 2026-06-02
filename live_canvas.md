@@ -530,3 +530,18 @@ Done at focused-check layer; full release qualification follows before checkpoin
 - Clean-shell release qualification green: build `3196` modules, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, and graph preflight.
 
 Next: corrective Slice C5 external benchmark sample adapters and real desktop interaction qualification where supported.
+
+## Post-V1 corrective Slice C5 status: launch qualification and external preflights
+
+Done at merge-gate layer; external release signoff remains explicit.
+
+- Added upstream-backed, side-effect-free preflights for SWE-bench's official gold smoke and Harbor's official Terminal-Bench 2.0 oracle path. Both samples require an explicit `--run-sample`.
+- Pinned the direct Tauri frontend API, moved native lifecycle hooks to `pnpm`, kept updater checks manual at boot, and made the release workflow fail unless `.sig` assets and `latest.json` are published.
+- Fixed packaged-host workspace truthfulness and same-root picker recovery after click-driven macOS inspection.
+- Removed the internal terminal/workspace barrel cycles and dead lazy wrappers reported by Rollup. The production build is warning-free across `3195` modules.
+- Live `v0.7.3` probe: only the app tarball and DMG exist; the configured updater JSON endpoint returns `404`.
+- Clean-shell release qualification green: Vitest `205`, build `3195` modules, Rust `144 + 3` intentional ignores, harness `3`, golden eval, desktop contract, dependency review, graph preflight, SWE-bench preflight, Terminal-Bench preflight, and signed-release preflight.
+
+Corrective slices `C1-C5`: complete at merge-gate layer.
+
+Remaining release signoff: publish a new signed draft release and confirm updater assets, run both explicit Docker-backed external samples, and execute Linux plus Windows interactive checks.

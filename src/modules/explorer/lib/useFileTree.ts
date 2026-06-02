@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { currentWorkspaceEnv } from "@/modules/workspace";
+import { currentWorkspaceEnv } from "@/modules/workspace/env";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { listenFsChanged, watchAdd, watchRemove } from "./watch";
 

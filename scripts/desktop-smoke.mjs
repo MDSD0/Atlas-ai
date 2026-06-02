@@ -11,6 +11,8 @@ const miniWindow = read("src/modules/ai/components/AiMiniWindow.tsx");
 
 assert.equal(config.build.devUrl, "http://localhost:1420");
 assert.equal(config.build.frontendDist, "../dist");
+assert.equal(config.build.beforeDevCommand, "pnpm dev");
+assert.equal(config.build.beforeBuildCommand, "pnpm build");
 assert.ok(config.app.windows.some((window) => window.title === "Atlas"));
 for (const command of [
   "workspace_authorize_agent_project",

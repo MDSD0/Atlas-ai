@@ -310,13 +310,16 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
           />
           <div className="flex flex-col gap-1">
             <div className="text-xs font-medium text-foreground/80">
-              Folder not found
+              Folder unavailable
             </div>
             <div
               className="max-w-[200px] truncate text-[11px] text-muted-foreground"
               title={rootPath}
             >
               {rootPath}
+            </div>
+            <div className="max-w-[220px] text-[10px] leading-relaxed text-muted-foreground">
+              {rootNode.message}
             </div>
           </div>
           <div className="flex flex-col gap-1.5">
@@ -325,7 +328,8 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               className="rounded-md border border-border/60 bg-card px-3 py-1.5 text-[11px] font-medium text-foreground hover:bg-accent hover:text-accent-foreground"
               onClick={async () => {
                 try {
-                  await openProjectFromDialog();
+                  const selected = await openProjectFromDialog();
+                  if (selected) tree.refresh(rootPath);
                 } catch (error) {
                   window.alert(workspaceBindingErrorMessage(error));
                 }

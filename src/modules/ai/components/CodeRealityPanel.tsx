@@ -8,7 +8,7 @@ import {
   Gauge as TokenIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useWorkspaceStore } from "@/modules/workspace";
+import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 import type { RepoContextResponse } from "../lib/native";
 import { useRealityStore } from "../store/realityStore";
 import { useStatusStore } from "../store/statusStore";

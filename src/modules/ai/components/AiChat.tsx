@@ -36,7 +36,7 @@ import type {
 import type { StickToBottomContext } from "use-stick-to-bottom";
 import { memo, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { AiToolApproval } from "./AiToolApproval";
-import { useWorkspaceStore } from "@/modules/workspace";
+import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 
 function CommandSnippet({ name }: { name: string }) {
   const meta = SLASH_COMMANDS[name];

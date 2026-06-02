@@ -81,7 +81,7 @@ interface HookOptions {
   autoCheck?: boolean;
 }
 
-export function useUpdater({ autoCheck = true }: HookOptions = {}) {
+export function useUpdater({ autoCheck = false }: HookOptions = {}) {
   const [status, setStatus] = useState<UpdaterStatus>({ kind: "idle" });
 
   const runCheck = useCallback(async ({ manual }: Options = {}) => {

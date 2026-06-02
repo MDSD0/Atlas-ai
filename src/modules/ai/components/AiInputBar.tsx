@@ -28,6 +28,7 @@ import { SnippetPickerContent, type PickerItem } from "./SnippetPicker";
 import { usePreferencesStore } from "@/modules/settings/preferences";
 import { hasAnyKey } from "../lib/keyring";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
+import { open } from "@tauri-apps/plugin-dialog";
 
 export function AiInput() {
   const apiKeys = useChatStore((s) => s.apiKeys);
@@ -409,7 +410,6 @@ export function AiInputBar() {
             <DropdownMenuContent align="end" className="glass-panel text-xs max-h-64 overflow-y-auto">
               <DropdownMenuItem
                 onSelect={async () => {
-                  const { open } = await import("@tauri-apps/plugin-dialog");
                   const result = await open({
                     multiple: true,
                     directory: false,

@@ -10,7 +10,8 @@ import {
   useState,
 } from "react";
 import { cn } from "@/lib/utils";
-import { useWorkspaceStore } from "@/modules/workspace";
+import { currentWorkspaceEnv } from "@/modules/workspace/env";
+import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 import { workspaceBindingErrorMessage } from "@/modules/workspace/workspaceStore";
 
 import { useChatStore } from "@/modules/ai";
@@ -325,7 +326,10 @@ export function SessionsList({
     Promise.all(
       uniqueRoots.map(async (root) => {
         try {
-          await invoke("fs_stat", { path: root });
+          await invoke("fs_stat", {
+            path: root,
+            workspace: currentWorkspaceEnv(),
+          });
           return [root, false] as const;
         } catch {
           return [root, true] as const;

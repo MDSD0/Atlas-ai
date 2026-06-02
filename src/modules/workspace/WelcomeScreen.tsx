@@ -15,6 +15,7 @@ import {
   workspaceBindingErrorMessage,
   type RecentWorkspace,
 } from "./workspaceStore";
+import { currentWorkspaceEnv } from "./env";
 import { getOrCreateChat, useChatStore } from "@/modules/ai/store/chatStore";
 import { AiChatView } from "@/modules/ai/components/AiChat";
 import { AiInput } from "@/modules/ai/components/AiInputBar";
@@ -43,7 +44,10 @@ function RecentItem({
 
   useEffect(() => {
     let alive = true;
-    invoke<{ kind: string }>("fs_stat", { path: recent.path }).catch(() => {
+    invoke<{ kind: string }>("fs_stat", {
+      path: recent.path,
+      workspace: currentWorkspaceEnv(),
+    }).catch(() => {
       if (alive) setStale(true);
     });
     return () => {
@@ -77,7 +81,7 @@ function RecentItem({
           )}
           title={recent.path}
         >
-          {stale ? "Folder not found" : truncatePath(recent.path)}
+          {stale ? "Folder unavailable" : truncatePath(recent.path)}
         </span>
       </div>
       <button

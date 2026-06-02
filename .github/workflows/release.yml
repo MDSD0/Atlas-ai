@@ -93,4 +93,23 @@ jobs:
           releaseBody: "See the assets to download and install. Auto-update is built in."
           releaseDraft: true
           prerelease: false
+          uploadUpdaterJson: true
           args: ${{ matrix.args }}
+
+  verify-updater-assets:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Require signed updater metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets="$(gh release view "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json assets \
+            --jq '.assets[].name')"
+          printf '%s\n' "$assets"
+          printf '%s\n' "$assets" | grep -q '^latest\.json$'
+          printf '%s\n' "$assets" | grep -q '\.sig$'

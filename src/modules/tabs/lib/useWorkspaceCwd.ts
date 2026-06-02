@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { useWorkspaceStore } from "@/modules/workspace";
+import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 import type { Tab } from "./useTabs";
 
 type Result = {

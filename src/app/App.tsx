@@ -79,17 +79,15 @@ import {
 } from "@/modules/source-control";
 import { StatusBar } from "@/modules/statusbar";
 import { MAX_PANES_PER_TAB, useTabs, useWorkspaceCwd } from "@/modules/tabs";
+import { TerminalStack } from "@/modules/terminal/TerminalStack";
+import type { TerminalPaneHandle } from "@/modules/terminal/TerminalPane";
+import { findLeafCwd, hasLeaf, leafIds } from "@/modules/terminal/lib/panes";
 import {
   disposeSession,
-  findLeafCwd,
-  hasLeaf,
-  leafIds,
   respawnSession,
-  TerminalStack,
   whenSessionReady,
   writeToSession,
-  type TerminalPaneHandle,
-} from "@/modules/terminal";
+} from "@/modules/terminal/lib/useTerminalSession";
 import { ThemeProvider } from "@/modules/theme";
 import { listCustomThemes, saveCustomTheme } from "@/modules/theme/customThemes";
 import {
@@ -106,9 +104,9 @@ import {
   getWslHome,
   LOCAL_WORKSPACE,
   useWorkspaceEnvStore,
-  useWorkspaceStore,
   type WorkspaceEnv,
-} from "@/modules/workspace";
+} from "@/modules/workspace/env";
+import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 import { WelcomeScreen } from "@/modules/workspace/WelcomeScreen";
 import { workspaceBindingErrorMessage } from "@/modules/workspace/workspaceStore";
 import { SessionsPanel } from "@/modules/ai/components/SessionsPanel";

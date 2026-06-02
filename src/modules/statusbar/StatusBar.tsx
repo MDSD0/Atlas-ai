@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 
 import { CwdBreadcrumb } from "./CwdBreadcrumb";
 import { WorkspaceEnvSelector } from "./WorkspaceEnvSelector";
-import type { WorkspaceEnv } from "@/modules/workspace";
+import type { WorkspaceEnv } from "@/modules/workspace/env";
 
 type Props = {
   cwd: string | null;

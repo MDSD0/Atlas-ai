@@ -2,7 +2,7 @@ import {
   native,
   type GitDiffContentResult,
 } from "@/modules/ai/lib/native";
-import { currentWorkspaceScopeKey } from "@/modules/workspace";
+import { currentWorkspaceScopeKey } from "@/modules/workspace/env";
 
 const DIFF_CACHE_LIMIT = 6;
 const inflight = new Map<string, Promise<GitDiffContentResult>>();

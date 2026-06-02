@@ -1,5 +1,6 @@
 import type { Tab } from "@/modules/tabs";
-import { hasLeaf, leafIdForPty } from "@/modules/terminal";
+import { hasLeaf } from "@/modules/terminal/lib/panes";
+import { leafIdForPty } from "@/modules/terminal/lib/useTerminalSession";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef } from "react";
 import { maybeTriggerManagedReview } from "../lib/review";
