@@ -22,6 +22,8 @@ import {
   type ProviderId,
 } from "../config";
 import { buildTools, type ToolContext } from "../tools/tools";
+import { wrapToolsWithLifecycle } from "../tools/lifecycle";
+import type { AtlasLifecycleEvent } from "../skills";
 import { compactModelMessagesDetailed } from "./compact";
 import type { ProviderKeys } from "./keyring";
 import { createProxyFetch } from "./proxyFetch";
@@ -54,6 +56,12 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
     memory_delete: () => "Deleting project memory",
     memory_clear_project: () => "Clearing project memory",
     memory_lab: () => "Inspecting MemoryLab",
+    skill_list: () => "Listing local skills",
+    skill_inspect: () => "Inspecting local skill",
+    skill_install: () => "Installing local skill",
+    skill_enable: () => "Enabling local skill",
+    skill_disable: () => "Disabling local skill",
+    skill_remove: () => "Removing local skill",
     edit: (i) => `Editing ${shortPath(i.path)}`,
     multi_edit: (i) => `Editing ${shortPath(i.path)}`,
     write_file: (i) => `Writing ${shortPath(i.path)}`,
@@ -373,6 +381,10 @@ export type RunAgentOptions = {
     input: Record<string, unknown>;
     output: unknown;
   }) => void;
+  onLifecycleEvent?: (
+    event: AtlasLifecycleEvent,
+    payload: Record<string, unknown>,
+  ) => Promise<void>;
   lmstudioBaseURL?: string;
   lmstudioModelId?: string;
   mlxBaseURL?: string;
@@ -441,7 +453,7 @@ export async function runAgentStream(opts: RunAgentOptions) {
   return streamText({
     model,
     messages: finalMessages,
-    tools: buildTools(opts.toolContext),
+    tools: wrapToolsWithLifecycle(buildTools(opts.toolContext), opts.onLifecycleEvent),
     stopWhen: stepCountIs(MAX_AGENT_STEPS),
     abortSignal: opts.abortSignal,
     onStepFinish: (step) => {

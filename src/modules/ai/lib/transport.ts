@@ -12,6 +12,7 @@ import { proofJournal } from "../proof";
 import { RunRecorder } from "../proof/recorder";
 import { useProofStore } from "../store/proofStore";
 import { buildLocalMemoryContext } from "../memory";
+import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -81,11 +82,13 @@ type SendOptions = {
 export function createContextAwareTransport(deps: Deps) {
   const run = async (options: SendOptions) => {
     const live = deps.getLive();
-    const [atlasMd, localMemory] = await Promise.all([
+    const [atlasMd, localMemory, localSkills] = await Promise.all([
       readAtlasMd(live.workspaceRoot),
       buildLocalMemoryContext(live.workspaceRoot, lastUserText(options.messages)),
+      buildLocalSkillsContext(),
     ]);
-    const projectMemory = [atlasMd, localMemory].filter(Boolean).join("\n\n") || null;
+    const projectMemory =
+      [atlasMd, localMemory, localSkills].filter(Boolean).join("\n\n") || null;
     const contextBlock = atlasContextBlock(live.project);
     const messagesForRun = contextBlock
       ? injectEnvIntoLastUser(options.messages, contextBlock)
@@ -101,6 +104,20 @@ export function createContextAwareTransport(deps: Deps) {
       },
       { onUpdate: (summary) => useProofStore.getState().setSummary(summary) },
     ).catch(() => null);
+    const observeLifecycle = async (
+      event: Parameters<typeof lifecycleHookRunner.run>[0],
+      payload: Record<string, unknown> = {},
+    ) => {
+      if (recorder) {
+        await recorder.recordLifecycle(event, payload).catch(() => {});
+      } else {
+        await lifecycleHookRunner.run(event, payload).catch(() => {});
+      }
+    };
+    await observeLifecycle("run_start");
+    await observeLifecycle("prompt_submit", {
+      text: lastUserText(options.messages),
+    });
 
     if (options.abortSignal && recorder) {
       options.abortSignal.addEventListener(
@@ -124,6 +141,7 @@ export function createContextAwareTransport(deps: Deps) {
         onToolResult: recorder
           ? (r) => void recorder.recordTool(r).catch(() => {})
           : undefined,
+        onLifecycleEvent: observeLifecycle,
         lmstudioBaseURL: deps.getLmstudioBaseURL?.(),
         lmstudioModelId: deps.getLmstudioModelId?.(),
         mlxBaseURL: deps.getMlxBaseURL?.(),

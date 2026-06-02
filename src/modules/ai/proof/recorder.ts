@@ -8,6 +8,10 @@ import {
   semanticEvidenceFromToolResult,
   summarizeDiagnosticEvidence,
 } from "@/modules/ai/proof/diagnostics";
+import {
+  lifecycleHookRunner,
+  type AtlasLifecycleEvent,
+} from "@/modules/ai/skills";
 
 // Compact, synchronous view of a run for the UI. Built from state the recorder
 // already accumulates, so the receipt strip never has to reload the journal.
@@ -213,6 +217,22 @@ export class RunRecorder {
     this.emit();
   }
 
+  async recordLifecycle(
+    event: AtlasLifecycleEvent,
+    payload: Record<string, unknown> = {},
+  ): Promise<void> {
+    const results = await lifecycleHookRunner.run(event, payload);
+    for (const result of results) {
+      await this.journal.appendEvent(this.run.id, {
+        kind: `hook.${event}.${result.status}`,
+        summary: `${result.hookId} ${event}: ${result.status}`,
+        payload: result,
+      });
+      this.eventCount += 1;
+    }
+    if (results.length > 0) this.emit();
+  }
+
   /**
    * Close the run exactly once. The verdict is computed from observed evidence:
    * a cancelled run is "cancelled"; any recorded failure makes it "failed";
@@ -232,6 +252,8 @@ export class RunRecorder {
         : this.shellChecks.length === 0
           ? "incomplete"
           : "passed";
+    await this.recordLifecycle("verdict", { status });
+    await this.recordLifecycle("run_finish", { status });
     const verdict = await this.journal.finishRun(this.run.id, {
       status,
       changedFiles: [...this.changedFiles],

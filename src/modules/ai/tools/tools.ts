@@ -6,6 +6,7 @@ import { buildRealityTools } from "./reality";
 import { buildSearchTools } from "./search";
 import { buildSemanticTools } from "./semantic";
 import { buildShellTools } from "./shell";
+import { buildSkillTools } from "./skills";
 import { buildSubagentTools } from "./subagent";
 import { buildTerminalTools } from "./terminal";
 import { buildTodoTools } from "./todo";
@@ -39,7 +40,7 @@ export {
  * terminal cwd is informational unless the execution mode explicitly selects it.
  */
 export function buildTools(ctx: import("./context").ToolContext) {
-  return {
+  const base = {
     ...buildFsTools(ctx),
     ...buildEditTools(ctx),
     ...buildMemoryTools(ctx),
@@ -52,6 +53,10 @@ export function buildTools(ctx: import("./context").ToolContext) {
     ...buildTerminalTools(ctx),
     ...buildTodoTools(ctx),
     ...buildManagedAgentTools(ctx),
+  } as const;
+  return {
+    ...base,
+    ...buildSkillTools(() => Object.keys(base)),
   } as const;
 }
 

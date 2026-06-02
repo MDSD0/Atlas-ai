@@ -5,6 +5,7 @@ import type { ProviderKeys } from "../lib/keyring";
 import type { ToolContext } from "../tools/context";
 import { buildFsTools } from "../tools/fs";
 import { buildReadOnlyMemoryTools } from "../tools/memory";
+import { buildReadOnlySkillTools } from "../tools/skills";
 import { buildRealityTools } from "../tools/reality";
 import { buildSearchTools } from "../tools/search";
 import { buildSemanticTools } from "../tools/semantic";
@@ -41,13 +42,17 @@ export async function runSubagent({
   const def = SUBAGENTS[type];
   if (!def) throw new Error(`unknown subagent type: ${type}`);
 
-  const readOnly: Record<string, unknown> = {
+  const baseReadOnly: Record<string, unknown> = {
     ...buildFsTools(toolContext),
     ...buildReadOnlyMemoryTools(toolContext),
     ...buildRealityTools(toolContext),
     ...buildSearchTools(toolContext),
     ...buildSemanticTools(toolContext),
     ...buildVerificationTools(),
+  };
+  const readOnly: Record<string, unknown> = {
+    ...baseReadOnly,
+    ...buildReadOnlySkillTools(() => Object.keys(baseReadOnly)),
   };
   const tools: Record<string, unknown> = {};
   for (const t of def.tools) {

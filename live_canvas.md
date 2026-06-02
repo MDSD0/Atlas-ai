@@ -387,3 +387,13 @@ Done.
 - MemoryLab starts with a deterministic local fixture and reports advanced providers as candidates until they produce measured results.
 
 Next: Accelerated V1 Slice G scoped skill packages and bounded lifecycle hooks.
+
+## Accelerated V1 Slice G status: scoped skills and lifecycle hooks
+
+Done.
+
+- Local skill packages are prompt-only, persisted, inspectable, and approval-gated for mutation.
+- A skill can narrow its suggested Atlas tools but cannot register tools or expand permissions.
+- In-process lifecycle hooks are bounded, timeout-isolated, failure-isolated, and recorded through the existing proof journal.
+
+Next: Accelerated V1 Slice H optional MCP boundary.

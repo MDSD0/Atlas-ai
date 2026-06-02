@@ -27,6 +27,8 @@ const READ_ONLY_TOOLS = [
   "memory_recall",
   "memory_list",
   "memory_lab",
+  "skill_list",
+  "skill_inspect",
   "read_file",
   "list_directory",
   "grep",

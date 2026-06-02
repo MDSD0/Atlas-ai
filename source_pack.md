@@ -690,3 +690,30 @@ Applied:
 - Added the `memory-stale` deterministic fixture and focused regressions for restart restore, project isolation, clear-project, secret refusal, bounded recall, linked-artifact stale marking, combined post-edit observation, loopback-only SimpleMem probing, and the MemoryLab default-provider report.
 
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, `pnpm test` 164 passed (25 files).
+
+## Accelerated V1 Slice G: scoped local skills and bounded lifecycle hooks
+
+Source-parity packet:
+
+- Slice: add inspectable local skill packages and bounded in-process lifecycle hooks without turning Atlas into a general plugin runtime or allowing extensions to bypass policy.
+- Atlas files inspected: `src/modules/ai/lib/snippets.ts`, `src/modules/ai/store/snippetsStore.ts`, `src/modules/ai/lib/composer.tsx`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/lib/transport.ts`, `src/modules/ai/proof/{journal,recorder}.ts`, and `src-tauri/src/modules/agent.rs`.
+- Primary evidence refreshed: official Claude Code skills documentation (`https://code.claude.com/docs/en/skills`), hooks reference (`https://code.claude.com/docs/en/hooks`), and hooks guide (`https://code.claude.com/docs/en/hooks-guide`). Skills require `SKILL.md` frontmatter and load instructions progressively. Hooks fire at lifecycle points; `SessionStart` must stay fast, `PreToolUse` can block before execution, and post-tool output is bounded context rather than a time machine.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh skills hooks examples`. Outbound refresh was unavailable, so the resolver used cached snapshots explicitly.
+- opensrc inspected (cached): `anthropics/skills:template/SKILL.md`, `spec/agent-skills-spec.md`, and `skills/webapp-testing/SKILL.md`.
+- opensrc inspected (cached): `earendil-works/pi:packages/coding-agent/docs/skills.md`, `src/core/skills.ts`, `src/core/extensions/{types,runner}.ts`, `test/skills.test.ts`, and `test/extensions-runner.test.ts`.
+- Disposition: `ADAPT` Agent Skills progressive disclosure into an Atlas-local package ledger: name, description, prompt material, advisory allowed-tool subset, optional fixture, enabled state, and inspectable persistence. Preserve the existing snippet picker; packages are a separate bounded extension lane.
+- Disposition: `ADAPT` Claude's lifecycle names into an in-process runner with explicit timeout, failure isolation, enable/disable state, and receipt visibility. Keep the first hook API dependency-light and callback-based. Do not execute arbitrary scripts, HTTP hooks, or MCP hooks in Slice G.
+- Disposition: `REJECT` Pi's broad dynamic extension runtime for V1. Atlas skills cannot register executable tools, shortcuts, providers, or policy exceptions. An `allowedTools` list can only narrow the existing Atlas tool names and never suppress approval, native authorization, secret guards, or proof recording.
+- Tests required: valid package install; invalid rejection; enable/disable/remove; tool subset cannot expand permissions; context is bounded and visible; lifecycle order; timeout; failure isolation; disabled hook inert.
+- Freshness: official web evidence refreshed on 2026-06-02; upstream source used cached opensrc fallback because sandbox network refresh was unavailable.
+
+Applied:
+
+- Added `src/modules/ai/skills/`: a bounded local package contract, explicit-save Tauri Store registry, progressive prompt context renderer, and in-process lifecycle runner.
+- Added inspectable tools for list, inspect, install, enable, disable, and remove. Skill mutations require approval. Read-only subagents receive only list and inspect.
+- Skill `allowedTools` is advisory and resolved as an intersection with the existing Atlas tools. Skills cannot register executable tools, expand permissions, or suppress existing policy.
+- Added `tools/lifecycle.ts` to wrap the existing Atlas tool execute functions. Enabled hooks observe actual `before_tool` and `after_tool` lifecycle points with bounded output, timeouts, and failure isolation.
+- Added lifecycle receipt events through the existing `RunRecorder`; verdict and run-finish hooks execute before journal closure.
+- Added focused regressions for package CRUD, invalid metadata, permission narrowing, ordered hooks, disabled hooks, timeout/failure isolation, and before/execute/after ordering.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 14 passed.
