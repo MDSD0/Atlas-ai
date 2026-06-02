@@ -1,3 +1,5 @@
+import { redactSensitive } from "@/modules/ai/lib/redact";
+
 const encoder = new TextEncoder();
 
 export const PROOF_PAYLOAD_BYTES = 2_048;
@@ -93,9 +95,14 @@ export function boundPayload(
   value: unknown,
   maxBytes = PROOF_PAYLOAD_BYTES,
 ): BoundedText {
-  if (typeof value === "string") return boundText(value, maxBytes);
+  if (typeof value === "string") {
+    return boundText(redactSensitive(value), maxBytes);
+  }
   try {
-    return boundText(JSON.stringify(value) ?? String(value), maxBytes);
+    return boundText(
+      redactSensitive(JSON.stringify(value) ?? String(value)),
+      maxBytes,
+    );
   } catch {
     return boundText("[unserializable payload]", maxBytes);
   }
@@ -107,7 +114,9 @@ export function boundTextList(
   maxBytes = PROOF_PAYLOAD_BYTES,
 ): BoundedList<BoundedText> {
   return {
-    items: values.slice(0, maxItems).map((value) => boundText(value, maxBytes)),
+    items: values
+      .slice(0, maxItems)
+      .map((value) => boundText(redactSensitive(value), maxBytes)),
     truncated: values.length > maxItems,
     originalCount: values.length,
   };

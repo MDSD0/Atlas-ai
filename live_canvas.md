@@ -612,3 +612,21 @@ Done at merge-gate layer; packaged-host inspection is host-blocked.
 - Packaged-host follow-up blocked by host Gatekeeper pressure: two low-priority single-worker debug rebuild attempts were terminated while `/usr/libexec/syspolicyd` consumed more than four CPU cores and roughly `12-15%` of host RAM. The second attempt completed the updated frontend build and reached native wrapper compilation. No build process remained afterward, and the older pre-C9 `.app` was not reused as evidence.
 
 Next: continue the final-memo audit, then retry the fresh debug package and click-check Context when the host pressure clears.
+
+## Post-V1 corrective Slice C10 status: durable redacted flight recorder
+
+Done at merge-gate layer; packaged-host click inspection is OS-blocked.
+
+- Proof persistence now redacts every persisted summary, payload, artifact preview, path, command, and verdict list at the storage boundary.
+- Recorder payloads are metadata-only by default: prompts, file bodies, diffs, terminal streams, and unfamiliar free-form output strings become byte-count markers before persistence.
+- Session start, prompt submission, tool start, tool finish, finish verdict, and session finish are durable timeline rows even when no optional skill hook is installed.
+- Recorder writes are serialized, so a stream finish cannot outrun already-enqueued tool evidence.
+- A bounded latest-recorder registry lets UI approval request/resolution states append once to the durable timeline even after the provider stream has closed.
+- Reality Proof is now labeled `Flight recorder timeline`, refreshes from the live receipt pulse while visible, and reports dropped older rows.
+- Removed local quarantine metadata inherited from Arc-downloaded icon assets and the ignored debug bundle. Tracked file contents and signing policy are unchanged.
+- Focused green: diff check 0, TypeScript 0, proof/lifecycle Vitest `21` across `4` files, full Vitest `232` across `47` files, warning-free build `3210` modules, and desktop contract smoke.
+- Clean-shell release qualification green with `CARGO_BUILD_JOBS=1`: Cargo check and Clippy 0, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, graph preflight, SWE-bench preflight, Terminal-Bench preflight, and signed-release preflight.
+- Fresh debug package evidence: Tauri produced the updated `.app` and updater tarball, then stopped only at the expected missing `TAURI_SIGNING_PRIVATE_KEY` boundary. The local debug bundle required ad-hoc signing to launch and then stayed alive via `open`.
+- Packaged click inspection blocked by macOS automation/capture services: Computer Use failed/timed out through LaunchServices, Apple Events to System Events are unauthorized, and `screencapture` could not create a display image. The app process was stopped cleanly.
+
+Next: commit C10, then finish the launchability verdict with external Docker samples, release publication, and cross-platform checks still called out explicitly.

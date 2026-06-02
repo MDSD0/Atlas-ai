@@ -17,6 +17,7 @@ import {
   type ProofVerdictStatus,
 } from "@/modules/ai/proof/contracts";
 import type { ProofPersistence } from "@/modules/ai/proof/persistence";
+import { redactSensitive } from "@/modules/ai/lib/redact";
 
 const INDEX_KEY = "runs";
 const runKey = (runId: string) => `run:${runId}`;
@@ -135,8 +136,30 @@ export class ProofJournal {
   }
 
   appendEvent(runId: string, input: AppendEventInput): Promise<ProofEvent> {
+    return this.appendEventForRun(runId, input, false);
+  }
+
+  /**
+   * Append a bounded follow-up to the latest run after its model stream closes.
+   * This is intentionally narrow: user approval responses can arrive after a
+   * tool-call stream has finished, but still belong in the durable timeline.
+   */
+  appendFollowUpEvent(
+    runId: string,
+    input: AppendEventInput,
+  ): Promise<ProofEvent> {
+    return this.appendEventForRun(runId, input, true);
+  }
+
+  private appendEventForRun(
+    runId: string,
+    input: AppendEventInput,
+    allowFinished: boolean,
+  ): Promise<ProofEvent> {
     return this.mutate(async () => {
-      const run = await this.requireRunningRun(runId);
+      const run = allowFinished
+        ? await this.requireRun(runId)
+        : await this.requireRunningRun(runId);
       const sequence = run.nextSequence++;
       const event: ProofEvent = {
         id: `${runId}:event:${sequence}`,
@@ -145,7 +168,7 @@ export class ProofJournal {
         kind: input.kind,
         startedAt: input.startedAt ?? this.clock(),
         finishedAt: input.finishedAt ?? null,
-        summary: boundText(input.summary, this.summaryBytes),
+        summary: boundText(redactSensitive(input.summary), this.summaryBytes),
         boundedPayload:
           input.payload === undefined
             ? null
@@ -171,12 +194,15 @@ export class ProofJournal {
         id: await proofArtifactId(runId, input.kind, input.pathOrCommand),
         runId,
         kind: input.kind,
-        pathOrCommand: boundText(input.pathOrCommand, this.pathBytes),
+        pathOrCommand: boundText(
+          redactSensitive(input.pathOrCommand),
+          this.pathBytes,
+        ),
         contentHash: input.contentHash,
         boundedPreview:
           input.preview == null
             ? null
-            : boundText(input.preview, this.payloadBytes),
+            : boundText(redactSensitive(input.preview), this.payloadBytes),
       };
       const index = run.artifacts.findIndex((item) => item.id === artifact.id);
       if (index !== -1) {
@@ -252,11 +278,16 @@ export class ProofJournal {
   }
 
   private async requireRunningRun(runId: string): Promise<ProofRun> {
-    const run = await this.persistence.get<ProofRun>(runKey(runId));
-    if (!run) throw new Error(`proof run not found: ${runId}`);
+    const run = await this.requireRun(runId);
     if (run.status !== "running") {
       throw new Error(`proof run is already finished: ${runId}`);
     }
+    return run;
+  }
+
+  private async requireRun(runId: string): Promise<ProofRun> {
+    const run = await this.persistence.get<ProofRun>(runKey(runId));
+    if (!run) throw new Error(`proof run not found: ${runId}`);
     return run;
   }
 

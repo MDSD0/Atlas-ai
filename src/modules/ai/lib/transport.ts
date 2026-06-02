@@ -10,6 +10,7 @@ import {
 } from "../tools/tools";
 import { proofJournal } from "../proof";
 import { RunRecorder } from "../proof/recorder";
+import { proofRunRegistry } from "../proof/runtime";
 import { useProofStore } from "../store/proofStore";
 import {
   buildLocalMemoryContext,
@@ -160,6 +161,7 @@ export function createContextAwareTransport(deps: Deps) {
       },
       { onUpdate: (summary) => useProofStore.getState().setSummary(summary) },
     ).catch(() => null);
+    if (recorder) proofRunRegistry.register(recorder);
     const observeLifecycle = async (
       event: Parameters<typeof lifecycleHookRunner.run>[0],
       payload: Record<string, unknown> = {},

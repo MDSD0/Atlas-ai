@@ -10,6 +10,8 @@ const tools = read("src/modules/ai/tools/tools.ts");
 const memoryTools = read("src/modules/ai/tools/memory.ts");
 const transport = read("src/modules/ai/lib/transport.ts");
 const harnessInspector = read("src/modules/ai/components/HarnessInspector.tsx");
+const proofRecorder = read("src/modules/ai/proof/recorder.ts");
+const proofRuntime = read("src/modules/ai/proof/runtime.ts");
 const miniWindow = read("src/modules/ai/components/AiMiniWindow.tsx");
 
 assert.equal(config.build.devUrl, "http://localhost:1420");
@@ -52,6 +54,10 @@ for (const memorySurfaceTool of [
 assert.match(transport, /onContextPacked/);
 assert.match(harnessInspector, /Last packed model input/);
 assert.match(harnessInspector, /Task subgraph preview - not auto-injected/);
+assert.match(harnessInspector, /Flight recorder timeline/);
+assert.match(proofRecorder, /lifecycle\.session_started/);
+assert.match(proofRecorder, /approval\.\$\{stage\}/);
+assert.match(proofRuntime, /latestBySession/);
 assert.match(miniWindow, /<ReceiptStrip/);
 
 console.log(JSON.stringify({
@@ -70,6 +76,7 @@ console.log(JSON.stringify({
     "shell command lane",
     "memory MCP metrics work packet and filesystem surface tool registration",
     "packed context ledger and honest repository preview label",
+    "durable redacted lifecycle and approval flight recorder",
     "proof receipt mount",
   ],
 }, null, 2));

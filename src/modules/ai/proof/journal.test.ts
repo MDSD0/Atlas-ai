@@ -190,4 +190,40 @@ describe("ProofJournal", () => {
     expect(await proof.getRun(first.id)).toBeNull();
     expect(await proof.restore()).toHaveLength(1);
   });
+
+  it("redacts persisted proof surfaces and accepts explicit late follow-ups", async () => {
+    const { journal: proof } = journal();
+    const run = await proof.startRun({
+      sessionId: "session-1",
+      workspaceRoot: "/repo",
+    });
+    await proof.appendEvent(run.id, {
+      kind: "shell",
+      summary: "pnpm test API_KEY=super-secret-value",
+      payload: { stderr: "PASSWORD=super-secret-value" },
+    });
+    await proof.upsertArtifact(run.id, {
+      kind: "command",
+      pathOrCommand: "API_KEY=super-secret-value pnpm test",
+      contentHash: "hash",
+      preview: "AUTH_TOKEN=super-secret-value",
+    });
+    await proof.finishRun(run.id, {
+      status: "failed",
+      unresolvedFailures: ["PASSWORD=super-secret-value"],
+    });
+    await proof.appendFollowUpEvent(run.id, {
+      kind: "approval.resolved",
+      summary: "write_file denied",
+      payload: { approved: false },
+    });
+
+    const restored = await proof.getRun(run.id);
+    const serialized = JSON.stringify(restored);
+    expect(serialized).not.toContain("super-secret-value");
+    expect(serialized).toContain("<REDACTED>");
+    expect(restored?.events[restored.events.length - 1]?.kind).toBe(
+      "approval.resolved",
+    );
+  });
 });

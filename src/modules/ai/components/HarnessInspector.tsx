@@ -24,6 +24,7 @@ import type { ProofRun } from "../proof/contracts";
 import { proofJournal } from "../proof";
 import { skillRegistry } from "../skills";
 import { useChatStore } from "../store/chatStore";
+import { useProofStore } from "../store/proofStore";
 import {
   useContextLedgerStore,
   type PackedContextSnapshot,
@@ -312,9 +313,19 @@ function ContextTab({
 }
 
 function ProofTab({ runs }: { runs: ProofRun[] }) {
-  if (runs.length === 0) return empty("No proof runs recorded for this session.");
   return (
     <div className="flex flex-col gap-3">
+      <div>
+        <div className="text-[11px] font-medium text-foreground/90">
+          Flight recorder timeline
+        </div>
+        <div className="text-[10px] text-muted-foreground">
+          Expandable payloads contain bounded redacted metadata, not raw
+          prompts, file bodies, or terminal streams.
+        </div>
+      </div>
+      {runs.length === 0 &&
+        empty("No proof runs recorded for this session.")}
       {runs.slice(0, 12).map((run) => (
         <details key={run.id} className="border-b border-border/60 pb-2">
           <summary className="cursor-pointer text-[11px] text-foreground/90">
@@ -323,6 +334,7 @@ function ProofTab({ runs }: { runs: ProofRun[] }) {
             {run.events.length} events
             {" - "}
             {when(run.finishedAt)}
+            {run.eventsDropped > 0 ? ` - ${run.eventsDropped} older dropped` : ""}
           </summary>
           <ul className="mt-2 flex flex-col gap-1">
             {run.events.map((event) => (
@@ -569,6 +581,11 @@ export function HarnessInspector({
   const packedContext = useContextLedgerStore(
     (state) => state.latestByProject[workspaceRoot] ?? null,
   );
+  const proofPulse = useProofStore((state) =>
+    activeSessionId
+      ? (state.latestBySession[activeSessionId]?.eventCount ?? 0)
+      : 0,
+  );
   const [tab, setTab] = useState<InspectorTab>("map");
   const [query, setQuery] = useState("");
   const [proofRuns, setProofRuns] = useState<ProofRun[]>([]);
@@ -625,7 +642,7 @@ export function HarnessInspector({
 
   useEffect(() => {
     void loadTab();
-  }, [loadTab]);
+  }, [loadTab, proofPulse]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();

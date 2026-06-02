@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { native } from "../lib/native";
 import { checkReadable } from "../lib/security";
 import { resolvePath } from "../tools/tools";
+import { proofRunRegistry } from "../proof/runtime";
 import {
   flushPersist,
   getOrCreateChat,
@@ -53,6 +54,12 @@ type ToolPartLike = ToolUIPart & {
 };
 
 type AnyPart = UIMessagePart<Record<string, never>, Record<string, never>>;
+
+type ApprovalTelemetry = {
+  approvalId: string;
+  toolName: string;
+  approved?: boolean;
+};
 
 function Bridge({
   sessionId,
@@ -123,6 +130,32 @@ function Bridge({
   useEffect(() => {
     if (approvalsPending > 0) openMini();
   }, [approvalsPending, openMini]);
+
+  // Approval state is emitted by the AI SDK as UI-message parts. Mirror each
+  // request and resolution once into the latest proof run for this session.
+  // The registry intentionally retains a just-finished run because users often
+  // respond after the provider stream has already closed.
+  const journalledApprovalsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    journalledApprovalsRef.current = new Set();
+  }, [sessionId]);
+  useEffect(() => {
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+      for (const part of message.parts as AnyPart[]) {
+        const telemetry = extractApprovalTelemetry(part);
+        if (!telemetry) continue;
+        const stage =
+          telemetry.approved === undefined ? "requested" : "resolved";
+        const key = `${telemetry.approvalId}:${stage}`;
+        if (journalledApprovalsRef.current.has(key)) continue;
+        journalledApprovalsRef.current.add(key);
+        void proofRunRegistry
+          .recordApproval(sessionId, telemetry)
+          .catch(() => {});
+      }
+    }
+  }, [messages, sessionId]);
 
   // ---- AI diff tab management ----------------------------------------------
   // We track which approvalIds have already opened a tab so re-renders don't
@@ -249,6 +282,35 @@ function Bridge({
   }, [messages, fileMutationFingerprint, openAiDiffTab, closeAiDiffTab]);
 
   return null;
+}
+
+function extractApprovalTelemetry(part: AnyPart): ApprovalTelemetry | null {
+  const type = (part as { type?: string }).type ?? "";
+  const state = (part as { state?: string }).state ?? "";
+  const approval = (part as {
+    approval?: { id?: string; approved?: boolean };
+  }).approval;
+  if (!approval?.id) return null;
+  if (
+    state !== "approval-requested" &&
+    state !== "approval-responded" &&
+    state !== "output-available" &&
+    state !== "output-error" &&
+    state !== "output-denied"
+  ) {
+    return null;
+  }
+  const toolName =
+    type === "dynamic-tool"
+      ? ((part as { toolName?: string }).toolName ?? "dynamic-tool")
+      : type.replace(/^tool-/, "") || "tool";
+  return {
+    approvalId: approval.id,
+    toolName,
+    ...(typeof approval.approved === "boolean"
+      ? { approved: approval.approved }
+      : {}),
+  };
 }
 
 type EditOp = { old_string: string; new_string: string; replace_all?: boolean };
