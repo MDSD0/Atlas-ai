@@ -407,3 +407,13 @@ Done.
 - The first process transport adapter is deliberately deferred until a connector is explicitly adopted against a stable SDK release.
 
 Next: Accelerated V1 Slice I local metrics and compact context inspector.
+
+## Accelerated V1 Slice I status: local metrics and context inspector
+
+Done.
+
+- Local metrics record bounded run and tool measurements with low-cardinality secret-free attributes. Detailed actions stay in proof receipts.
+- The compact inspector reads reality, LSP, memory, skills, MCP, and latest proof state only when invoked. Optional failures remain visible as degraded sections.
+- Metrics stay local and explicit: no exporter, collector, network dependency, or background service.
+
+Next: Accelerated V1 Slice J release qualification.

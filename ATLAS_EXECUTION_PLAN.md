@@ -823,7 +823,8 @@ Implementation checkpoint `2026-06-02`:
 - LocalRecords remains the default and adds no boot work, Python runtime, embedding model, or network dependency. Current repository evidence still outranks historical memory.
 - `G` landed persisted prompt-only local skill packages plus bounded in-process lifecycle hooks. Skills can narrow suggested tools but cannot register tools or weaken policy. Hook execution is timeout-isolated and visible in proof events.
 - `H` landed an optional inert MCP policy boundary with disabled-by-default stdio configs, deny-first tools, approval-gated bounded calls, and GitHub plus Playwright connector studies. No server process starts and no SDK dependency is imported until a connector is explicitly adopted against a stable release.
-- Next: `I` local metrics and compact context inspector.
+- `I` landed bounded local run/tool metrics and an on-demand context inspector over reality, LSP, memory, skills, MCP, and latest proof state. Metrics remain local and explicit with no exporter or background collector.
+- Next: `J` scripted evals, desktop smoke, golden fixture, dependency review, and release qualification report.
 
 ### Slice 3.1: Shared repository ignore policy
 

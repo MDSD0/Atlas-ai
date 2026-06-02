@@ -12,6 +12,7 @@ import {
   lifecycleHookRunner,
   type AtlasLifecycleEvent,
 } from "@/modules/ai/skills";
+import { recordLocalMetric } from "@/modules/ai/metrics";
 
 // Compact, synchronous view of a run for the UI. Built from state the recorder
 // already accumulates, so the receipt strip never has to reload the journal.
@@ -140,6 +141,7 @@ export class RunRecorder {
   ): Promise<RunRecorder> {
     const run = await journal.startRun(input);
     const recorder = new RunRecorder(journal, run, options.onUpdate);
+    recordLocalMetric({ name: "run.started", value: 1, unit: "count" });
     recorder.emit();
     return recorder;
   }
@@ -178,6 +180,12 @@ export class RunRecorder {
       payload: record.output,
     });
     this.eventCount += 1;
+    recordLocalMetric({
+      name: "tool.completed",
+      value: 1,
+      unit: "count",
+      attributes: { tool: record.toolName, status: failed ? "failed" : "ok" },
+    });
 
     if (failed) {
       const detail = isErrorResult(record.output)
@@ -263,6 +271,18 @@ export class RunRecorder {
     });
     this.status = verdict.status;
     this.finishedAt = Date.now();
+    recordLocalMetric({
+      name: "run.duration",
+      value: this.finishedAt - this.run.startedAt,
+      unit: "ms",
+      attributes: { status: verdict.status },
+    });
+    recordLocalMetric({
+      name: "run.completed",
+      value: 1,
+      unit: "count",
+      attributes: { status: verdict.status },
+    });
     this.emit();
   }
 }

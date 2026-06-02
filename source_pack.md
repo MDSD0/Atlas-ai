@@ -742,3 +742,27 @@ Applied:
 - Added focused regressions for disabled default, registry lifecycle, secret refusal, deny and ask enforcement, lazy call, timeout, crash, output bounding, malformed input, and connector-study defaults.
 
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 6 passed.
+
+## Accelerated V1 Slice I: local metrics and compact context inspector
+
+Source-parity packet:
+
+- Slice: add inspectable local measurements and one compact on-demand context inspector covering reality, LSP, memory, skills, MCP, and proof without a remote telemetry exporter or background collector.
+- Atlas files inspected: `src/modules/ai/proof/recorder.ts`, `store/proofStore.ts`, `tools/{context,reality,semantic,memory,mcp,tools}.ts`, `lib/native.ts`, and the existing explicit-save persistence adapters.
+- Primary evidence refreshed: OpenTelemetry signals documentation (`https://opentelemetry.io/docs/concepts/signals/`) and stable metrics data model (`https://opentelemetry.io/docs/specs/otel/metrics/data-model/`). Metrics are runtime measurements. Streams are identified by metric name and attributes, and raw high-volume events should be transformed or bounded rather than exported indiscriminately.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh metrics observability context event-traces`. Outbound refresh was unavailable, so the resolver used cached snapshots explicitly.
+- opensrc inspected (cached): `All-Hands-AI/OpenHands:openhands/app_server/event/event_service_base.py`. Its event service exposes independently retrievable, filterable, countable records rather than hiding activity in prose logs.
+- opensrc inspected (cached): `earendil-works/pi:packages/coding-agent/test/agent-session-stats.test.ts` and `src/core/agent-session.ts`. Pi keeps compact session stats and current context usage separately from the detailed session transcript.
+- Disposition: `ADAPT` OpenTelemetry's separation of measurements from detailed logs: retain detailed proof in the existing journal, record only bounded local counters and durations with low-cardinality attributes, and expose explicit local inspection. Do not add OTLP, network export, a collector, or a telemetry dependency.
+- Disposition: `ADAPT` Pi's compact-stats posture into an Atlas inspector that asks existing subsystem boundaries for current state only when invoked. Repository truth remains current and memory remains advisory.
+- Tests required: bounded local retention, secret refusal, low-cardinality attribute validation, explicit-save restore, recorder measurements, inspector aggregation, graceful degraded subsystem state, and bounded metric export.
+
+Applied:
+
+- Added `src/modules/ai/metrics/`: a bounded explicit-save local metric ledger, validation for low-cardinality secret-free attributes, and a compact on-demand inspector.
+- The existing proof recorder emits local `run.started`, `tool.completed`, `run.duration`, and `run.completed` measurements. Detailed action payloads remain in proof receipts rather than metric attributes.
+- Added inspectable `metrics_status`, bounded `metrics_export`, and `context_inspector` tools. The inspector asks existing reality, LSP, memory, skill, MCP, and proof boundaries for current state only when invoked.
+- Inspector sections degrade independently. Optional-provider failures stay visible without breaking the rest of the snapshot.
+- No collector, OTLP exporter, network call, dependency, background watcher, or boot-time work was added.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 12 passed.
