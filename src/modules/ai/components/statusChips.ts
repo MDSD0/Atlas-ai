@@ -13,8 +13,8 @@ const LIVE = new Set(["available", "connected"]);
 
 function lspState(p: LspProviderInfo): { suffix: string; tone: StatusChip["tone"] } {
   if (p.status === "broken") return { suffix: "broken", tone: "warn" };
-  // Installed but Atlas does not deliver diagnostics for it yet: be honest —
-  // "detected", never "on". Only TypeScript is wired today.
+  // Installed but Atlas does not deliver diagnostics for it: be honest:
+  // "detected", never "on".
   if (LIVE.has(p.status) && !p.diagnostics_enabled) {
     return { suffix: "detected", tone: "muted" };
   }

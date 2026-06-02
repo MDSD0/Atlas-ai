@@ -849,3 +849,30 @@ Applied:
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, Vitest `204` passed across `38` files.
 
 Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `204` passed across `38` files, production build `3195` modules, Cargo check 0, Clippy 0, Rust `135` passed plus `2` intentional diagnostic ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, and dependency review passed. Existing Rollup circular-chunk warnings remain visible and unchanged.
+
+## Corrective Slice C2: multi-language semantic LSP client
+
+Source-parity packet:
+
+- Slice: generalize the existing lazy native LSP client instead of adding a second semantic runtime.
+- Atlas files inspected: `src-tauri/src/modules/lsp{.rs,/client.rs}`, `src-tauri/src/lib.rs`, `src/modules/ai/lib/native.ts`, `src/modules/ai/tools/semantic.ts`, `src/modules/ai/agents/registry.ts`, and `scripts/desktop-smoke.mjs`.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh lsp semantic diagnostics definitions references hover symbols opencode`; authenticated refresh resolved OpenCode, Serena, the official LSP repository, TypeScript Language Server, Pyright, rust-analyzer, Helix, Zed, Lapce, and VS Code.
+- Primary documentation refreshed: official LSP `3.17` specification capability model and request methods for hover, definition, references, document symbols, and workspace symbols.
+- opensrc inspected: `anomalyco/opencode:packages/opencode/src/lsp/{lsp,client,server}.ts`; `microsoft/language-server-protocol:_specifications/lsp/3.17/specification.md`; and `typescript-language-server:README.md`.
+- Host probe: `rust-analyzer` resolves from `$HOME/.cargo/bin` and `clangd` resolves from `/usr/bin`; TypeScript Language Server and Pyright are absent on this host. Atlas must degrade per provider and must not install servers implicitly.
+- Disposition: `ADAPT` OpenCode's extension routing, one lazy client per provider/root, shared open-document state, bounded request posture, and failure isolation. `WRAP` the official LSP JSON-RPC methods through Atlas's existing process client. `REJECT` server auto-install, server download, an additional JSON-RPC dependency, and unbounded result injection.
+- Tests required: provider routing across new language families, generic request framing, document synchronization before semantic requests, bounded result behavior, graceful unavailable provider state, and desktop-contract registration.
+
+Applied:
+
+- Extended the existing provider registry to TypeScript/JavaScript, Python, Rust, C/C++, Java, HTML, CSS, and JSON adapters. Every adapter remains optional, executable-detected, lazy, and independently degradable.
+- Generalized the native client with bounded `textDocument/definition`, `textDocument/references`, `textDocument/documentSymbol`, `workspace/symbol`, and `textDocument/hover` requests on the existing initialized process.
+- Preserved the existing document synchronization and diagnostics cache. Semantic arrays cap at `200` items and all semantic results cap at `64 KiB`.
+- Added the authorized `agent_lsp_semantic` native command, frontend bridge, desktop-contract assertion, and selective `lsp_definition`, `lsp_references`, `lsp_hover`, `lsp_document_symbols`, and `lsp_workspace_symbols` agent tools.
+- Generalized post-edit diagnostic refresh across the registered language families. Missing servers stay non-fatal and visible.
+- Added deterministic provider-routing, parameter-validation, result-bounding, and Unix socket fake-server tests.
+- Added an ignored host-qualification smoke and ran it explicitly: Atlas spawned `/usr/bin/clangd`, initialized the server, opened a C++ file, received non-empty document symbols, and shut the process down cleanly in `1.62s`.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, Vitest `204` passed across `38` files, focused LSP Rust tests `12` passed plus `1` intentional host smoke ignored by default, explicit installed-`clangd` smoke passed, and Clippy 0.
+
+Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `204` passed across `38` files, production build `3195` modules, Cargo check 0, Clippy 0, Rust `139` passed plus `3` intentional diagnostic or host-smoke ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, and dependency review passed. Existing Rollup circular-chunk warnings remain visible and unchanged.

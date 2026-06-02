@@ -15,7 +15,11 @@ use crate::modules::proc::hide_console;
 
 const INITIALIZE_TIMEOUT: Duration = Duration::from_secs(10);
 const DIAGNOSTICS_TIMEOUT: Duration = Duration::from_secs(3);
+const SEMANTIC_TIMEOUT: Duration = Duration::from_secs(3);
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_millis(500);
+const SEMANTIC_QUERY_BYTES: usize = 1_024;
+const SEMANTIC_RESULT_BYTES: usize = 64 * 1_024;
+const SEMANTIC_RESULT_ITEMS: usize = 200;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct LspPosition {
@@ -42,6 +46,31 @@ pub struct LspDiagnostic {
 pub struct DiagnosticSnapshot {
     pub diagnostics: Vec<LspDiagnostic>,
     pub fresh: bool,
+    pub waited_ms: u128,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LspSemanticOperation {
+    Definition,
+    References,
+    DocumentSymbols,
+    WorkspaceSymbols,
+    Hover,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct LspSemanticRequest {
+    pub operation: LspSemanticOperation,
+    pub line: Option<u64>,
+    pub character: Option<u64>,
+    pub query: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct SemanticSnapshot {
+    pub result: Value,
+    pub truncated: bool,
     pub waited_ms: u128,
 }
 
@@ -132,6 +161,32 @@ impl LspClient {
         })
     }
 
+    pub fn semantic(
+        &mut self,
+        file: &Path,
+        language_id: &str,
+        request: &LspSemanticRequest,
+    ) -> Result<SemanticSnapshot, String> {
+        let uri = file_uri(file)?;
+        let text = std::fs::read_to_string(file)
+            .map_err(|error| format!("failed to read semantic target: {error}"))?;
+        self.sync_document(&uri, language_id, text)?;
+        let params = semantic_params(&uri, request)?;
+        let started = Instant::now();
+        let id = self.send_request(semantic_method(&request.operation), params)?;
+        let response = self.wait_for_response(id, SEMANTIC_TIMEOUT)?;
+        if let Some(error) = response.get("error") {
+            return Err(format!("language server semantic request failed: {error}"));
+        }
+        let (result, truncated) =
+            bound_semantic_result(response.get("result").cloned().unwrap_or(Value::Null))?;
+        Ok(SemanticSnapshot {
+            result,
+            truncated,
+            waited_ms: started.elapsed().as_millis(),
+        })
+    }
+
     fn initialize(&mut self) -> Result<(), String> {
         let id = self.send_request(
             "initialize",
@@ -143,15 +198,22 @@ impl LspClient {
                     "uri": self.root_uri,
                 }],
                 "capabilities": {
-                    "workspace": {
-                        "configuration": true,
-                    },
                     "textDocument": {
                         "synchronization": {
                             "didOpen": true,
                             "didChange": true,
                         },
                         "publishDiagnostics": {},
+                        "definition": {},
+                        "references": {},
+                        "documentSymbol": {
+                            "hierarchicalDocumentSymbolSupport": true,
+                        },
+                        "hover": {},
+                    },
+                    "workspace": {
+                        "configuration": true,
+                        "symbol": {},
                     },
                 },
             }),
@@ -329,6 +391,80 @@ impl Drop for LspClient {
     }
 }
 
+fn semantic_method(operation: &LspSemanticOperation) -> &'static str {
+    match operation {
+        LspSemanticOperation::Definition => "textDocument/definition",
+        LspSemanticOperation::References => "textDocument/references",
+        LspSemanticOperation::DocumentSymbols => "textDocument/documentSymbol",
+        LspSemanticOperation::WorkspaceSymbols => "workspace/symbol",
+        LspSemanticOperation::Hover => "textDocument/hover",
+    }
+}
+
+fn semantic_params(uri: &str, request: &LspSemanticRequest) -> Result<Value, String> {
+    let text_document = json!({ "uri": uri });
+    match request.operation {
+        LspSemanticOperation::Definition | LspSemanticOperation::Hover => Ok(json!({
+            "textDocument": text_document,
+            "position": required_position(request)?,
+        })),
+        LspSemanticOperation::References => Ok(json!({
+            "textDocument": text_document,
+            "position": required_position(request)?,
+            "context": { "includeDeclaration": true },
+        })),
+        LspSemanticOperation::DocumentSymbols => Ok(json!({
+            "textDocument": text_document,
+        })),
+        LspSemanticOperation::WorkspaceSymbols => {
+            let query = request.query.as_deref().unwrap_or("").trim();
+            if query.len() > SEMANTIC_QUERY_BYTES {
+                return Err("language server workspace-symbol query exceeds byte limit".into());
+            }
+            Ok(json!({ "query": query }))
+        }
+    }
+}
+
+fn required_position(request: &LspSemanticRequest) -> Result<Value, String> {
+    Ok(json!({
+        "line": request
+            .line
+            .ok_or_else(|| "language server request requires a line".to_string())?,
+        "character": request
+            .character
+            .ok_or_else(|| "language server request requires a character".to_string())?,
+    }))
+}
+
+fn bound_semantic_result(mut result: Value) -> Result<(Value, bool), String> {
+    let mut truncated = false;
+    if let Value::Array(items) = &mut result {
+        truncated = items.len() > SEMANTIC_RESULT_ITEMS;
+        items.truncate(SEMANTIC_RESULT_ITEMS);
+    }
+    if serde_json::to_vec(&result)
+        .map_err(|error| format!("failed to encode language server result: {error}"))?
+        .len()
+        <= SEMANTIC_RESULT_BYTES
+    {
+        return Ok((result, truncated));
+    }
+    let Value::Array(items) = &mut result else {
+        return Err("language server result exceeded byte limit".into());
+    };
+    while !items.is_empty()
+        && serde_json::to_vec(items)
+            .map_err(|error| format!("failed to encode language server result: {error}"))?
+            .len()
+            > SEMANTIC_RESULT_BYTES
+    {
+        truncated = true;
+        items.pop();
+    }
+    Ok((result, truncated))
+}
+
 #[derive(Deserialize)]
 struct PublishDiagnosticsParams {
     uri: String,
@@ -437,6 +573,44 @@ mod tests {
         assert_eq!(end_position("one\n😀").character, 2);
     }
 
+    #[test]
+    fn semantic_position_requests_require_line_and_character() {
+        let missing = LspSemanticRequest {
+            operation: LspSemanticOperation::Definition,
+            line: None,
+            character: Some(0),
+            query: None,
+        };
+        assert_eq!(
+            semantic_params("file:///sample.ts", &missing).expect_err("missing line"),
+            "language server request requires a line"
+        );
+
+        let references = LspSemanticRequest {
+            operation: LspSemanticOperation::References,
+            line: Some(4),
+            character: Some(2),
+            query: None,
+        };
+        let params = semantic_params("file:///sample.ts", &references).expect("params");
+        assert_eq!(params["position"], json!({ "line": 4, "character": 2 }));
+        assert_eq!(params["context"]["includeDeclaration"], true);
+    }
+
+    #[test]
+    fn semantic_result_arrays_are_bounded() {
+        let result = Value::Array(
+            (0..1_000)
+                .map(|index| json!({ "name": format!("symbol-{index}") }))
+                .collect(),
+        );
+        let (bounded, truncated) = bound_semantic_result(result).expect("bound result");
+
+        assert!(truncated);
+        assert!(bounded.as_array().expect("array").len() <= SEMANTIC_RESULT_ITEMS);
+        assert!(serde_json::to_vec(&bounded).expect("serialize").len() <= SEMANTIC_RESULT_BYTES);
+    }
+
     #[cfg(unix)]
     #[test]
     fn fake_server_observes_lifecycle_and_publishes_diagnostic() {
@@ -534,5 +708,139 @@ mod tests {
             *events.lock().expect("events"),
             vec!["initialize", "initialized", "didOpen", "shutdown", "exit"]
         );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fake_server_observes_document_open_before_definition_request() {
+        use std::os::unix::net::UnixStream;
+
+        let root = tempfile::tempdir().expect("root");
+        let file = root.path().join("sample.rs");
+        std::fs::write(&file, "fn target() {}\nfn main() { target(); }\n").expect("write Rust");
+        let uri = file_uri(&file).expect("file URI");
+        let (client_stream, mut server_stream) = UnixStream::pair().expect("socket pair");
+        let server_reader = server_stream.try_clone().expect("server reader");
+        let expected_uri = uri.clone();
+        let server = thread::spawn(move || {
+            let mut reader = BufReader::new(server_reader);
+            let initialize = read_message(&mut reader)
+                .expect("read initialize")
+                .expect("initialize message");
+            write_message(
+                &mut server_stream,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": initialize["id"],
+                    "result": { "capabilities": { "definitionProvider": true } },
+                }),
+            )
+            .expect("write initialize response");
+            assert_eq!(
+                read_message(&mut reader)
+                    .expect("read initialized")
+                    .expect("initialized message")["method"],
+                "initialized"
+            );
+            assert_eq!(
+                read_message(&mut reader)
+                    .expect("read didOpen")
+                    .expect("didOpen message")["method"],
+                "textDocument/didOpen"
+            );
+            let definition = read_message(&mut reader)
+                .expect("read definition")
+                .expect("definition message");
+            assert_eq!(definition["method"], "textDocument/definition");
+            assert_eq!(definition["params"]["position"], json!({ "line": 1, "character": 12 }));
+            write_message(
+                &mut server_stream,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": definition["id"],
+                    "result": [{
+                        "uri": expected_uri,
+                        "range": {
+                            "start": { "line": 0, "character": 3 },
+                            "end": { "line": 0, "character": 9 },
+                        },
+                    }],
+                }),
+            )
+            .expect("write definition response");
+            let shutdown = read_message(&mut reader)
+                .expect("read shutdown")
+                .expect("shutdown message");
+            assert_eq!(shutdown["method"], "shutdown");
+            write_message(
+                &mut server_stream,
+                &json!({
+                    "jsonrpc": "2.0",
+                    "id": shutdown["id"],
+                    "result": null,
+                }),
+            )
+            .expect("write shutdown response");
+            assert_eq!(
+                read_message(&mut reader)
+                    .expect("read exit")
+                    .expect("exit message")["method"],
+                "exit"
+            );
+        });
+        let client_writer = client_stream.try_clone().expect("client writer");
+        let mut client =
+            LspClient::connect(client_writer, client_stream, root.path(), None).expect("connect");
+        let snapshot = client
+            .semantic(
+                &file,
+                "rust",
+                &LspSemanticRequest {
+                    operation: LspSemanticOperation::Definition,
+                    line: Some(1),
+                    character: Some(12),
+                    query: None,
+                },
+            )
+            .expect("definition");
+
+        assert_eq!(snapshot.result[0]["uri"], uri);
+        assert!(!snapshot.truncated);
+        drop(client);
+        server.join().expect("server thread");
+    }
+
+    #[test]
+    #[ignore = "run explicitly when clangd is installed for host semantic qualification"]
+    fn installed_clangd_document_symbols_smoke() {
+        let Some(executable) = std::env::var_os("PATH")
+            .as_deref()
+            .and_then(|path| {
+                std::env::split_paths(path)
+                    .map(|directory| directory.join("clangd"))
+                    .find(|candidate| candidate.is_file())
+            })
+        else {
+            return;
+        };
+        let root = tempfile::tempdir().expect("root");
+        let file = root.path().join("sample.cpp");
+        std::fs::write(&file, "int target() { return 42; }\n").expect("write C++");
+        let mut client = LspClient::spawn(&executable, &[], root.path()).expect("spawn clangd");
+        let snapshot = client
+            .semantic(
+                &file,
+                "cpp",
+                &LspSemanticRequest {
+                    operation: LspSemanticOperation::DocumentSymbols,
+                    line: None,
+                    character: None,
+                    query: None,
+                },
+            )
+            .expect("request document symbols");
+
+        assert!(!snapshot.truncated);
+        assert!(snapshot.result.as_array().is_some_and(|items| !items.is_empty()));
     }
 }

@@ -32,7 +32,7 @@ describe("lspChips", () => {
   });
 
   it("reads 'detected' for an installed server whose diagnostics are deferred", () => {
-    // e.g. rust-analyzer present on PATH but Atlas does not wire its diagnostics
+    // A custom registered server can still be detected while diagnostics are disabled.
     expect(
       lspChips([
         provider({
@@ -71,7 +71,7 @@ describe("memoryChips", () => {
         provider: "simplemem",
         status: "available",
         optional: true,
-        endpoint: "http://127.0.0.1:8766/health",
+        endpoint: "http://127.0.0.1:8766/cross/health",
         latencyMs: 5,
         detail: "ok",
       }),
@@ -97,7 +97,7 @@ describe("memoryChips", () => {
         provider: "simplemem",
         status: "unavailable",
         optional: true,
-        endpoint: "http://127.0.0.1:8766/health",
+        endpoint: "http://127.0.0.1:8766/cross/health",
         latencyMs: 750,
         detail: "timeout",
       }),

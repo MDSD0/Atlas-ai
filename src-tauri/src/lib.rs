@@ -161,6 +161,7 @@ pub fn run() {
             reality::agent_reality_context,
             lsp::agent_lsp_status,
             lsp::agent_lsp_diagnostics,
+            lsp::agent_lsp_semantic,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,

@@ -485,3 +485,21 @@ Done at the frontend layer; full release qualification follows before checkpoint
 Green (clean shell `release-qualify.sh`): `git diff --check` 0, tsc 0, Vitest `204` passed (38 files), build 0 across `3195` modules, cargo check/clippy 0, cargo test `135 + 3` with `2` intentional diagnostic ignores, golden eval passed, desktop contract smoke passed, dependency review passed.
 
 Next: corrective Slice C2 multi-language semantic LSP client.
+
+## Post-V1 corrective Slice C2 status: multi-language semantic LSP client
+
+Done at focused-check layer; full release qualification follows before checkpoint.
+
+- Reused the existing lazy native JSON-RPC process client for definitions, references, hover, document symbols, workspace symbols, and diagnostics.
+- Registered optional providers for TypeScript/JavaScript, Python, Rust, C/C++, Java, HTML, CSS, and JSON. Atlas detects executables but never installs or starts a server at boot.
+- Generalized post-edit diagnostics across registered language families; a missing provider remains visible and non-fatal.
+- Semantic arrays cap at `200` items and all semantic result payloads cap at `64 KiB`.
+- Added selective agent tools: `lsp_definition`, `lsp_references`, `lsp_hover`, `lsp_document_symbols`, and `lsp_workspace_symbols`.
+- Deterministic fake-server tests prove initialize, didOpen-before-definition, bounded results, diagnostics, and shutdown.
+- Explicit host qualification passed against installed `/usr/bin/clangd`: real initialization, C++ document open, non-empty document-symbol result, and clean shutdown in `1.62s`.
+
+Focused green: `git diff --check` 0, tsc 0, Vitest `204` passed (38 files), focused Rust LSP `12` passed plus `1` intentional host smoke ignored by default, explicit installed-`clangd` smoke passed, clippy 0.
+
+Green (clean shell `release-qualify.sh`): tsc 0, Vitest `204` passed (38 files), build 0 across `3195` modules, cargo check/clippy 0, cargo test `139 + 3` with `3` intentional diagnostic or host-smoke ignores, golden eval passed, desktop contract smoke passed, dependency review passed.
+
+Next: corrective Slice C3 Aider-style repo-map ranking parity and selective graph quality measurement.

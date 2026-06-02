@@ -102,6 +102,24 @@ export type LspDiagnosticsResponse = {
   detail: string;
 };
 
+export type LspSemanticOperation =
+  | "definition"
+  | "references"
+  | "document_symbols"
+  | "workspace_symbols"
+  | "hover";
+
+export type LspSemanticResponse = {
+  provider: string;
+  operation: LspSemanticOperation;
+  status: "fresh" | "unavailable" | "broken";
+  file: string;
+  result: unknown;
+  truncated: boolean;
+  waited_ms: number;
+  detail: string;
+};
+
 export type GitRepoInfo = {
   repoRoot: string;
   branch: string;
@@ -511,6 +529,23 @@ export const agentNative = {
       root: projectRoot,
       projectRoot,
       file,
+      workspace: currentWorkspaceEnv(),
+    }),
+  lspSemantic: (
+    projectRoot: string,
+    file: string,
+    request: {
+      operation: LspSemanticOperation;
+      line?: number;
+      character?: number;
+      query?: string;
+    },
+  ) =>
+    invoke<LspSemanticResponse>("agent_lsp_semantic", {
+      root: projectRoot,
+      projectRoot,
+      file,
+      request,
       workspace: currentWorkspaceEnv(),
     }),
 };

@@ -10,7 +10,10 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::modules::workspace::{authorize_agent_existing_path, WorkspaceEnv, WorkspaceRegistry};
-use client::{DiagnosticSnapshot, LspClient, LspDiagnostic};
+use client::{
+    DiagnosticSnapshot, LspClient, LspDiagnostic, LspSemanticOperation, LspSemanticRequest,
+    SemanticSnapshot,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -59,7 +62,7 @@ const PROVIDERS: &[Provider] = &[
         executable: "pyright-langserver",
         args: &["--stdio"],
         extensions: &["py"],
-        diagnostics_enabled: false,
+        diagnostics_enabled: true,
     },
     Provider {
         id: "rust-analyzer",
@@ -67,7 +70,47 @@ const PROVIDERS: &[Provider] = &[
         executable: "rust-analyzer",
         args: &[],
         extensions: &["rs"],
-        diagnostics_enabled: false,
+        diagnostics_enabled: true,
+    },
+    Provider {
+        id: "clangd",
+        language: "c-cpp",
+        executable: "clangd",
+        args: &[],
+        extensions: &["c", "cc", "cpp", "cxx", "h", "hh", "hpp", "hxx"],
+        diagnostics_enabled: true,
+    },
+    Provider {
+        id: "jdtls",
+        language: "java",
+        executable: "jdtls",
+        args: &[],
+        extensions: &["java"],
+        diagnostics_enabled: true,
+    },
+    Provider {
+        id: "html",
+        language: "html",
+        executable: "vscode-html-language-server",
+        args: &["--stdio"],
+        extensions: &["html", "htm"],
+        diagnostics_enabled: true,
+    },
+    Provider {
+        id: "css",
+        language: "css",
+        executable: "vscode-css-language-server",
+        args: &["--stdio"],
+        extensions: &["css", "scss", "less"],
+        diagnostics_enabled: true,
+    },
+    Provider {
+        id: "json",
+        language: "json",
+        executable: "vscode-json-language-server",
+        args: &["--stdio"],
+        extensions: &["json", "jsonc"],
+        diagnostics_enabled: true,
     },
 ];
 
@@ -93,6 +136,26 @@ pub struct LspDiagnosticsResponse {
     pub status: LspDiagnosticStatus,
     pub file: String,
     pub diagnostics: Vec<LspDiagnostic>,
+    pub waited_ms: u128,
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LspSemanticStatus {
+    Fresh,
+    Unavailable,
+    Broken,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct LspSemanticResponse {
+    pub provider: &'static str,
+    pub operation: LspSemanticOperation,
+    pub status: LspSemanticStatus,
+    pub file: String,
+    pub result: serde_json::Value,
+    pub truncated: bool,
     pub waited_ms: u128,
     pub detail: String,
 }
@@ -218,7 +281,7 @@ pub fn agent_lsp_diagnostics(
     let snapshot = clients
         .get_mut(&key)
         .expect("LSP client inserted above")
-        .diagnostics(&file, language_id(&file));
+        .diagnostics(&file, language_id(provider, &file));
     match snapshot {
         Ok(snapshot) => Ok(snapshot_response(provider, &file, snapshot)),
         Err(detail) => {
@@ -234,6 +297,132 @@ pub fn agent_lsp_diagnostics(
                 LspDiagnosticStatus::Broken,
                 Vec::new(),
                 0,
+                detail,
+            ))
+        }
+    }
+}
+
+#[tauri::command]
+pub fn agent_lsp_semantic(
+    root: String,
+    project_root: String,
+    file: String,
+    request: LspSemanticRequest,
+    workspace: Option<WorkspaceEnv>,
+    state: State<'_, LspState>,
+    registry: State<'_, WorkspaceRegistry>,
+) -> Result<LspSemanticResponse, String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    if !root.is_dir() {
+        return Err("LSP root is not a directory".into());
+    }
+    let file = authorize_agent_existing_path(&registry, &file, &project_root, &workspace)?;
+    if !file.is_file() {
+        return Err("semantic target is not a file".into());
+    }
+    let provider = provider_for_file(&file)
+        .ok_or_else(|| "no semantic provider is registered for this file extension".to_string())?;
+    let key = client_key(&root, provider);
+    if let Some(detail) = state
+        .broken
+        .lock()
+        .map_err(|_| "LSP broken-state lock poisoned")?
+        .get(&key)
+        .cloned()
+    {
+        return Ok(semantic_response(
+            provider,
+            &file,
+            &request.operation,
+            LspSemanticStatus::Broken,
+            SemanticSnapshot {
+                result: serde_json::Value::Null,
+                truncated: false,
+                waited_ms: 0,
+            },
+            detail,
+        ));
+    }
+    let executable = match find_executable(provider.executable, std::env::var_os("PATH").as_deref())
+    {
+        Some(executable) => executable,
+        None => {
+            return Ok(semantic_response(
+                provider,
+                &file,
+                &request.operation,
+                LspSemanticStatus::Unavailable,
+                SemanticSnapshot {
+                    result: serde_json::Value::Null,
+                    truncated: false,
+                    waited_ms: 0,
+                },
+                "not installed or not on PATH; repository tools remain available",
+            ));
+        }
+    };
+    let mut clients = state
+        .clients
+        .lock()
+        .map_err(|_| "LSP client lock poisoned")?;
+    if !clients.contains_key(&key) {
+        match LspClient::spawn(&executable, provider.args, &root) {
+            Ok(client) => {
+                clients.insert(key.clone(), client);
+            }
+            Err(detail) => {
+                state
+                    .broken
+                    .lock()
+                    .map_err(|_| "LSP broken-state lock poisoned")?
+                    .insert(key, detail.clone());
+                return Ok(semantic_response(
+                    provider,
+                    &file,
+                    &request.operation,
+                    LspSemanticStatus::Broken,
+                    SemanticSnapshot {
+                        result: serde_json::Value::Null,
+                        truncated: false,
+                        waited_ms: 0,
+                    },
+                    detail,
+                ));
+            }
+        }
+    }
+    let snapshot = clients
+        .get_mut(&key)
+        .expect("LSP client inserted above")
+        .semantic(&file, language_id(provider, &file), &request);
+    match snapshot {
+        Ok(snapshot) => Ok(semantic_response(
+            provider,
+            &file,
+            &request.operation,
+            LspSemanticStatus::Fresh,
+            snapshot,
+            "fresh language-server semantic response",
+        )),
+        Err(detail) => {
+            clients.remove(&key);
+            state
+                .broken
+                .lock()
+                .map_err(|_| "LSP broken-state lock poisoned")?
+                .insert(key, detail.clone());
+            Ok(semantic_response(
+                provider,
+                &file,
+                &request.operation,
+                LspSemanticStatus::Broken,
+                SemanticSnapshot {
+                    result: serde_json::Value::Null,
+                    truncated: false,
+                    waited_ms: 0,
+                },
                 detail,
             ))
         }
@@ -311,11 +500,44 @@ fn client_key(root: &Path, provider: &Provider) -> String {
     format!("{}:{}", crate::modules::fs::to_canon(root), provider.id)
 }
 
-fn language_id(file: &Path) -> &'static str {
-    match file.extension().and_then(|extension| extension.to_str()) {
-        Some("js" | "jsx" | "mjs" | "cjs") => "javascript",
-        Some("tsx") => "typescriptreact",
-        _ => "typescript",
+fn language_id(provider: &Provider, file: &Path) -> &'static str {
+    match provider.id {
+        "typescript" => match file.extension().and_then(|extension| extension.to_str()) {
+            Some("js" | "jsx" | "mjs" | "cjs") => "javascript",
+            Some("tsx") => "typescriptreact",
+            _ => "typescript",
+        },
+        "pyright" => "python",
+        "rust-analyzer" => "rust",
+        "clangd" => match file.extension().and_then(|extension| extension.to_str()) {
+            Some("c" | "h") => "c",
+            _ => "cpp",
+        },
+        "jdtls" => "java",
+        "html" => "html",
+        "css" => "css",
+        "json" => "json",
+        _ => "plaintext",
+    }
+}
+
+fn semantic_response(
+    provider: &'static Provider,
+    file: &Path,
+    operation: &LspSemanticOperation,
+    status: LspSemanticStatus,
+    snapshot: SemanticSnapshot,
+    detail: impl Into<String>,
+) -> LspSemanticResponse {
+    LspSemanticResponse {
+        provider: provider.id,
+        operation: operation.clone(),
+        status,
+        file: crate::modules::fs::to_canon(file),
+        result: snapshot.result,
+        truncated: snapshot.truncated,
+        waited_ms: snapshot.waited_ms,
+        detail: detail.into(),
     }
 }
 
@@ -425,6 +647,26 @@ mod tests {
         assert!(infos[0]
             .detail
             .contains("repository tools remain available"));
+    }
+
+    #[test]
+    fn extension_routing_covers_registered_language_families() {
+        for (file, expected_provider, expected_language_id) in [
+            ("sample.ts", "typescript", "typescript"),
+            ("sample.jsx", "typescript", "javascript"),
+            ("sample.py", "pyright", "python"),
+            ("sample.rs", "rust-analyzer", "rust"),
+            ("sample.cpp", "clangd", "cpp"),
+            ("sample.java", "jdtls", "java"),
+            ("sample.html", "html", "html"),
+            ("sample.css", "css", "css"),
+            ("sample.json", "json", "json"),
+        ] {
+            let provider = provider_for_file(Path::new(file)).expect("registered provider");
+            assert_eq!(provider.id, expected_provider);
+            assert_eq!(language_id(provider, Path::new(file)), expected_language_id);
+            assert!(provider.diagnostics_enabled);
+        }
     }
 
     #[test]

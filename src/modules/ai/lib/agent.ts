@@ -47,6 +47,12 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
       `Scoping ${ellipsize(String(i.symbol ?? ""), 40)}`,
     lsp_status: () => "Checking semantic provider",
     lsp_diagnostics: (i) => `Diagnosing ${shortPath(i.path)}`,
+    lsp_definition: (i) => `Finding definition in ${shortPath(i.path)}`,
+    lsp_references: (i) => `Finding references in ${shortPath(i.path)}`,
+    lsp_hover: (i) => `Reading hover in ${shortPath(i.path)}`,
+    lsp_document_symbols: (i) => `Reading symbols in ${shortPath(i.path)}`,
+    lsp_workspace_symbols: (i) =>
+      `Searching symbols ${ellipsize(String(i.query ?? ""), 40)}`,
     verification_plan: () => "Planning verification",
     memory_status: () => "Checking project memory",
     memory_recall: (i) =>

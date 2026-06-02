@@ -17,6 +17,7 @@ for (const command of [
   "agent_reality_context",
   "agent_lsp_status",
   "agent_lsp_diagnostics",
+  "agent_lsp_semantic",
   "shell_run_command",
 ]) {
   assert.match(native, new RegExp(command));
