@@ -55,6 +55,11 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
     memory_list: () => "Listing project memory",
     memory_delete: () => "Deleting project memory",
     memory_clear_project: () => "Clearing project memory",
+    memory_simplemem_configure: () => "Configuring SimpleMem",
+    memory_simplemem_search: (i) =>
+      `Searching SimpleMem ${ellipsize(String(i.query ?? ""), 40)}`,
+    memory_simplemem_stats: () => "Reading SimpleMem stats",
+    memory_simplemem_probe: () => "Probing SimpleMem lifecycle",
     memory_lab: () => "Inspecting MemoryLab",
     metrics_status: () => "Checking local metrics",
     metrics_export: () => "Exporting local metrics",

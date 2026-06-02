@@ -798,3 +798,54 @@ Measured verification on macOS:
 - `bash scripts/verify-atlas.sh --desktop` passed in `1.37s`: static desktop contract on `darwin`; interactive macOS automation remains manual because WKWebView has no WebDriver.
 - `bash scripts/verify-atlas.sh --deps` passed: `81` frontend and `32` Rust direct runtime dependencies match the approved baseline; Rust `url` is reviewed and already transitive.
 - Clean-shell `bash scripts/release-qualify.sh` passed: TypeScript 0, Vitest `180` passed, production build `3188` modules, Cargo check 0, Clippy 0, Rust `135` passed plus `2` intentional diagnostic ignores, fixture harness `3` passed, eval passed, desktop contract passed, dependency review passed.
+
+## Post-V1 corrective program: real coding-harness adapters
+
+Source-parity packet:
+
+- Trigger: the accelerated V1 proved a trustworthy desktop shell, but its optional-provider surfaces remain deliberately narrow. The next program converts the strongest stubs into real adapters without replacing the Atlas core or inventing blank-page subsystems.
+- Launch probe on `2026-06-02`: `PATH="$HOME/.nvm/versions/node/v22.16.0/bin:$HOME/.cargo/bin:/usr/bin:/bin" pnpm tauri dev` built and launched `target/debug/atlas`. It also exposed two release blockers: Tauri Rust `2.11.2` is ahead of `@tauri-apps/api` `2.10.1`, and the configured updater endpoint did not return a successful response.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh memory simplemem evolvemem lsp semantic aider repomap graph mcp benchmark desktop`. The resolver authenticated through the GitHub CLI keyring and refreshed the curated cache paths.
+- Primary documentation refreshed: official LSP `3.17` specification; Aider repository-map documentation; MCP TypeScript SDK V1 documentation; MCP transport documentation; SimpleMem upstream README and Cross README.
+- opensrc inspected: `aiming-lab/SimpleMem:cross/{README.md,api_http.py,orchestrator.py,session_manager.py,context_injector.py,types.py}`, `Aider-AI/aider:aider/repomap.py`, `DeusData/codebase-memory-mcp:README.md`, `modelcontextprotocol/typescript-sdk:docs/{client,server}.md`, and `microsoft/language-server-protocol:_specifications/lsp/3.17/specification.md`.
+- SimpleMem finding: Atlas currently probes `GET /health`, but the upstream Cross HTTP app mounts its complete API at `/cross/*`. The real upstream surface includes session start, message/tool recording, stop, end, search, stats, and health. Atlas must wrap that contract through an explicit loopback-only provider and retain LocalRecords as the offline default.
+- LSP finding: Atlas owns a real lazy JSON-RPC lifecycle, but diagnostics are enabled only for TypeScript. The next LSP slice generalizes request handling and provider capabilities before exposing definitions, references, document symbols, workspace symbols, hover, and multi-language diagnostics.
+- Repo-map finding: Atlas owns official Tree-sitter extraction and bounded projections, but not Aider ranking parity. The next reality slice ports the measured file graph ranking behavior and compares selective graph quality against `codebase-memory-mcp`.
+- MCP finding: Atlas owns the disabled-by-default policy boundary, but no transport. The next MCP slice wraps a pinned stable SDK path or a native-equivalent process boundary with conformance tests; it does not hand-roll a new protocol.
+- Qualification finding: the static desktop smoke remains useful but is not an interactive desktop proof. Add external benchmark sample adapters and click-driven host qualification where the platform supports it.
+- Performance rule: all new providers remain lazy, bounded, opt-in, inspectable, and independently degradable.
+
+Corrective execution order:
+
+1. Replace the SimpleMem health-only stub with a real optional Cross HTTP adapter and focused fake-sidecar tests.
+2. Generalize the existing LSP client and expose semantic requests across registered providers.
+3. Add Aider-style repo-map ranking parity tests and selective graph comparison.
+4. Attach a real pinned MCP transport adapter behind the existing disabled policy boundary.
+5. Add external benchmark samples and interactive desktop qualification evidence.
+
+## Corrective Slice C1: real optional SimpleMem Cross adapter
+
+Source-parity packet:
+
+- Slice: replace the health-only candidate stub with the smallest real adapter over upstream SimpleMem Cross HTTP, keeping all advanced-memory work optional and independently degradable.
+- Atlas files inspected: `src/modules/ai/memory/{index,contracts,localRecords,memoryLab,persistence,simpleMem}.ts`, `src/modules/ai/tools/memory.ts`, `src/modules/ai/lib/{agent,transport}.ts`, and `src/modules/ai/store/statusStore.ts`.
+- opensrc inspected: `aiming-lab/SimpleMem:cross/{README.md,api_http.py,orchestrator.py,session_manager.py,context_injector.py,types.py}` and `cross/tests/test_session_lifecycle.py`.
+- Upstream contract adapted: `GET /cross/health`, `POST /cross/sessions/start`, message, tool-use, stop, end, `POST /cross/search`, and `GET /cross/stats`. Upstream stop runs observation extraction, optional SimpleMem pipeline finalization, and summary persistence. Atlas wraps that lifecycle; it does not recreate the Python provider.
+- Security posture: accept only credential-free loopback HTTP endpoints, bound outbound text and response bytes, refuse recognized secret material before network calls, require explicit approval for sidecar configuration, search, and write-and-retrieve probe, and preserve LocalRecords as the default offline ledger.
+- Context posture: sidecar run recording starts lazily only when enabled. Prior sidecar context remains advisory and is injected only when the separately persisted `injectContext` switch is explicitly enabled. Current repository evidence remains authoritative.
+- MemoryLab posture: add an explicit probe that records one isolated marker session, finalizes it, searches for the marker, reads aggregate stats, and reports retrieval observation. It reports stale-fact invalidation and consolidation false-merge gates as unsupported until a provider contract and seeded benchmark exist.
+- Tests required: disabled boot, corrected `/cross/health` path, complete lifecycle routing, secret refusal before fetch, invalid JSON failure, inert persisted config, normalized loopback origin, remote endpoint refusal, observer context and idempotent finalization, unbound-project inactivity, measured probe, and absent-sidecar degradation.
+
+Applied:
+
+- Replaced `simpleMem.ts` with a loopback-only bounded Cross HTTP adapter covering health, lifecycle, search, and stats.
+- Added `simpleMemConfig.ts`: explicit-save opt-in config with separate `enabled` and `injectContext` switches.
+- Added `simpleMemObserver.ts`: lazy turn-level start, user-message and tool-event recording, advisory prior-context rendering, and idempotent stop/end finalization. Failures are swallowed by the transport boundary so the default agent loop keeps working.
+- Added `simpleMemLab.ts`: an approval-gated write-and-retrieve marker probe with honest unsupported-gate reporting.
+- Added `memory_simplemem_configure`, `memory_simplemem_search`, `memory_simplemem_stats`, and `memory_simplemem_probe` agent tools.
+- Updated the CodeReality status probe to read persisted provider configuration while continuing to hide disabled-sidecar noise.
+- Added focused adapter, config, observer, and probe regressions.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, Vitest `204` passed across `38` files.
+
+Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `204` passed across `38` files, production build `3195` modules, Cargo check 0, Clippy 0, Rust `135` passed plus `2` intentional diagnostic ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, and dependency review passed. Existing Rollup circular-chunk warnings remain visible and unchanged.

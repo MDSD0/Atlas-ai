@@ -7,6 +7,9 @@ export * from "@/modules/ai/memory/localRecords";
 export * from "@/modules/ai/memory/memoryLab";
 export * from "@/modules/ai/memory/persistence";
 export * from "@/modules/ai/memory/simpleMem";
+export * from "@/modules/ai/memory/simpleMemConfig";
+export * from "@/modules/ai/memory/simpleMemLab";
+export * from "@/modules/ai/memory/simpleMemObserver";
 
 export const localRecords = new LocalRecordsProvider(
   new TauriMemoryPersistence(),

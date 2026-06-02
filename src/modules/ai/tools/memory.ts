@@ -3,7 +3,8 @@ import { z } from "zod";
 import {
   buildMemoryLabReport,
   localRecords,
-  SimpleMemAdapter,
+  probeSimpleMem,
+  simpleMemConfig,
   type MemoryRecordKind,
 } from "@/modules/ai/memory";
 import { agentNative } from "@/modules/ai/lib/native";
@@ -45,6 +46,12 @@ async function sourceArtifacts(
   return resolved;
 }
 
+async function simpleMemAdapter(forceEnabled = false) {
+  return simpleMemConfig.adapter({
+    forceEnabled: forceEnabled ? true : undefined,
+  });
+}
+
 export function buildMemoryTools(ctx: ToolContext) {
   return {
     memory_status: tool({
@@ -56,11 +63,88 @@ export function buildMemoryTools(ctx: ToolContext) {
       execute: async ({ probe_simplemem }) => {
         const root = projectRoot(ctx);
         if (typeof root !== "string") return root;
-        const [stats, simpleMem] = await Promise.all([
+        const [stats, adapter, config] = await Promise.all([
           localRecords.stats(root),
-          new SimpleMemAdapter({ enabled: probe_simplemem }).health(),
+          simpleMemAdapter(probe_simplemem),
+          simpleMemConfig.get(),
         ]);
-        return { default_provider: "local_records", local_records: stats, simplemem: simpleMem };
+        return {
+          default_provider: "local_records",
+          local_records: stats,
+          simplemem_config: config,
+          simplemem: await adapter.health(),
+        };
+      },
+    }),
+
+    memory_simplemem_configure: tool({
+      description:
+        "Configure the optional loopback-only SimpleMem Cross sidecar. This never installs or starts a provider. LocalRecords remains the offline default.",
+      inputSchema: z.object({
+        enabled: z.boolean().optional(),
+        inject_context: z.boolean().optional(),
+        base_url: z.string().optional(),
+      }),
+      needsApproval: true,
+      execute: async ({ base_url, inject_context, ...input }) => {
+        try {
+          return await simpleMemConfig.configure({
+            ...input,
+            baseUrl: base_url,
+            injectContext: inject_context,
+          });
+        } catch (error) {
+          return { error: String(error) };
+        }
+      },
+    }),
+
+    memory_simplemem_search: tool({
+      description:
+        "Search the explicitly enabled local SimpleMem Cross sidecar. Returned memory is advisory and current repository evidence still wins.",
+      inputSchema: z.object({
+        query: z.string().min(1),
+        top_k: z.number().int().min(1).max(100).optional(),
+        tenant_id: z.string().optional(),
+      }),
+      needsApproval: true,
+      execute: async ({ top_k, tenant_id, ...input }) => {
+        try {
+          return await (await simpleMemAdapter()).search({
+            ...input,
+            topK: top_k,
+            tenantId: tenant_id,
+          });
+        } catch (error) {
+          return { error: String(error) };
+        }
+      },
+    }),
+
+    memory_simplemem_stats: tool({
+      description:
+        "Inspect aggregate statistics from the explicitly enabled local SimpleMem Cross sidecar.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        try {
+          return await (await simpleMemAdapter()).stats();
+        } catch (error) {
+          return { error: String(error) };
+        }
+      },
+    }),
+
+    memory_simplemem_probe: tool({
+      description:
+        "Run an explicit write-and-retrieve MemoryLab sample against the enabled local SimpleMem Cross sidecar. This records a marker session and reports unsupported gates honestly.",
+      inputSchema: z.object({}),
+      needsApproval: true,
+      execute: async () => {
+        try {
+          return await probeSimpleMem(await simpleMemAdapter());
+        } catch (error) {
+          return { error: String(error) };
+        }
       },
     }),
 
@@ -166,11 +250,11 @@ export function buildMemoryTools(ctx: ToolContext) {
       execute: async ({ probe_simplemem }) => {
         const root = projectRoot(ctx);
         if (typeof root !== "string") return root;
-        const [stats, simpleMem] = await Promise.all([
+        const [stats, adapter] = await Promise.all([
           localRecords.stats(root),
-          new SimpleMemAdapter({ enabled: probe_simplemem }).health(),
+          simpleMemAdapter(probe_simplemem),
         ]);
-        return buildMemoryLabReport(stats, simpleMem);
+        return buildMemoryLabReport(stats, await adapter.health());
       },
     }),
   } as const;
@@ -182,6 +266,7 @@ export function buildReadOnlyMemoryTools(ctx: ToolContext) {
     memory_status: tools.memory_status,
     memory_recall: tools.memory_recall,
     memory_list: tools.memory_list,
+    memory_simplemem_stats: tools.memory_simplemem_stats,
     memory_lab: tools.memory_lab,
   } as const;
 }

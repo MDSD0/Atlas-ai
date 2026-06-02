@@ -470,3 +470,18 @@ Fix:
 So on the Atlas repo the honest reading is: indexing covers TS+Rust (working); diagnostics are TS-only (typescript-language-server not installed here -> off), rust-analyzer detected-but-deferred.
 
 Green (clean shell verify-atlas.sh --all): tsc 0, vitest 194 passed (35 files), build 0, cargo check/clippy 0, cargo test 135 + 3 harness (incl. 8 lsp tests).
+
+## Post-V1 corrective Slice C1 status: real optional SimpleMem Cross adapter
+
+Done at the frontend layer; full release qualification follows before checkpoint.
+
+- Replaced the misaddressed `/health`-only candidate stub with a real loopback-only adapter over upstream `/cross/*`.
+- Added opt-in persisted sidecar configuration with separate `enabled` and `injectContext` switches. LocalRecords remains the offline default.
+- Agent turns lazily start SimpleMem sessions only when enabled, record bounded prompt/tool events best-effort, optionally inject bounded advisory context, and finalize through stop/end.
+- Added approval-gated SimpleMem configuration, search, and write-and-retrieve MemoryLab probe tools plus read-only aggregate stats.
+- The MemoryLab probe is intentionally honest: it measures one isolated marker lifecycle and retrieval sample, then reports stale-fact invalidation and consolidation false-merge gates as unsupported until the provider exposes and passes those contracts.
+- Launch probe found two release blockers outside this slice: Tauri JS API `2.10.1` vs Rust crate `2.11.2`, and the configured updater endpoint currently returns an unsuccessful response.
+
+Green (clean shell `release-qualify.sh`): `git diff --check` 0, tsc 0, Vitest `204` passed (38 files), build 0 across `3195` modules, cargo check/clippy 0, cargo test `135 + 3` with `2` intentional diagnostic ignores, golden eval passed, desktop contract smoke passed, dependency review passed.
+
+Next: corrective Slice C2 multi-language semantic LSP client.

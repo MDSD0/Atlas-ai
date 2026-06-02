@@ -26,6 +26,7 @@ const READ_ONLY_TOOLS = [
   "memory_status",
   "memory_recall",
   "memory_list",
+  "memory_simplemem_stats",
   "memory_lab",
   "skill_list",
   "skill_inspect",

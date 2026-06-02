@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { agentNative, type LspProviderInfo } from "../lib/native";
-import { SimpleMemAdapter, type SimpleMemHealth } from "../memory/simpleMem";
+import {
+  simpleMemConfig,
+  SimpleMemAdapter,
+  type SimpleMemHealth,
+} from "../memory";
 
 // Honest capability status for the CodeReality panel footer: which language
 // servers are actually reachable, and which memory provider is active. This
@@ -21,7 +25,13 @@ type StatusState = {
 
 // SimpleMem is opt-in; default adapter is disabled, so health() reports
 // "disabled" rather than probing a sidecar nobody started.
-const simpleMem = new SimpleMemAdapter();
+async function simpleMemHealth(): Promise<SimpleMemHealth> {
+  try {
+    return await (await simpleMemConfig.adapter()).health();
+  } catch {
+    return new SimpleMemAdapter().health();
+  }
+}
 
 export const useStatusStore = create<StatusState>((set) => ({
   lsp: null,
@@ -36,7 +46,7 @@ export const useStatusStore = create<StatusState>((set) => ({
     set({ loading: true });
     const [lsp, simplemem] = await Promise.all([
       agentNative.lspStatus(workspaceRoot).catch(() => [] as LspProviderInfo[]),
-      simpleMem.health(),
+      simpleMemHealth(),
     ]);
     set({
       lsp,

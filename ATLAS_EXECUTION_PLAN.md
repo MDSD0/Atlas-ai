@@ -1564,3 +1564,49 @@ Source-resolution note:
 - GitHub unauthenticated API rate limiting prevented a later blind full refresh.
 - `scripts/consult-opensrc.sh` reports the refresh failure and falls back to inspected local cache paths.
 - Freshness-sensitive implementation slices must retry through the authenticated hook and record exact refreshed commits.
+
+## 24. Post-V1 Corrective Harness Program
+
+The accelerated V1 queue is a verified foundation, not the final coding harness. Continue with the smallest upstream-backed adapters in this order.
+
+### Slice C1: Real optional SimpleMem Cross adapter
+
+- Wrap the upstream loopback-only `/cross/*` HTTP lifecycle: health, start, message, tool-use, stop, end, search, and stats.
+- Refuse remote endpoints and secret-bearing payloads.
+- Keep `LocalRecords` as the offline default and require explicit opt-in for every sidecar call.
+- Add fake-sidecar contract tests and a comparative MemoryLab gate before any automatic context injection.
+
+### Slice C2: Multi-language semantic LSP client
+
+- Generalize the existing lazy LSP JSON-RPC client instead of adding another process manager.
+- Expose bounded diagnostics, definition, references, document symbols, workspace symbols, and hover.
+- Register TypeScript/JavaScript, Python, Rust, C/C++, Java, HTML, CSS, and JSON providers with real executable detection and graceful fallback.
+- Add fake-server lifecycle and request-contract tests. Run real installed-server smoke tests when the host has a provider.
+
+### Slice C3: Aider-style repo-map ranking parity
+
+- Adapt Aider's dependency graph ranking, mention boosts, and token-budget fitting onto the existing Tree-sitter inventory.
+- Compare key-file recall, wrong-file selection, context savings, invalidation, and latency against the existing deterministic fixture.
+- Study `codebase-memory-mcp` selective graph queries and adopt only measured improvements.
+
+### Slice C4: Real pinned MCP transport
+
+- Preserve the existing disabled-by-default policy registry.
+- Wrap a stable MCP SDK transport where runtime-compatible, or add the smallest native-equivalent process boundary when desktop runtime constraints require it.
+- Prove initialize negotiation, tool listing, bounded invocation, timeout, crash visibility, permission gates, and disabled boot.
+
+### Slice C5: External qualification
+
+- Add sample adapters for at least one coding benchmark and one terminal-oriented benchmark without turning upstream benchmark infrastructure into product runtime.
+- Keep deterministic Atlas fixtures as merge gates.
+- Add click-driven desktop qualification where supported and retain an honest manual checklist where platform automation is unavailable.
+
+### Corrective release gate
+
+Atlas is launch-candidate ready only when:
+
+1. `pnpm tauri dev` starts without package-version mismatch warnings.
+2. Updater failure behavior is intentional and documented.
+3. Every optional provider reports real capability state and degrades independently.
+4. The full clean-shell release qualification passes.
+5. External benchmark samples and desktop interaction evidence are recorded.

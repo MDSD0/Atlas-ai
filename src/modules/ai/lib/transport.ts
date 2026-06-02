@@ -11,7 +11,10 @@ import {
 import { proofJournal } from "../proof";
 import { RunRecorder } from "../proof/recorder";
 import { useProofStore } from "../store/proofStore";
-import { buildLocalMemoryContext } from "../memory";
+import {
+  buildLocalMemoryContext,
+  SimpleMemRunObserver,
+} from "../memory";
 import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
@@ -82,13 +85,21 @@ type SendOptions = {
 export function createContextAwareTransport(deps: Deps) {
   const run = async (options: SendOptions) => {
     const live = deps.getLive();
+    const prompt = lastUserText(options.messages);
+    const simpleMem = await SimpleMemRunObserver.start({
+      workspaceRoot: live.workspaceRoot,
+      contentSessionId: deps.toolContext.getSessionId() ?? "unknown",
+      userPrompt: prompt,
+    }).catch(() => null);
     const [atlasMd, localMemory, localSkills] = await Promise.all([
       readAtlasMd(live.workspaceRoot),
-      buildLocalMemoryContext(live.workspaceRoot, lastUserText(options.messages)),
+      buildLocalMemoryContext(live.workspaceRoot, prompt),
       buildLocalSkillsContext(),
     ]);
     const projectMemory =
-      [atlasMd, localMemory, localSkills].filter(Boolean).join("\n\n") || null;
+      [atlasMd, localMemory, simpleMem?.context, localSkills]
+        .filter(Boolean)
+        .join("\n\n") || null;
     const contextBlock = atlasContextBlock(live.project);
     const messagesForRun = contextBlock
       ? injectEnvIntoLastUser(options.messages, contextBlock)
@@ -116,13 +127,22 @@ export function createContextAwareTransport(deps: Deps) {
     };
     await observeLifecycle("run_start");
     await observeLifecycle("prompt_submit", {
-      text: lastUserText(options.messages),
+      text: prompt,
     });
 
-    if (options.abortSignal && recorder) {
+    const finishObservers = async (
+      outcome: { cancelled?: boolean; errored?: boolean } = {},
+    ) => {
+      await Promise.all([
+        recorder?.finish(outcome).catch(() => {}),
+        simpleMem?.finish().catch(() => {}),
+      ]);
+    };
+
+    if (options.abortSignal && (recorder || simpleMem)) {
       options.abortSignal.addEventListener(
         "abort",
-        () => void recorder.finish({ cancelled: true }).catch(() => {}),
+        () => void finishObservers({ cancelled: true }),
         { once: true },
       );
     }
@@ -138,8 +158,11 @@ export function createContextAwareTransport(deps: Deps) {
         onUsage: deps.onUsage,
         onCompact: deps.onCompact,
         onFinishMeta: deps.onFinishMeta,
-        onToolResult: recorder
-          ? (r) => void recorder.recordTool(r).catch(() => {})
+        onToolResult: recorder || simpleMem
+          ? (r) => {
+              void recorder?.recordTool(r).catch(() => {});
+              void simpleMem?.recordTool(r).catch(() => {});
+            }
           : undefined,
         onLifecycleEvent: observeLifecycle,
         lmstudioBaseURL: deps.getLmstudioBaseURL?.(),
@@ -157,19 +180,19 @@ export function createContextAwareTransport(deps: Deps) {
         uiMessages: messagesForRun,
         abortSignal: options.abortSignal,
       });
-      if (recorder) {
+      if (recorder || simpleMem) {
         // Close the receipt when the model stream resolves. finish() is
         // idempotent, so an earlier abort-driven close wins over this one.
         void result.finishReason.then(
-          () => recorder.finish(),
-          () => recorder.finish({ errored: true }),
+          () => finishObservers(),
+          () => finishObservers({ errored: true }),
         );
       }
       return result.toUIMessageStream({
         originalMessages: options.messages,
       });
     } catch (e) {
-      if (recorder) await recorder.finish({ errored: true }).catch(() => {});
+      await finishObservers({ errored: true });
       throw e;
     }
   };
