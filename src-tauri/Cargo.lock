@@ -285,6 +285,7 @@ dependencies = [
  "tree-sitter-rust",
  "tree-sitter-tags",
  "tree-sitter-typescript",
+ "url",
  "windows-sys 0.59.0",
 ]
 

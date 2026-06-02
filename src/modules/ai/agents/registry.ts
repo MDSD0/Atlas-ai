@@ -21,6 +21,7 @@ const READ_ONLY_TOOLS = [
   "find_references",
   "impact_candidates",
   "lsp_status",
+  "lsp_diagnostics",
   "verification_plan",
   "read_file",
   "list_directory",

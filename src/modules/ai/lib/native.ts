@@ -74,9 +74,29 @@ export type RepoContextResponse = {
 export type LspProviderInfo = {
   id: string;
   language: string;
-  status: "available" | "unavailable";
+  status: "available" | "unavailable" | "connected" | "broken";
   executable: string;
   resolved_path: string | null;
+  detail: string;
+};
+
+export type LspDiagnostic = {
+  range: {
+    start: { line: number; character: number };
+    end: { line: number; character: number };
+  };
+  severity: number | null;
+  code: unknown | null;
+  source: string | null;
+  message: string;
+};
+
+export type LspDiagnosticsResponse = {
+  provider: string;
+  status: "fresh" | "cached" | "pending" | "unavailable" | "broken";
+  file: string;
+  diagnostics: LspDiagnostic[];
+  waited_ms: number;
   detail: string;
 };
 
@@ -482,6 +502,13 @@ export const agentNative = {
       root: projectRoot,
       projectRoot,
       file: file ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+  lspDiagnostics: (projectRoot: string, file: string) =>
+    invoke<LspDiagnosticsResponse>("agent_lsp_diagnostics", {
+      root: projectRoot,
+      projectRoot,
+      file,
       workspace: currentWorkspaceEnv(),
     }),
 };

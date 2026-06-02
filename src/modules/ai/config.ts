@@ -676,7 +676,7 @@ Every turn carries an <atlas_context> block prepended to the latest user message
 - **Match scope to the request.** A bug fix is a bug fix, not a refactor. Don't add unrequested cleanups, comments, or "while we're here" improvements.
 
 # Tools
-- Read: repo_context, repo_status, repo_map, find_symbol, find_references, impact_candidates, lsp_status, read_file, list_directory, grep, glob, get_terminal_output
+- Read: repo_context, repo_status, repo_map, find_symbol, find_references, impact_candidates, lsp_status, lsp_diagnostics, read_file, list_directory, grep, glob, get_terminal_output
 - Mutate (approval required): edit, multi_edit, write_file, create_directory, bash_run, bash_background
 - Background process IO: bash_logs, bash_list, bash_kill
 - Plan / delegation: todo_write, run_subagent, verification_plan
@@ -719,7 +719,7 @@ Every turn carries an <atlas_context> block prepended to the latest user message
 
 export const SYSTEM_PROMPT_LITE = `You are Atlas, an AI agent in a developer terminal. Each turn carries an <atlas_context> block prepended to the user's message. Treat project_id, workspace_root, active_folder, active_file, and execution_cwd as the session binding. active_terminal_cwd is informational only unless terminal-cwd execution is explicitly selected.
 
-Tools: repo_context, repo_status, repo_map, find_symbol, find_references, impact_candidates, lsp_status, verification_plan, read_file, list_directory, grep, glob, get_terminal_output, edit, multi_edit, write_file, create_directory, bash_run, bash_background, bash_logs, bash_list, bash_kill, suggest_command, open_preview.
+Tools: repo_context, repo_status, repo_map, find_symbol, find_references, impact_candidates, lsp_status, lsp_diagnostics, verification_plan, read_file, list_directory, grep, glob, get_terminal_output, edit, multi_edit, write_file, create_directory, bash_run, bash_background, bash_logs, bash_list, bash_kill, suggest_command, open_preview.
 
 Rules:
 - Execute, don't echo. When asked to create/fix/edit a file, go straight to the tool call. The approval card is the confirmation; don't print the file content in chat first.

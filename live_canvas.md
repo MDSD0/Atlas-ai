@@ -261,6 +261,18 @@ Implemented.
 
 Next: Accelerated V1 Slice B lazy LSP process lifecycle, initialize handshake, file synchronization, and TypeScript diagnostics.
 
+## Accelerated V1 Slice B status: lazy TypeScript diagnostics lifecycle
+
+Implemented.
+
+- Added a lazy native JSON-RPC client around an installed `typescript-language-server --stdio`.
+- App boot and repository tools stay independent of LSP health. A server starts only when the agent calls `lsp_diagnostics` for a TypeScript-family file.
+- The client performs initialize, initialized, didOpen/didChange, bounded publish-diagnostics waiting, and shutdown/exit.
+- Status is inspectable: available, connected, unavailable, broken, fresh, cached, or pending states stay explicit.
+- Python and Rust providers remain visible but their diagnostic adapters are deferred rather than implied.
+
+Next: Accelerated V1 Slice C post-edit diagnostic refresh and proof-receipt attachment.
+
 ## Slice 1.3 status: platform-correct path containment (S1)
 
 Done.

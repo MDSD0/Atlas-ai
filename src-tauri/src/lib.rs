@@ -119,6 +119,7 @@ pub fn run() {
         .manage(secrets::SecretsState::default())
         .manage(fs::watch::FsWatchState::default())
         .manage(reality::RealityState::default())
+        .manage(lsp::LspState::default())
         .manage({
             let registry = workspace::WorkspaceRegistry::default();
             workspace::bootstrap_registry(&registry);
@@ -159,6 +160,7 @@ pub fn run() {
             fs::grep::agent_fs_glob,
             reality::agent_reality_context,
             lsp::agent_lsp_status,
+            lsp::agent_lsp_diagnostics,
             git::commands::git_resolve_repo,
             git::commands::git_panel_snapshot,
             git::commands::git_status,

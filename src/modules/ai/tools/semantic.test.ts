@@ -27,4 +27,22 @@ describe("summarizeSemanticAvailability", () => {
       semantic_requests: "not_started",
     });
   });
+
+  it("keeps a connected provider semantically available", () => {
+    expect(
+      summarizeSemanticAvailability([
+        {
+          id: "typescript",
+          language: "typescript",
+          status: "connected",
+          executable: "typescript-language-server",
+          resolved_path: "/bin/typescript-language-server",
+          detail: "connected",
+        },
+      ]),
+    ).toMatchObject({
+      status: "available",
+      semantic_requests: "not_started",
+    });
+  });
 });

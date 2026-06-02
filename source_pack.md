@@ -608,3 +608,30 @@ Applied:
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused Vitest 17 passed, `cargo test --locked lsp::` 3 passed.
 
 Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, Vitest 146 passed (19 files), production build 0 across 3158 modules, cargo check/clippy 0, cargo test 130 lib passed + 2 intentional diagnostics ignored + 3 harness passed.
+
+## Accelerated V1 Slice B: lazy TypeScript LSP diagnostics lifecycle
+
+Source-parity packet:
+
+- Slice: start the first semantic client lazily, honor the LSP initialize lifecycle, synchronize the requested document, and surface bounded TypeScript diagnostics without making boot depend on any language server.
+- Atlas files inspected: `src-tauri/src/modules/{lsp,proc}.rs`, `src-tauri/src/lib.rs`, `src-tauri/Cargo.toml`, `src/modules/ai/lib/native.ts`, and `src/modules/ai/tools/{semantic,tools}.ts`.
+- Primary documentation refreshed: official LSP `3.17` lifecycle, initialize request, initialized notification, shutdown/exit sequence, mandatory `textDocument/didOpen` and `textDocument/didChange` synchronization, `textDocument/publishDiagnostics`, and crash-loop guidance.
+- opensrc refreshed through the authenticated GitHub CLI keyring: `anomalyco/opencode`, `microsoft/language-server-protocol`, and `typescript-language-server/typescript-language-server`.
+- Exact upstream files inspected: `anomalyco/opencode:packages/opencode/src/lsp/{lsp,client}.ts`; `microsoft/language-server-protocol:_specifications/lsp/3.17/{specification.md,general/initialize.md}`; `typescript-language-server:README.md`, `src/{cli,lsp-connection,lsp-server,diagnosticsManager}.ts`.
+- Disposition: `ADAPT` OpenCode's lazy per-root client creation, first TypeScript push-diagnostic seeding, bounded waits, explicit broken-provider state, and finalizer shutdown. Keep Atlas V1 smaller: TypeScript push diagnostics first, one process per project root, no pull-diagnostics negotiation, no hover/definition/reference requests yet, and no restart loop.
+- Disposition: `WRAP` the installed `typescript-language-server --stdio` executable. `REJECT` auto-installing servers, starting them during app boot, hiding initialization failures, or making repo tools depend on semantic availability.
+- Atlas-owned integration: extend the existing optional LSP registry with a small framed JSON-RPC client, authorize root and file at the native boundary, spawn only on `lsp_diagnostics`, send initialize once, then initialized and didOpen/didChange, capture bounded publishDiagnostics, and report connected, pending, unavailable, or broken states explicitly.
+- Tests required: JSON-RPC framing, diagnostic notification parsing, existing provider-routing regressions, lazy-start state, broken-provider visibility, and a Unix fake-server lifecycle test covering initialize before initialized before didOpen and a published diagnostic response.
+
+Applied:
+
+- Added `lsp/client.rs`, a small framed JSON-RPC client. It starts only from `agent_lsp_diagnostics`, sends initialize once, then initialized, synchronizes didOpen/didChange, captures push diagnostics, and performs shutdown then exit when dropped.
+- Kept the first semantic slice intentionally TypeScript-only. Python and Rust providers remain visible but diagnostics return an explicit deferred/unavailable result.
+- Added native `LspState` with one lazy client per project-root/provider pair and sticky broken-provider visibility. `agent_lsp_status` remains a probe and never starts a process.
+- Added `lsp_diagnostics` to the normal loop and read-only subagents. The frontend contract preserves fresh, cached, pending, unavailable, and broken statuses.
+- Used UTF-16 code-unit positions for didChange ranges and case-insensitive JSON-RPC header parsing.
+- Added a self-contained Rust socket-pair lifecycle test, avoiding an interpreter or external language-server dependency in the verification floor.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused semantic Vitest 3 passed, `cargo check --locked --lib` 0, `cargo clippy --all-targets --locked -- -D warnings` 0, `cargo test --locked lsp::` 8 passed.
+
+Verified (clean shell `verify-atlas.sh --all` exit 0): tsc 0, Vitest 147 passed (19 files), production build 0 across 3158 modules, cargo check/clippy 0, cargo test 135 lib passed + 2 intentional diagnostics ignored + 3 harness passed.

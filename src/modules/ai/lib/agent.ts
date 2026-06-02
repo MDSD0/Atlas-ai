@@ -44,6 +44,7 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
     impact_candidates: (i) =>
       `Scoping ${ellipsize(String(i.symbol ?? ""), 40)}`,
     lsp_status: () => "Checking semantic provider",
+    lsp_diagnostics: (i) => `Diagnosing ${shortPath(i.path)}`,
     verification_plan: () => "Planning verification",
     edit: (i) => `Editing ${shortPath(i.path)}`,
     multi_edit: (i) => `Editing ${shortPath(i.path)}`,
