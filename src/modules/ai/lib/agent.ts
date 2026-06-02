@@ -67,6 +67,13 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
     memory_simplemem_stats: () => "Reading SimpleMem stats",
     memory_simplemem_probe: () => "Probing SimpleMem lifecycle",
     memory_lab: () => "Inspecting MemoryLab",
+    memory_surface_status: () => "Checking memory filesystem",
+    memory_surface_enable: () => "Enabling memory filesystem",
+    memory_surface_disable: () => "Disabling memory filesystem",
+    memory_surface_read_index: () => "Reading memory index",
+    memory_surface_search_sessions: (i) =>
+      `Searching session summaries ${ellipsize(String(i.query ?? ""), 40)}`,
+    memory_surface_export_work_packet: () => "Exporting work packet",
     work_packet_generate: () => "Generating work packet",
     work_packet_list: () => "Listing work packets",
     work_packet_inspect: () => "Inspecting work packet",

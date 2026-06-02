@@ -1036,3 +1036,38 @@ Applied:
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused work-packet Vitest `7` passed across `3` files, full Vitest `217` passed across `43` files, and desktop contract smoke passed.
 
 Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `217` passed across `43` files, production build `3205` modules warning-free, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional benchmark, watcher, or host-smoke ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed at `81` frontend and `33` Rust direct runtime dependencies, graph preflight passed, SWE-bench preflight passed, Terminal-Bench preflight passed, and signed-release preflight passed.
+
+## Corrective Slice C8: opt-in harness-native memory filesystem
+
+Source-parity packet:
+
+- Slice: add the memo's human-visible filesystem memory surface without weakening Atlas's explicit workspace-mutation approval law. Preserve LocalRecords as the always-available typed offline ledger and expose `.atlas/memory/` as an opt-in managed surface for a capped index, grep-only session JSONL, topics, and exported packets.
+- Atlas files inspected: `src/modules/ai/memory/`, `src/modules/ai/lib/{native,transport}.ts`, `src/modules/ai/tools/{fs,memory}.ts`, `src/modules/ai/proof/{contracts,recorder}.ts`, `src/modules/ai/components/HarnessInspector.tsx`, and native workspace authorization in `src-tauri/src/modules/{workspace,fs}/`.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh memory filesystem MEMORY.md topics session jsonl handoff claude-code pi` under a bounded timeout; authenticated cache remained available for direct source inspection.
+- Primary documentation refreshed: official Claude Code memory documentation (`https://docs.claude.com/en/docs/claude-code/memory`) and LangChain's official harness-memory article (`https://www.langchain.com/blog/your-harness-your-memory/`).
+- opensrc inspected: `earendil-works/pi:packages/coding-agent/src/core/session-manager.ts`; `packages/coding-agent/docs/session-format.md`; `packages/coding-agent/README.md`; and `anthropics/anthropic-quickstarts:autonomous-coding/{README.md,autonomous_agent_demo.py}`.
+- Claude finding: official docs load project memory files into context, support additional imported memory files, expose `/memory` for direct user editing, and recommend recording project conventions and frequent commands. Atlas should adapt the inspectable filesystem posture, not copy Claude-specific hierarchy wholesale.
+- LangChain finding: cross-session memory is part of the harness's context lifecycle and should remain open, owned, and portable rather than hidden behind a provider API.
+- Pi finding: sessions are append-only JSONL with a header, stable IDs, bounded parsing, explicit resume, and full history kept outside lossy compacted context. Atlas already has a durable proof journal, so it should mirror compact redacted proof-run summaries instead of duplicating Pi's conversation tree.
+- Anthropic quickstart finding: long-running coding sessions resume through project-visible progress artifacts and git while each iteration receives a fresh context window. Persist only the small continuation surface the next run needs.
+- Disposition: `ADAPT` Claude's user-visible project-memory index, Pi's append-only grep-only JSONL posture, and Anthropic's project-visible fresh-context handoff. `PRESERVE` Atlas proof journal and LocalRecords as canonical typed stores. `REQUIRE` one explicit approval before creating managed repository artifacts and explicit approval for packet export. `REJECT` silent repository mutation, raw transcript dumping, provider lock-in, hidden vector storage as the only surface, and a second event runtime.
+- Tests required: fixed managed paths, explicit enable and disable, default index preservation, bounded redacted index injection, idempotent run mirroring, capped JSONL history, lexical session search, explicit packet export, disabled-surface no-op behavior, and lazy inspector visibility.
+
+Applied:
+
+- Added a separate persisted `MemorySurfaceRegistry` for the optional filesystem surface. It creates only the fixed `.atlas/memory/{topics,sessions,work-packets}` hierarchy plus `.atlas/memory/MEMORY.md`, preserves an existing readable index, and does nothing until the approval-gated enable tool succeeds.
+- Injected only the bounded redacted `MEMORY.md` index into agent context, labeled as advisory. LocalRecords stays the canonical typed offline ledger and current repository evidence still outranks memory.
+- Mirrored completed proof runs into per-session append-only JSONL only while the filesystem surface is enabled. Entries are redacted, idempotent by run id, capped at `8 KiB`, and retained inside a `256 KiB` session file. Raw conversation history remains outside prompt context.
+- Added filesystem status, enable, disable, index-read, grep-only session-search, and packet-export agent tools. Repository artifact creation, disabling, and packet export are approval gated; read-only subagents receive only status, index-read, and lexical-search operations.
+- Routed optional work-packet materialization through the managed filesystem surface instead of a generic write suggestion. Packet export remains a separately approved repository mutation.
+- Extended the lazy Reality Memory inspector with filesystem-surface state and index path visibility. Extended desktop smoke with explicit registration checks for all six filesystem-memory tools.
+- Added deterministic regressions for existing-index preservation, disabled no-op behavior, index and proof redaction, duplicate-run suppression, adversarial entry compaction, capped JSONL retention, lexical search, packet export, approval gating, and read-only subagent exposure.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, focused filesystem-memory Vitest `6` passed across `2` files, and desktop contract smoke passed.
+
+Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `223` passed across `45` files, production build `3206` modules warning-free, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional benchmark, watcher, or host-smoke ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed at `81` frontend and `33` Rust direct runtime dependencies, graph preflight passed, SWE-bench preflight passed, Terminal-Bench preflight passed, and signed-release preflight passed.
+
+Packaged-host follow-up:
+
+- Debug `.app` rebuild produced the macOS application bundle and updater tarball, then stopped at the expected local signing boundary because `TAURI_SIGNING_PRIVATE_KEY` is intentionally absent from the shell.
+- Click-driven packaged macOS evidence: bound the real Atlas repository, opened Reality, selected Memory, and observed `local_records`, `0` active records, `0` stale records, `Filesystem surface disabled`, `Work packets (0)`, and both empty-state messages in the combined inspector. No `.atlas/memory` repository artifacts were created during inspection.

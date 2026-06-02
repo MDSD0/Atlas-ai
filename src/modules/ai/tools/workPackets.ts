@@ -28,7 +28,7 @@ export function buildWorkPacketTools(ctx: ToolContext) {
   return {
     work_packet_generate: tool({
       description:
-        "Generate one bounded resumable work packet for the active session. Atlas derives changed files, checks, failures, and proof references from its proof journal. This persists app-local state only. To materialize the returned Markdown under .atlas/memory/work-packets/, use the normal approval-gated write_file tool.",
+        "Generate one bounded resumable work packet for the active session. Atlas derives changed files, checks, failures, and proof references from its proof journal. This persists app-local state only. To materialize the returned Markdown under .atlas/memory/work-packets/, enable the opt-in filesystem surface and use the separately approval-gated memory_surface_export_work_packet tool.",
       inputSchema: z.object({
         original_goal: z.string().min(1),
         accepted_interpretation: z.string().min(1),

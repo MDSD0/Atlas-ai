@@ -580,3 +580,20 @@ Done at frontend verification layer; clean release qualification follows before 
 - Clean-shell release qualification green: production build `3205` modules warning-free, Cargo check and Clippy 0, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, graph preflight, SWE-bench preflight, Terminal-Bench preflight, and signed-release preflight.
 
 Next: implement the opt-in filesystem memory surface, then rebuild the debug package and click-check the combined memory inspector in the packaged host.
+
+## Post-V1 corrective Slice C8 status: opt-in harness-native memory filesystem
+
+Done at merge-gate layer; packaged-host inspection follows.
+
+- Added a separate opt-in `.atlas/memory/` surface with a small editable `MEMORY.md`, `topics/`, capped grep-only `sessions/*.jsonl`, and exported `work-packets/*.md`.
+- LocalRecords and the proof journal remain canonical. The visible filesystem surface is portable and advisory, not a second event runtime or hidden provider dependency.
+- Enabling the surface, disabling automatic use, and exporting a packet are approval gated. Atlas never silently creates repository artifacts.
+- Only bounded redacted `MEMORY.md` enters prompt context. Completed proof runs mirror into capped redacted JSONL after opt-in; raw transcripts remain outside the prompt.
+- Read-only subagents receive status, index read, and lexical session search only. The lazy Reality Memory tab exposes filesystem status and the active index path.
+- Added adversarial serializer coverage so a large proof verdict still produces a valid JSONL entry at or below `8 KiB`, plus fixed-path, preservation, redaction, idempotence, retention-cap, packet-export, approval, and read-only tool tests.
+- Focused green: diff check 0, TypeScript 0, filesystem-memory Vitest `6` across `2` files, and desktop contract smoke.
+- Clean-shell release qualification green: Vitest `223` across `45` files, warning-free build `3206` modules, Cargo check and Clippy 0, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, graph preflight, SWE-bench preflight, Terminal-Bench preflight, and signed-release preflight.
+
+Packaged macOS click evidence green: bound the real Atlas repository, opened Reality Memory, and observed `local_records`, `0` active records, `0` stale records, `Filesystem surface disabled`, `Work packets (0)`, and both empty states together. The disabled default is truthful and the inspection created no `.atlas/memory` artifacts.
+
+Next: continue the final-memo audit for remaining locally solvable harness gaps.

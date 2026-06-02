@@ -15,7 +15,7 @@ import {
   Search as SearchIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { localRecords } from "../memory";
+import { localRecords, memorySurface } from "../memory";
 import type { LocalMetricRecord } from "../metrics/contracts";
 import { localMetrics } from "../metrics";
 import { mcpRegistry } from "../mcp";
@@ -41,6 +41,7 @@ type MemoryData = {
   stats: Awaited<ReturnType<typeof localRecords.stats>>;
   records: Awaited<ReturnType<typeof localRecords.list>>;
   packets: Awaited<ReturnType<typeof workPacketRegistry.list>>;
+  surface: Awaited<ReturnType<typeof memorySurface.status>>;
 };
 
 type ExtensionsData = {
@@ -295,7 +296,16 @@ function MemoryTab({ data }: { data: MemoryData | null }) {
           <span className="text-muted-foreground">Stale records</span>
           <span>{data.stats.stale}</span>
         </div>
+        <div className="flex justify-between py-1.5">
+          <span className="text-muted-foreground">Filesystem surface</span>
+          <span>{data.surface.enabled ? "enabled" : "disabled"}</span>
+        </div>
       </div>
+      {data.surface.enabled && (
+        <div className="text-[10px] text-muted-foreground">
+          index: {data.surface.indexPath}
+        </div>
+      )}
       <div>
         <div className="font-medium text-foreground/90">
           Work packets ({data.packets.length})
@@ -508,12 +518,13 @@ export function HarnessInspector({
       if (tab === "proof") {
         setProofRuns(await proofJournal.restore());
       } else if (tab === "memory") {
-        const [stats, records, packets] = await Promise.all([
+        const [stats, records, packets, surface] = await Promise.all([
           localRecords.stats(workspaceRoot),
           localRecords.list(workspaceRoot, true),
           workPacketRegistry.list(workspaceRoot),
+          memorySurface.status(workspaceRoot),
         ]);
-        setMemory({ stats, records, packets });
+        setMemory({ stats, records, packets, surface });
       } else if (tab === "extensions") {
         const [skills, mcp, servers] = await Promise.all([
           skillRegistry.list(),

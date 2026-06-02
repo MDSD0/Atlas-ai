@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   buildMemoryLabReport,
   localRecords,
+  memorySurface,
   probeSimpleMem,
   simpleMemConfig,
   type MemoryRecordKind,
@@ -14,6 +15,7 @@ import {
   validateWithinWorkspace,
   type ToolContext,
 } from "@/modules/ai/tools/context";
+import { workPacketRegistry } from "@/modules/ai/workPackets";
 
 const memoryKind = z.enum([
   "fact",
@@ -74,6 +76,107 @@ export function buildMemoryTools(ctx: ToolContext) {
           simplemem_config: config,
           simplemem: await adapter.health(),
         };
+      },
+    }),
+
+    memory_surface_status: tool({
+      description:
+        "Inspect the optional human-visible .atlas/memory filesystem surface. LocalRecords remains available even while this repository artifact surface is disabled.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const root = projectRoot(ctx);
+        return typeof root === "string" ? memorySurface.status(root) : root;
+      },
+    }),
+
+    memory_surface_enable: tool({
+      description:
+        "Create and enable the managed .atlas/memory filesystem surface after explicit user approval. Initializes a small editable MEMORY.md index plus topics/, sessions/, and work-packets/ directories. Existing readable MEMORY.md content is preserved.",
+      inputSchema: z.object({ confirm: z.literal(true) }),
+      needsApproval: true,
+      execute: async () => {
+        const root = projectRoot(ctx);
+        if (typeof root !== "string") return root;
+        try {
+          return await memorySurface.enable(root);
+        } catch (error) {
+          return { error: String(error) };
+        }
+      },
+    }),
+
+    memory_surface_disable: tool({
+      description:
+        "Disable automatic use of the managed .atlas/memory filesystem surface. Existing project artifacts remain untouched.",
+      inputSchema: z.object({ confirm: z.literal(true) }),
+      needsApproval: true,
+      execute: async () => {
+        const root = projectRoot(ctx);
+        if (typeof root !== "string") return root;
+        try {
+          return await memorySurface.disable(root);
+        } catch (error) {
+          return { error: String(error) };
+        }
+      },
+    }),
+
+    memory_surface_read_index: tool({
+      description:
+        "Read the bounded user-editable .atlas/memory/MEMORY.md project index. It is advisory context; verify current repository evidence before editing.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const root = projectRoot(ctx);
+        if (typeof root !== "string") return root;
+        try {
+          return {
+            provider: "filesystem",
+            path: ".atlas/memory/MEMORY.md",
+            content: await memorySurface.readIndex(root),
+          };
+        } catch (error) {
+          return { error: String(error) };
+        }
+      },
+    }),
+
+    memory_surface_search_sessions: tool({
+      description:
+        "Lexically search capped grep-only .atlas/memory/sessions/*.jsonl proof-run summaries. Raw session history stays outside prompt context.",
+      inputSchema: z.object({
+        query: z.string().min(1),
+        max_results: z.number().int().min(1).max(100).optional(),
+      }),
+      execute: async ({ query, max_results }) => {
+        const root = projectRoot(ctx);
+        if (typeof root !== "string") return root;
+        try {
+          return await memorySurface.searchSessions(root, query, max_results);
+        } catch (error) {
+          return { error: String(error) };
+        }
+      },
+    }),
+
+    memory_surface_export_work_packet: tool({
+      description:
+        "Export one app-local Atlas work packet into .atlas/memory/work-packets/<id>.md after explicit user approval.",
+      inputSchema: z.object({ id: z.string().min(1) }),
+      needsApproval: true,
+      execute: async ({ id }) => {
+        const root = projectRoot(ctx);
+        if (typeof root !== "string") return root;
+        const packet = await workPacketRegistry.get(root, id);
+        if (!packet) return { error: "work packet not found" };
+        try {
+          return {
+            id,
+            path: await memorySurface.exportWorkPacket(root, packet),
+            exported: true,
+          };
+        } catch (error) {
+          return { error: String(error) };
+        }
       },
     }),
 
@@ -268,5 +371,8 @@ export function buildReadOnlyMemoryTools(ctx: ToolContext) {
     memory_list: tools.memory_list,
     memory_simplemem_stats: tools.memory_simplemem_stats,
     memory_lab: tools.memory_lab,
+    memory_surface_status: tools.memory_surface_status,
+    memory_surface_read_index: tools.memory_surface_read_index,
+    memory_surface_search_sessions: tools.memory_surface_search_sessions,
   } as const;
 }

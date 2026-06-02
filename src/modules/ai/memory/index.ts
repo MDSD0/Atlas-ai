@@ -5,6 +5,7 @@ import { TauriMemoryPersistence } from "@/modules/ai/memory/persistence";
 export * from "@/modules/ai/memory/contracts";
 export * from "@/modules/ai/memory/localRecords";
 export * from "@/modules/ai/memory/memoryLab";
+export * from "@/modules/ai/memory/memorySurface";
 export * from "@/modules/ai/memory/persistence";
 export * from "@/modules/ai/memory/simpleMem";
 export * from "@/modules/ai/memory/simpleMemConfig";

@@ -7,6 +7,7 @@ const read = (path) => readFileSync(resolve(root, path), "utf8");
 const config = JSON.parse(read("src-tauri/tauri.conf.json"));
 const native = read("src-tauri/src/lib.rs");
 const tools = read("src/modules/ai/tools/tools.ts");
+const memoryTools = read("src/modules/ai/tools/memory.ts");
 const miniWindow = read("src/modules/ai/components/AiMiniWindow.tsx");
 
 assert.equal(config.build.devUrl, "http://localhost:1420");
@@ -36,6 +37,16 @@ for (const toolBuilder of [
 ]) {
   assert.match(tools, new RegExp(toolBuilder));
 }
+for (const memorySurfaceTool of [
+  "memory_surface_status",
+  "memory_surface_enable",
+  "memory_surface_disable",
+  "memory_surface_read_index",
+  "memory_surface_search_sessions",
+  "memory_surface_export_work_packet",
+]) {
+  assert.match(memoryTools, new RegExp(memorySurfaceTool));
+}
 assert.match(miniWindow, /<ReceiptStrip/);
 
 console.log(JSON.stringify({
@@ -52,7 +63,7 @@ console.log(JSON.stringify({
     "graceful LSP commands",
     "lazy RMCP stdio commands",
     "shell command lane",
-    "memory MCP metrics and work packet tool registration",
+    "memory MCP metrics work packet and filesystem surface tool registration",
     "proof receipt mount",
   ],
 }, null, 2));

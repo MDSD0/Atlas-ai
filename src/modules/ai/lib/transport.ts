@@ -13,6 +13,8 @@ import { RunRecorder } from "../proof/recorder";
 import { useProofStore } from "../store/proofStore";
 import {
   buildLocalMemoryContext,
+  buildMemorySurfaceContext,
+  mirrorProofRunToMemorySurface,
   SimpleMemRunObserver,
 } from "../memory";
 import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
@@ -92,14 +94,15 @@ export function createContextAwareTransport(deps: Deps) {
       contentSessionId: deps.toolContext.getSessionId() ?? "unknown",
       userPrompt: prompt,
     }).catch(() => null);
-    const [atlasMd, localMemory, activeWorkPacket, localSkills] = await Promise.all([
+    const [atlasMd, fileMemory, localMemory, activeWorkPacket, localSkills] = await Promise.all([
       readAtlasMd(live.workspaceRoot),
+      buildMemorySurfaceContext(live.workspaceRoot),
       buildLocalMemoryContext(live.workspaceRoot, prompt),
       buildActiveWorkPacketContext(live.workspaceRoot),
       buildLocalSkillsContext(),
     ]);
     const projectMemory =
-      [atlasMd, localMemory, activeWorkPacket, simpleMem?.context, localSkills]
+      [atlasMd, fileMemory, localMemory, activeWorkPacket, simpleMem?.context, localSkills]
         .filter(Boolean)
         .join("\n\n") || null;
     const contextBlock = atlasContextBlock(live.project);
@@ -136,7 +139,14 @@ export function createContextAwareTransport(deps: Deps) {
       outcome: { cancelled?: boolean; errored?: boolean } = {},
     ) => {
       await Promise.all([
-        recorder?.finish(outcome).catch(() => {}),
+        (async () => {
+          await recorder?.finish(outcome).catch(() => {});
+          if (!recorder) return;
+          const run = await proofJournal.getRun(recorder.runId).catch(() => null);
+          await mirrorProofRunToMemorySurface(live.workspaceRoot, run).catch(
+            () => {},
+          );
+        })(),
         simpleMem?.finish().catch(() => {}),
       ]);
     };
