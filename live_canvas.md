@@ -566,3 +566,17 @@ Full clean-shell qualification green: TypeScript 0, Vitest `210` passed across `
 Packaged macOS click evidence green: the real Atlas repository rendered `667` files, `28,142` symbols, `13,124` weighted links, a bounded `24`-node SVG overview, task context, empty-session proof, local-memory state, disabled MCP transport state, and populated reliability metrics. Startup stayed silent with no new updater failure.
 
 Next: continue the final-memo audit for remaining locally solvable harness gaps, then finish external and cross-platform release signoff where prerequisites permit it.
+
+## Post-V1 corrective Slice C7 status: resumable work-packet compiler
+
+Done at frontend verification layer; clean release qualification follows before checkpoint.
+
+- Added bounded app-local work packets with goal, interpretation, status, decisions, blockers, next action, proof refs, proof-derived changed files, shell checks, and failures.
+- Added approval-gated generation and deletion plus read-only list, inspect, and resume tools. Read-only subagents receive the inspectable resume operations.
+- Latest active packet context enters the next prompt as a bounded advisory capsule with an explicit fresh-repository-evidence rule.
+- Optional `.atlas/memory/work-packets/<id>.md` materialization remains explicit through the normal approved `write_file` lane; Atlas does not silently mutate repositories.
+- Reality Memory now lazily shows work packets beside local records.
+- Focused green: diff check 0, TypeScript 0, packet Vitest `7`, full Vitest `217` across `43` files, and desktop contract smoke.
+- Clean-shell release qualification green: production build `3205` modules warning-free, Cargo check and Clippy 0, Rust `144 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, graph preflight, SWE-bench preflight, Terminal-Bench preflight, and signed-release preflight.
+
+Next: implement the opt-in filesystem memory surface, then rebuild the debug package and click-check the combined memory inspector in the packaged host.

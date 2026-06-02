@@ -12,6 +12,7 @@ import { buildRealityTools } from "../tools/reality";
 import { buildSearchTools } from "../tools/search";
 import { buildSemanticTools } from "../tools/semantic";
 import { buildVerificationTools } from "../tools/verification";
+import { buildReadOnlyWorkPacketTools } from "../tools/workPackets";
 import { SUBAGENTS, type SubagentType } from "./registry";
 
 const SUBAGENT_MAX_STEPS = 12;
@@ -53,6 +54,7 @@ export async function runSubagent({
     ...buildSearchTools(toolContext),
     ...buildSemanticTools(toolContext),
     ...buildVerificationTools(),
+    ...buildReadOnlyWorkPacketTools(toolContext),
   };
   const readOnly: Record<string, unknown> = {
     ...baseReadOnly,

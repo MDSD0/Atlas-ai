@@ -32,6 +32,7 @@ for (const toolBuilder of [
   "buildMetricsTools",
   "buildRealityTools",
   "buildSemanticTools",
+  "buildWorkPacketTools",
 ]) {
   assert.match(tools, new RegExp(toolBuilder));
 }
@@ -51,7 +52,7 @@ console.log(JSON.stringify({
     "graceful LSP commands",
     "lazy RMCP stdio commands",
     "shell command lane",
-    "memory MCP and metrics tool registration",
+    "memory MCP metrics and work packet tool registration",
     "proof receipt mount",
   ],
 }, null, 2));

@@ -16,6 +16,7 @@ import {
   SimpleMemRunObserver,
 } from "../memory";
 import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
+import { buildActiveWorkPacketContext } from "../workPackets";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -91,13 +92,14 @@ export function createContextAwareTransport(deps: Deps) {
       contentSessionId: deps.toolContext.getSessionId() ?? "unknown",
       userPrompt: prompt,
     }).catch(() => null);
-    const [atlasMd, localMemory, localSkills] = await Promise.all([
+    const [atlasMd, localMemory, activeWorkPacket, localSkills] = await Promise.all([
       readAtlasMd(live.workspaceRoot),
       buildLocalMemoryContext(live.workspaceRoot, prompt),
+      buildActiveWorkPacketContext(live.workspaceRoot),
       buildLocalSkillsContext(),
     ]);
     const projectMemory =
-      [atlasMd, localMemory, simpleMem?.context, localSkills]
+      [atlasMd, localMemory, activeWorkPacket, simpleMem?.context, localSkills]
         .filter(Boolean)
         .join("\n\n") || null;
     const contextBlock = atlasContextBlock(live.project);

@@ -19,6 +19,7 @@ import { localRecords } from "../memory";
 import type { LocalMetricRecord } from "../metrics/contracts";
 import { localMetrics } from "../metrics";
 import { mcpRegistry } from "../mcp";
+import { workPacketRegistry } from "../workPackets";
 import type { ProofRun } from "../proof/contracts";
 import { proofJournal } from "../proof";
 import { skillRegistry } from "../skills";
@@ -39,6 +40,7 @@ type InspectorTab =
 type MemoryData = {
   stats: Awaited<ReturnType<typeof localRecords.stats>>;
   records: Awaited<ReturnType<typeof localRecords.list>>;
+  packets: Awaited<ReturnType<typeof workPacketRegistry.list>>;
 };
 
 type ExtensionsData = {
@@ -294,6 +296,33 @@ function MemoryTab({ data }: { data: MemoryData | null }) {
           <span>{data.stats.stale}</span>
         </div>
       </div>
+      <div>
+        <div className="font-medium text-foreground/90">
+          Work packets ({data.packets.length})
+        </div>
+        {data.packets.length === 0
+          ? empty("No resumable work packets for this project.")
+          : data.packets.slice(0, 20).map((packet) => (
+              <details key={packet.id} className="mt-1 border-b border-border/60 pb-1.5">
+                <summary className="cursor-pointer text-foreground/90">
+                  {packet.status}
+                  {" - "}
+                  <span className="text-muted-foreground">
+                    {packet.originalGoal}
+                  </span>
+                </summary>
+                <div className="mt-1 break-words text-muted-foreground">
+                  next: {packet.nextSuggestedAction}
+                </div>
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  packet: {packet.id}
+                </div>
+                <div className="text-[10px] text-muted-foreground">
+                  proof refs: {packet.proofRunIds.length}
+                </div>
+              </details>
+            ))}
+      </div>
       {data.records.length === 0
         ? empty("No local memory records for this project.")
         : data.records.slice(0, 30).map((record) => (
@@ -479,11 +508,12 @@ export function HarnessInspector({
       if (tab === "proof") {
         setProofRuns(await proofJournal.restore());
       } else if (tab === "memory") {
-        const [stats, records] = await Promise.all([
+        const [stats, records, packets] = await Promise.all([
           localRecords.stats(workspaceRoot),
           localRecords.list(workspaceRoot, true),
+          workPacketRegistry.list(workspaceRoot),
         ]);
-        setMemory({ stats, records });
+        setMemory({ stats, records, packets });
       } else if (tab === "extensions") {
         const [skills, mcp, servers] = await Promise.all([
           skillRegistry.list(),
