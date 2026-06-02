@@ -5,6 +5,7 @@
 #   --desktop  desktop contract smoke
 #   --eval     deterministic golden eval
 #   --deps     accelerated dependency review
+#   --graph    optional graph-provider preflight
 #   --all      everything required before merge
 # See ATLAS_EXECUTION_PLAN.md section 7.3.
 set -euo pipefail
@@ -62,6 +63,10 @@ deps() {
   run node scripts/review-dependencies.mjs
 }
 
+graph() {
+  run node scripts/codebase-memory-preflight.mjs
+}
+
 case "$mode" in
   --fast)
     frontend
@@ -78,6 +83,9 @@ case "$mode" in
   --deps)
     deps
     ;;
+  --graph)
+    graph
+    ;;
   --all)
     frontend
     build
@@ -85,9 +93,10 @@ case "$mode" in
     evals
     desktop
     deps
+    graph
     ;;
   *)
-    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--deps|--all]\n' >&2
+    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--deps|--graph|--all]\n' >&2
     exit 2
     ;;
 esac

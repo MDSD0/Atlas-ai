@@ -22,6 +22,9 @@ const RESPONSE: RepoContextResponse = {
   max_tokens: 256,
   projected_tokens: 40,
   naive_tokens: 100,
+  ranking_strategy: "aider_weighted_pagerank",
+  graph_edge_count: 3,
+  rank_iterations: 24,
   included_files: ["/repo/a.ts", "/repo/b.ts"],
   excluded_files: 1,
   degraded_files: [{ path: "/repo/c.ts", status: "parse_failed" }],
@@ -67,6 +70,7 @@ describe("repo reality helpers", () => {
     const summary = summarizeRepoStatus(RESPONSE);
     expect(summary.watch_status).toBe("snapshot_ttl");
     expect(summary.degraded_files).toHaveLength(1);
+    expect(summary.ranking_strategy).toBe("aider_weighted_pagerank");
     expect(summary).not.toHaveProperty("context");
   });
 });

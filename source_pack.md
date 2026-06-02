@@ -876,3 +876,32 @@ Applied:
 Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, Vitest `204` passed across `38` files, focused LSP Rust tests `12` passed plus `1` intentional host smoke ignored by default, explicit installed-`clangd` smoke passed, and Clippy 0.
 
 Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `204` passed across `38` files, production build `3195` modules, Cargo check 0, Clippy 0, Rust `139` passed plus `3` intentional diagnostic or host-smoke ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, and dependency review passed. Existing Rollup circular-chunk warnings remain visible and unchanged.
+
+## Corrective Slice C3: Aider-style repo-map ranking parity
+
+Source-parity packet:
+
+- Slice: improve the existing bounded Tree-sitter repository projection with a measured file-graph ranker, then expose an honest selective comparison lane for broader code-graph providers.
+- Atlas files inspected: `src-tauri/src/modules/reality/{index,projection,mod}.rs`, `src/modules/ai/lib/native.ts`, `src/modules/ai/tools/reality.ts`, the reality frontend tests, and `tests/fixtures/mixed-stack/`.
+- opensrc hook: ran `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh repo-reality repo-map ranking pagerank graph impact codebase-memory aider repomap`; authenticated refresh resolved Aider, grep-ast, Serena, Codebase-Memory MCP, RepoMaster, Graphiti, Tree-sitter, SCIP, and the official LSP repository.
+- Primary documentation refreshed: official Aider repository-map documentation (`https://aider.chat/docs/repomap.html`) and the upstream Codebase-Memory MCP README (`https://github.com/DeusData/codebase-memory-mcp`).
+- opensrc inspected: `Aider-AI/aider:aider/repomap.py`; `DeusData/codebase-memory-mcp:{README.md,src/graph_buffer/graph_buffer.h,src/semantic/semantic.c}`.
+- Aider finding: repository-map ranking is a weighted directed file graph built from symbol definitions and references. It boosts mentioned identifiers and distinctive structured identifiers, suppresses private and high-fanout symbols, weights repeated references by square root, runs weighted PageRank, and preserves a bounded snippet budget.
+- Codebase-Memory finding: upstream offers a much broader persistent graph with structural queries, call-path tracing, change detection, architecture summaries, and optional semantic layers. Those capabilities are useful comparison targets, but importing them wholesale would duplicate Atlas indexing and widen the persistence boundary.
+- Host preflight on `2026-06-02`: `codebase-memory-mcp` and `aider` are not installed on this machine. External comparison must remain optional and report unavailable state honestly rather than silently installing a provider.
+- Disposition: `ADAPT` Aider's measured file-level weighted PageRank into the existing in-memory Tree-sitter projection with deterministic iteration limits and no new dependency. Preserve direct task relevance and strict token budgeting.
+- Disposition: `STUDY` Codebase-Memory MCP as an optional selective comparator. Add a preflight and sample command plan only; do not auto-install, index, persist, or attach an external graph provider.
+- Tests required: deterministic weighted ranking, mentioned structured-symbol boost, noisy high-fanout suppression, graph metadata visibility, strict context budget, mixed-stack recall, and honest absent-provider preflight.
+
+Applied:
+
+- Added `reality/ranking.rs`: a deterministic dependency-free file graph ranker adapted from Aider's measured repo-map algorithm. It builds definition/reference edges from Atlas's existing Tree-sitter snapshot, applies mentioned-identifier and structured-name boosts, suppresses private and high-fanout names, scales repeated references by square root, and runs `24` weighted PageRank iterations.
+- Preserved the existing direct task-match scoring and strict context character budget. Graph rank is a bounded additional signal, not a replacement for obvious file matches or current repository evidence.
+- Exposed `ranking_strategy`, `graph_edge_count`, and `rank_iterations` in the native response and compact repository status summary.
+- Added `scripts/codebase-memory-preflight.mjs` and the `verify-atlas.sh --graph` gate. It checks the optional provider without installing or running it and prints a reviewed selective sample plan for `index_repository`, schema, symbol search, and call-path tracing.
+- Host preflight reports `codebase-memory-mcp: unavailable_not_installed`, which is an acceptable optional-provider state.
+- Added focused native tests for referenced-definition lift, Aider weighting factors, deterministic output, existing strict budget, and mixed-stack recall.
+
+Focused verification: `git diff --check` 0, `pnpm exec tsc --noEmit` 0, reality Rust tests `12` passed, Clippy 0, and `bash scripts/verify-atlas.sh --graph` passed with honest absent-provider output.
+
+Full clean-shell qualification: `scripts/release-qualify.sh` exit `0`; TypeScript 0, Vitest `204` passed across `38` files, production build `3195` modules, Cargo check 0, Clippy 0, Rust `142` passed plus `3` intentional ignores, fixture harness `3` passed, golden eval passed, desktop contract smoke passed, dependency review passed, and the Codebase-Memory optional-provider preflight passed.

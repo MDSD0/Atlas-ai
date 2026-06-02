@@ -64,6 +64,9 @@ export function summarizeRepoStatus(response: RepoContextResponse) {
     skipped_dirs: response.skipped_dirs,
     truncated: response.truncated,
     excluded_files: response.excluded_files,
+    ranking_strategy: response.ranking_strategy,
+    graph_edge_count: response.graph_edge_count,
+    rank_iterations: response.rank_iterations,
     degraded_files: response.degraded_files,
   };
 }

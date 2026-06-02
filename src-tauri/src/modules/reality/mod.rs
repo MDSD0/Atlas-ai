@@ -1,5 +1,6 @@
 mod index;
 mod projection;
+mod ranking;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

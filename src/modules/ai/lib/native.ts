@@ -58,6 +58,9 @@ export type RepoContextResponse = {
   max_tokens: number;
   projected_tokens: number;
   naive_tokens: number;
+  ranking_strategy: string;
+  graph_edge_count: number;
+  rank_iterations: number;
   included_files: string[];
   excluded_files: number;
   degraded_files: Array<{ path: string; status: string }>;

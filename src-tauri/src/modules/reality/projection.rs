@@ -4,6 +4,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use super::index::{RealitySnapshot, SymbolRecord};
+use super::ranking::{rank_files, RANK_ITERATIONS};
 
 const MAX_MATCHES: usize = 100;
 const MAX_DEGRADED_FILES: usize = 100;
@@ -41,6 +42,9 @@ pub struct RealityContextResponse {
     pub max_tokens: usize,
     pub projected_tokens: usize,
     pub naive_tokens: usize,
+    pub ranking_strategy: String,
+    pub graph_edge_count: usize,
+    pub rank_iterations: usize,
     pub included_files: Vec<String>,
     pub excluded_files: usize,
     pub degraded_files: Vec<DegradedFile>,
@@ -55,35 +59,47 @@ pub fn project(
     cache_hit: bool,
 ) -> RealityContextResponse {
     let terms = identifiers(task);
-    let mut scores: HashMap<&str, usize> = snapshot
+    let mut scores: HashMap<&str, f64> = snapshot
         .files
         .iter()
-        .map(|file| (file.path.as_str(), 1))
+        .map(|file| (file.path.as_str(), 1.0))
         .collect();
     let mut mentioned_symbols = HashSet::new();
 
     for file in &snapshot.files {
         let path = file.path.to_lowercase();
         if terms.iter().any(|term| path.contains(term)) {
-            *scores.entry(&file.path).or_default() += 20;
+            *scores.entry(&file.path).or_default() += 20.0;
         }
     }
     for symbol in &snapshot.symbols {
         let name = symbol.name.to_lowercase();
         if terms.contains(&name) {
             mentioned_symbols.insert(name);
-            *scores.entry(&symbol.path).or_default() += if symbol.is_definition { 120 } else { 30 };
+            *scores.entry(&symbol.path).or_default() +=
+                if symbol.is_definition { 120.0 } else { 30.0 };
         }
     }
     for symbol in &snapshot.symbols {
         if mentioned_symbols.contains(&symbol.name.to_lowercase()) {
-            *scores.entry(&symbol.path).or_default() += if symbol.is_definition { 40 } else { 10 };
+            *scores.entry(&symbol.path).or_default() +=
+                if symbol.is_definition { 40.0 } else { 10.0 };
         }
     }
 
-    let mut ranked: Vec<(&str, usize)> = scores.into_iter().collect();
+    let graph_ranking = rank_files(&snapshot.files, &snapshot.symbols, &terms);
+    for file in &snapshot.files {
+        *scores.entry(&file.path).or_default() += graph_ranking
+            .scores
+            .get(&file.path)
+            .copied()
+            .unwrap_or_default()
+            * 100.0;
+    }
+
+    let mut ranked: Vec<(&str, f64)> = scores.into_iter().collect();
     ranked.sort_by(|(path_a, score_a), (path_b, score_b)| {
-        score_b.cmp(score_a).then_with(|| path_a.cmp(path_b))
+        score_b.total_cmp(score_a).then_with(|| path_a.cmp(path_b))
     });
 
     let max_chars = max_tokens.saturating_mul(4);
@@ -152,6 +168,9 @@ pub fn project(
         max_tokens,
         projected_tokens: context.chars().count().div_ceil(4),
         naive_tokens: snapshot.naive_tokens,
+        ranking_strategy: "aider_weighted_pagerank".to_string(),
+        graph_edge_count: graph_ranking.edge_count,
+        rank_iterations: RANK_ITERATIONS,
         included_files: included_files.clone(),
         excluded_files: ranked.len().saturating_sub(included_files.len()),
         degraded_files,

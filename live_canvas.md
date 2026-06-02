@@ -503,3 +503,16 @@ Focused green: `git diff --check` 0, tsc 0, Vitest `204` passed (38 files), focu
 Green (clean shell `release-qualify.sh`): tsc 0, Vitest `204` passed (38 files), build 0 across `3195` modules, cargo check/clippy 0, cargo test `139 + 3` with `3` intentional diagnostic or host-smoke ignores, golden eval passed, desktop contract smoke passed, dependency review passed.
 
 Next: corrective Slice C3 Aider-style repo-map ranking parity and selective graph quality measurement.
+
+## Post-V1 corrective Slice C3 status: Aider-style repo-map ranking
+
+Done at focused-check layer; full release qualification follows before checkpoint.
+
+- Added a deterministic dependency-free weighted file graph ranker over the existing Tree-sitter snapshot, adapted from Aider's repository map implementation.
+- Direct task matches still protect obvious files. Graph rank adds a bounded relevance signal from definition/reference edges under the existing token budget.
+- Repository context now reports the ranking strategy, weighted graph edge count, and fixed iteration count for inspection.
+- Added an optional Codebase-Memory MCP preflight. It never auto-installs or indexes; on this host it honestly reports `unavailable_not_installed` and prints the reviewed selective comparison commands.
+- Focused green: diff check 0, tsc 0, reality Rust tests `12` passed, Clippy 0, graph preflight passed.
+- Clean-shell release qualification green: Vitest `204`, build `3195` modules, Rust `142 + 3` intentional ignores, harness `3`, eval, desktop contract, dependency review, and graph preflight.
+
+Next: corrective Slice C4 pinned MCP stdio transport adapter behind the disabled-by-default policy boundary.
