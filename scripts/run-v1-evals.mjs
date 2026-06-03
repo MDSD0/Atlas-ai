@@ -42,6 +42,46 @@ try {
     narrowTest: "node --test test/cart.test.mjs",
     receiptTruth: { beforeExit: failing.status, afterExit: passing.status },
   }, null, 2));
+
+  // Repo-brain go/no-go: surface the measured projection numbers the native
+  // gate already enforces, so the thesis (key-file recall, no same-name
+  // wrong-file, token efficiency) is reported as evidence, not just asserted.
+  const gate = spawnSync(
+    "cargo",
+    [
+      "test",
+      "--locked",
+      "--manifest-path",
+      "src-tauri/Cargo.toml",
+      "reality::projection::tests::mixed_stack_fixture_meets_first_projection_gate",
+      "--",
+      "--nocapture",
+    ],
+    { cwd: root, encoding: "utf8", env: { ...process.env, CARGO_BUILD_JOBS: "2" } },
+  );
+  assert.equal(gate.status, 0, gate.stderr || gate.stdout);
+  const line = `${gate.stdout}\n${gate.stderr}`
+    .split("\n")
+    .find((l) => l.includes("ATLAS_GO_NO_GO"));
+  assert.ok(line, "native gate did not emit ATLAS_GO_NO_GO measurement");
+  const metrics = JSON.parse(line.slice(line.indexOf("{")));
+  assert.ok(metrics.recall >= 0.85, `recall ${metrics.recall} < 0.85`);
+  assert.equal(metrics.wrong_file_hits, 0, "same-name decoy leaked into results");
+  assert.ok(
+    metrics.token_ratio_pct <= 40,
+    `token ratio ${metrics.token_ratio_pct}% > 40%`,
+  );
+  console.log(JSON.stringify({
+    eval: "repo-brain-go-no-go",
+    status: "passed",
+    fixture: "mixed-stack",
+    keyFileRecall: metrics.recall,
+    wrongFileEdits: metrics.wrong_file_hits,
+    tokenRatioPct: metrics.token_ratio_pct,
+    projectedTokens: metrics.projected_tokens,
+    naiveTokens: metrics.naive_tokens,
+    gates: { recall: ">= 0.85", wrongFileEdits: "== 0", tokenRatio: "<= 40%" },
+  }, null, 2));
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }

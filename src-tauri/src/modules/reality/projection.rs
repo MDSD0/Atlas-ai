@@ -352,5 +352,20 @@ mod tests {
             .included_files
             .contains(&"archive/cart.ts".to_string()));
         assert!(result.projected_tokens * 100 <= result.naive_tokens * 40);
+
+        // Surface the measured go/no-go numbers so "we measured it" is itself
+        // provable (run with --nocapture; the release qualifier parses this).
+        let recall = recalled as f32 / expected.len() as f32;
+        let token_ratio = (result.projected_tokens as f32 / result.naive_tokens.max(1) as f32)
+            * 100.0;
+        let wrong_file_hits = result
+            .included_files
+            .iter()
+            .filter(|path| path.as_str() == "archive/cart.ts")
+            .count();
+        println!(
+            "ATLAS_GO_NO_GO {{\"recall\":{:.2},\"token_ratio_pct\":{:.1},\"wrong_file_hits\":{},\"projected_tokens\":{},\"naive_tokens\":{}}}",
+            recall, token_ratio, wrong_file_hits, result.projected_tokens, result.naive_tokens
+        );
     }
 }
