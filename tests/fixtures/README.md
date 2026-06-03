@@ -4,7 +4,7 @@ Tiny deterministic repositories for Atlas acceptance tests. Each is small enough
 reason about and snapshot. Copy a pristine fixture into a temp dir with the harness
 (`src-tauri/tests/common`) rather than mutating these trees in place.
 
-Plan reference: `ATLAS_EXECUTION_PLAN.md` section 7.2.
+Release reference: `RELEASE_QUALIFICATION.md`.
 
 ## Status
 

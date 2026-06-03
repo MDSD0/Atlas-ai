@@ -1,34 +1,31 @@
-# Code of conduct
+# Code of Conduct
 
-Atlas is a small open-source project and we want it to stay a place people enjoy contributing to.
+Atlas is a small open-source project. We want it to stay useful, direct, and respectful.
 
-## The rules, briefly
+## Expected Behavior
 
-- **Be respectful.** Disagreement is fine; rudeness, condescension, and personal attacks are not.
-- **Assume good faith.** Most miscommunication isn't malicious — clarify before escalating.
-- **Stay on topic.** Issues, PRs, and discussions are about Atlas. Take off-topic conversations elsewhere.
-- **No harassment.** Targeted insults, slurs, sustained disruption, sexualized comments, doxxing, or threats are not tolerated — anywhere, against anyone.
-- **No spam.** That includes promotional links, irrelevant cross-posting, and AI-generated noise that doesn't engage with the actual conversation.
+- Be respectful and assume good faith.
+- Keep discussion focused on Atlas.
+- Critique code and ideas, not people.
+- Be patient with contributors who are learning the codebase.
+- Respect maintainer time and scope decisions.
 
-This applies to everything inside the project: issues, PRs, discussions, commits, and any community space we create later (Discord, etc.).
+## Unacceptable Behavior
+
+- Harassment, threats, slurs, doxxing, or personal attacks
+- Sustained disruption in issues, PRs, or discussions
+- Spam, self-promotion, or irrelevant links
+- AI-generated noise that does not engage with the actual project
+- Public disclosure of private security reports before a fix is available
 
 ## Enforcement
 
-If you see a violation — or experience one — email **crypticmite@gmail.com** with subject `[Atlas conduct]`. Include links and context.
+Maintainers may edit or delete comments, lock discussions, close issues or PRs, warn participants, or block accounts from the project.
 
-Maintainers may, at their discretion:
+We prefer the lightest action that restores a productive space. Severe or repeated behavior may skip directly to stronger action.
 
-1. Edit or delete the offending content
-2. Issue a private warning
-3. Lock the thread
-4. Block the account from the project
+## Reporting
 
-We default to the lightest action that resolves the situation. Severe or repeat violations skip steps.
+Use GitHub's project contact surfaces when possible. For security issues, follow [SECURITY.md](SECURITY.md) instead of posting publicly.
 
-## Scope
-
-Maintainers act in this project's spaces. We don't police behavior outside the project, but we do consider patterns of behavior elsewhere when deciding on enforcement here.
-
----
-
-*This document is intentionally short. It is inspired by the [Contributor Covenant](https://www.contributor-covenant.org/) but kept compact for a small project.*
+This code applies to Atlas project spaces: issues, pull requests, discussions, commits, and official community spaces.

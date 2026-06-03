@@ -20,7 +20,7 @@ The script resolves matching upstream source trees through opensrc.
 It uses GITHUB_TOKEN or GH_TOKEN when present, otherwise it reads the
 active GitHub CLI keyring token at runtime when gh is installed.
 Inspect only the files relevant to the current slice, then record exact
-paths and copy/adapt/reject decisions in source_pack.md before editing.
+paths and copy/adapt/reject decisions in the PR or local working notes.
 EOF
 }
 

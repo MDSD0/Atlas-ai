@@ -1,55 +1,101 @@
-<div align="center">
-  <img src="public/logo-transparent.png" width="144" height="144" alt="Atlas" />
-  <h1>Atlas</h1>
+# Atlas
 
-  <p><strong>Lightweight Terminal-first AI-native dev workspace.</strong></p>
+Atlas is an open-source, AI-native terminal and coding workspace built with Tauri 2, Rust, React, xterm.js, CodeMirror, and the Vercel AI SDK.
 
-  <p>
-    <img src="https://img.shields.io/github/v/release/MDSD0/Atlas-ai?label=version&color=blue" alt="version" />
-    <img src="https://img.shields.io/badge/license-Apache--2.0-green" alt="license" />
-    <img src="https://img.shields.io/badge/platform-macOS-lightgrey" alt="platform" />
-  </p>
-</div>
+It is terminal-first, local-first, and BYOK. Atlas gives the agent a real workspace, bounded tools, visible proof receipts, and a lightweight desktop surface instead of turning your project into a hosted backend.
 
----
-
-Atlas is a lightweight, natively compiled desktop application built with Tauri 2 + Rust and React 19. It brings powerful LLM capabilities directly to your local workspace, allowing you to ask questions, debug code, and analyze files with an ultra-lightweight footprint.
-
-## Download
-
-Latest installers are on the [Releases](https://github.com/MDSD0/Atlas-ai/releases/latest) page. 
-
-### macOS Troubleshooting
-
-If you receive an error that **"Atlas is damaged and can't be opened"** after downloading the app, this is due to macOS Gatekeeper quarantining unsigned applications downloaded from the internet. 
-
-To fix this, open your Terminal and run the following command to remove the quarantine attribute:
-```bash
-xattr -cr /Applications/Atlas.app
-```
-*(Assuming you placed Atlas in your Applications folder)*
+Atlas is maintained in the [MDSD0/Atlas-ai](https://github.com/MDSD0/Atlas-ai) repository. Terax is credited for the original lightweight desktop-terminal substrate and ongoing contribution to the project direction.
 
 ## Features
 
-- **Context-Aware AI**: Open any folder to "ground" the AI in your local workspace.
-- **Multi-Model Support**: Seamlessly switch between the best LLMs right from the UI.
-- **Blazing Fast**: Built on Rust and Tauri, uses less than 10MB of memory and starts instantly.
-- **Aesthetic**: Custom UI with frosted glass effects and proper macOS integration.
+- Native PTY terminal with multi-tab and split-pane workflow
+- Integrated editor, file explorer, source control, previews, and settings
+- BYOK cloud providers plus local/offline provider support
+- Agent tools for reading, searching, editing, running commands, and collecting proof
+- Approval gates for file writes, shell commands, and long-running background processes
+- Repository reality inspector with context, proof, memory, MCP, and reliability views
+- OS keychain storage for API keys
+- No telemetry by default
+- macOS, Linux, and Windows release workflow
 
-## Build from source
+## Status
 
-**Prerequisites**
-- Rust (stable), https://rustup.rs
-- Node 20+ and npm
-- Tauri prerequisites for your platform, https://tauri.app/start/prerequisites/
+Atlas is in active preview. The local harness and release qualification gates are automated, but a public launch release still requires signed updater metadata and final platform signoff. The project keeps those checks explicit through:
 
-**Run**
 ```bash
-npm install
-npm run tauri dev          # development
-npm run tauri build        # production bundle
+bash scripts/verify-atlas.sh --all
+bash scripts/verify-atlas.sh --launch
 ```
+
+The launch audit is advisory by default and has a strict mode for release signoff:
+
+```bash
+node scripts/launchability-audit.mjs --strict
+```
+
+## Build From Source
+
+Prerequisites:
+
+- Node 22.13 or newer
+- pnpm 10
+- Rust stable
+- Platform prerequisites for Tauri 2: <https://v2.tauri.app/start/prerequisites/>
+
+Install and run:
+
+```bash
+pnpm install
+pnpm tauri dev
+```
+
+Production build:
+
+```bash
+pnpm build
+pnpm tauri build
+```
+
+## Verification
+
+Fast loop:
+
+```bash
+bash scripts/verify-atlas.sh --fast
+```
+
+Native checks:
+
+```bash
+bash scripts/verify-atlas.sh --native
+```
+
+Full local qualification:
+
+```bash
+CARGO_BUILD_JOBS=1 bash scripts/release-qualify.sh
+```
+
+External benchmark samples are opt-in. Atlas never starts Docker, installs Harbor, or runs SWE-bench implicitly.
+
+## Repository Layout
+
+```text
+src/                       React app and feature modules
+src-tauri/                 Rust backend, Tauri commands, PTY, fs, git, shell
+scripts/                   verification, release, benchmark, and audit gates
+docs/                      screenshots and upstream reference manifest
+tests/fixtures/            deterministic harness fixtures
+```
+
+## Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md). Small bug fixes and docs improvements are welcome. Larger harness, AI, security, release, or platform changes should be discussed first so they fit the Atlas direction.
+
+## Security
+
+Please do not open public issues for security bugs. See [SECURITY.md](SECURITY.md).
 
 ## License
 
-Atlas is licensed under the Apache-2.0 License.
+Atlas is licensed under the [Apache-2.0 License](LICENSE).

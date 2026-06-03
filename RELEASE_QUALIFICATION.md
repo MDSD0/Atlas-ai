@@ -1,129 +1,82 @@
-# Atlas V1 Release Qualification
+# Atlas Release Qualification
 
-Date: `2026-06-02`
+This document describes the public release gate for Atlas.
 
 ## Automated Gate
 
 Run:
 
 ```bash
-bash scripts/release-qualify.sh
+CARGO_BUILD_JOBS=1 bash scripts/release-qualify.sh
 ```
 
-The gate covers frontend typecheck, frontend tests, production build, Rust check,
-Rust clippy, Rust tests, the deterministic golden eval, desktop-contract smoke,
-dependency review, optional graph-provider preflight, SWE-bench preflight,
-Terminal-Bench preflight, and the signed-release contract.
+This runs frontend typecheck, frontend tests, production build, Rust check, Rust clippy, Rust tests, deterministic golden eval, desktop smoke, dependency review, optional graph preflight, SWE-bench preflight, Terminal-Bench preflight, signed-release preflight, and advisory launchability audit.
 
-## Golden Demo
+## Launchability Audit
 
-Fixture: `tests/fixtures/golden-v1`
+Run:
 
-Prompt:
-
-```text
-Open the project. Find the total-calculation bug using repository evidence.
-Show the relevant definition and references. Make the smallest safe correction.
-Show diagnostics. Run the narrow test. Present proof.
+```bash
+bash scripts/verify-atlas.sh --launch
+node scripts/launchability-audit.mjs --strict
 ```
 
-The scripted gate copies the intentionally buggy fixture to a temp directory,
-proves the narrow test fails, applies the expected one-line correction, and
-proves the same test passes. The committed fixture is never mutated.
+Advisory mode is allowed in CI so the repo can show external blockers without failing normal builds. Strict mode is for release signoff.
+
+Strict signoff requires:
+
+- Docker daemon available
+- `SWE_BENCH_ROOT` pointing at an official SWE-bench checkout
+- Harbor CLI installed
+- Signed updater metadata published at the configured GitHub release endpoint
+- GitHub auth and API access healthy
+- Platform desktop checks recorded
+
+## External Benchmarks
+
+The benchmark adapters are side-effect-free by default.
+
+SWE-bench wraps the official gold smoke:
+
+```bash
+node scripts/external-benchmark-preflight.mjs --run-sample
+```
+
+Terminal-Bench 2.0 wraps Harbor's bounded oracle path:
+
+```bash
+node scripts/terminal-benchmark-preflight.mjs --run-sample
+```
+
+Atlas never installs benchmark tools, starts Docker, or runs expensive external samples implicitly.
 
 ## Desktop Qualification
 
-Automated on every CI host:
+Automated smoke checks verify that the desktop contract is registered and that the harness surfaces exist.
 
-- Tauri build contract is present.
-- Native project binding, repository reality, LSP, and shell commands are registered.
-- Memory, MCP, metrics, reality, and semantic tool lanes are registered.
-- The compact proof receipt is mounted.
+Interactive release checks should cover:
 
-Interactive checklist for macOS, Linux, and Windows:
+1. Launch packaged Atlas.
+2. Open a workspace.
+3. Open a terminal and confirm cwd.
+4. Bind the agent project.
+5. Read, edit, and review a file.
+6. Confirm stale-edit protection.
+7. Run a narrow command.
+8. Confirm proof receipt and flight recorder timeline.
+9. Confirm watcher update.
+10. Confirm missing optional providers degrade honestly.
 
-1. Launch Atlas.
-2. Open a workspace and confirm terminal shell.
-3. Bind the agent project.
-4. Read and edit one file.
-5. Confirm stale-edit protection.
-6. Run a narrow command and confirm truthful proof receipt.
-7. Confirm watcher-observed update.
-8. Confirm graceful missing-LSP state.
-9. Inspect local metrics and compact context inspector.
-10. Confirm MCP remains disabled until explicitly configured.
+macOS WKWebView does not provide the same WebDriver path as Linux/Windows desktop automation, so macOS packaged checks may require manual evidence.
 
-Tauri documents WebDriver desktop automation for Linux and Windows. macOS
-WKWebView has no WebDriver tool, so macOS interactive qualification remains a
-manual release step. CI compiles native Rust on Ubuntu, macOS, and Windows.
+## Signed Release Contract
 
-Click-driven packaged macOS evidence recorded on `2026-06-02`:
+The GitHub release workflow must:
 
-1. Built and launched `src-tauri/target/debug/bundle/macos/Atlas.app`.
-2. Bound a real fixture workspace through the native picker.
-3. Opened a native terminal and confirmed its working directory.
-4. Inspected Reality metrics, provider status, and the honest no-repository state.
-5. Opened Settings and confirmed updates remain a manual action.
-6. Bound the real Atlas workspace and confirmed explorer and source control load.
-7. Inspected the Tauri log and confirmed no updater endpoint failure at boot.
+- Build macOS Apple Silicon, macOS Intel, Linux, and Windows artifacts
+- Use `tauri-apps/tauri-action@v1`
+- Upload updater JSON
+- Upload updater signatures
+- Fail unless the draft release contains `latest.json` and `.sig` assets
 
-The click-driven pass exposed and fixed explorer recovery and workspace-environment
-probe defects. Linux and Windows interactive signoff remain release steps.
-
-## Dependency Review
-
-The corrective harness adds reviewed direct Rust runtime dependencies for lazy
-LSP file-URI conversion and the official RMCP client transport. Optional memory,
-graph comparison, benchmark, and MCP lanes remain inert at boot. None installs
-tools, starts containers, or starts a sidecar implicitly.
-
-## External Preflight
-
-The merge gate performs side-effect-free capability checks:
-
-- SWE-bench: wraps the official gold smoke for `sympy__sympy-20590`. Running it
-  requires explicit `--run-sample`, a running Docker daemon, and
-  `SWE_BENCH_ROOT` pointing to an official checkout.
-- Terminal-Bench 2.0: wraps Harbor's official oracle path, bounded to one task
-  with `-l 1`. Running it requires explicit `--run-sample`, the official Harbor
-  CLI, and a running Docker daemon.
-
-On this host Docker Desktop is stopped and Harbor is not installed, so the
-external samples were not executed. The preflights pass honestly without side
-effects.
-
-## Signed Updater Contract
-
-Atlas v0.7.3 currently has a DMG and app tarball but no `.sig` asset or
-`latest.json`. The configured updater endpoint therefore returns `404`.
-
-The corrected release workflow explicitly requests updater JSON and fails unless
-the published release contains both signed updater assets and `latest.json`.
-Startup checks remain manual until a corrected signed release is published.
-
-## Recorded Result
-
-Passed on macOS (`darwin`) on `2026-06-02`:
-
-| Layer | Result |
-| --- | --- |
-| TypeScript | passed |
-| Frontend Vitest | `205` passed across `38` files |
-| Production build | passed, `3195` modules transformed with prior Rollup cycle warnings removed |
-| Cargo check | passed |
-| Cargo clippy | passed with `-D warnings` |
-| Rust library tests | `144` passed, `3` intentional diagnostics or host-smoke tests ignored |
-| Rust fixture harness | `3` passed |
-| Golden eval | passed, narrow exit `1 -> 0`, one-line correction |
-| Desktop contract smoke | passed on `darwin` |
-| Dependency review | passed, `81` frontend and `33` Rust direct runtime dependencies |
-| Graph provider preflight | passed, external comparator remains optional |
-| SWE-bench preflight | passed, sample unavailable until Docker Desktop starts and `SWE_BENCH_ROOT` is set |
-| Terminal-Bench preflight | passed, sample unavailable until Harbor is installed and Docker Desktop starts |
-| Signed updater contract | passed |
-
-Residual release work:
-
-- Publish a new signed draft release and confirm `.sig` assets plus `latest.json`.
-- Start Docker Desktop and run the explicit SWE-bench and Terminal-Bench samples.
-- Execute the interactive desktop checklist on Linux and Windows.
+Until those assets exist on a new release, auto-update remains a manual user action.

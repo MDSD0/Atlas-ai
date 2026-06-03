@@ -1,46 +1,49 @@
-# Security
+# Security Policy
 
-Atlas runs shells, reads/writes files, and talks to AI providers — so security bugs matter. If you find one, please tell us before posting it publicly.
+Atlas runs shells, reads and writes files, stores API keys, and can execute agent-suggested commands after approval. Security issues matter.
 
-## Reporting
+## Reporting A Vulnerability
 
-Email **security@atlas.app**. Include:
+Do not open a public issue for security reports.
 
-- What the issue is and what it lets an attacker do
-- Steps to reproduce (a small PoC is great)
-- Version, OS, arch
+Use GitHub's private vulnerability reporting for [MDSD0/Atlas-ai](https://github.com/MDSD0/Atlas-ai/security/advisories/new) if available. If that is unavailable, contact the maintainer through the public GitHub profile and request a private disclosure channel.
 
-We'll get back to you within a few days. Once it's fixed, we'll credit you in the release notes — unless you'd rather stay anonymous.
+Please include:
 
-Please **don't** open a public GitHub issue for security reports.
+- Atlas version or commit
+- Operating system and architecture
+- Clear impact
+- Reproduction steps or proof of concept
+- Whether the issue requires local access, workspace access, provider access, or a malicious file
 
-## Supported versions
+We will confirm receipt, investigate, and coordinate disclosure when a fix is ready.
 
-Until `1.0.0`, only the latest minor gets security fixes. Right now that's `0.5.x`. 
+## Supported Versions
 
-## What's in scope
+Until Atlas reaches `1.0.0`, security fixes target the latest public minor release and `main`.
 
-- The Rust backend in `src-tauri/` (PTY, FS, IPC, plugins)
-- The frontend in `src/` — anywhere untrusted input lands (terminal output, file content, AI tool results, credentials)
-- Release artifacts on GitHub and `atlas.app`
-- The auto-updater
+## In Scope
 
-## What's not
+- Tauri commands and IPC boundaries
+- PTY, shell, and background process handling
+- Workspace authorization and filesystem guards
+- Git command argument handling
+- AI tool approval and execution surfaces
+- API key storage and provider request handling
+- Updater signing and release artifacts
 
-- Bugs in upstream deps (Tauri, xterm.js, CodeMirror, AI SDKs…) — report those upstream. We'll ship the fix once it's released.
-- Anything that needs an already-compromised machine or a local attacker with shell access
-- Older versions (`< 0.5`)
+## Out Of Scope
 
-## What we do to keep things safe
+- Vulnerabilities in upstream dependencies that should be reported upstream first
+- Issues requiring an already-compromised local machine
+- Provider-side model behavior or retention policies
+- User-approved shell commands that behave as the command itself is designed to behave
 
-- **API keys** live in the OS keychain via `keyring` — not on disk, not in `localStorage`, not in logs.
-- **No telemetry.** Atlas only talks to the network when you ask it to (AI requests, update checks, web preview).
-- **AI tool approval.** File writes and shell commands from the agent need your OK before they run.
-- **No Node in the renderer.** The frontend only reaches the host through the allow-listed Tauri commands.
-- **Signed releases.** Updates are verified before they're applied.
+## Security Posture
 
-## What we can't promise
-
-- Atlas runs whatever you (or the agent) tell it to run, with your permissions. That's kind of the point of a terminal.
-- AI providers see whatever you send them. Read their retention policies.
-- Local LLM endpoints (LM Studio, OpenAI-compatible) are trusted at the network level — only point Atlas at servers you control.
+- API keys are stored in the OS keychain.
+- The webview does not get direct filesystem or shell access.
+- File writes and shell commands from the agent are approval-gated.
+- Obvious secret paths are denied on read and write.
+- Network provider calls go through a Rust-side guard.
+- Updates require signed updater metadata before automatic release use.

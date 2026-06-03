@@ -48,7 +48,7 @@ esac
     ' "$manifest"
   done
   printf '  resolve: bash scripts/consult-opensrc.sh %s\n' "$topics"
-  printf '  record decision in source_pack.md (copy/adapt/wrap/study/reject) before merging.\n\n'
+  printf '  record decision in the PR or local working notes (copy/adapt/wrap/study/reject) before merging.\n\n'
 } >&2
 
 exit 0

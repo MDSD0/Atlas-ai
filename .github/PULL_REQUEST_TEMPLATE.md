@@ -16,9 +16,9 @@ Examples: feat(terminal): add split panes / fix(explorer): close button alignmen
 <!-- How did you verify this works? "Ran tsc clean" is not enough on its own —
      describe the actual flows you exercised. -->
 
-- [ ] `pnpm exec tsc --noEmit` clean
+- [ ] `bash scripts/verify-atlas.sh --fast` clean
 - [ ] Manual smoke-test of the affected feature
-- [ ] (If you touched `src-tauri/`) `cargo check` clean
+- [ ] (If you touched `src-tauri/`) `bash scripts/verify-atlas.sh --native` clean
 - [ ] (If UI) tested in `pnpm tauri dev`
 
 ## Screenshots / GIFs

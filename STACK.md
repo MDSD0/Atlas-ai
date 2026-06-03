@@ -1,10 +1,10 @@
-# Atlas Stack — What We Stitch
+# Atlas Stack - What We Stitch
 
-Atlas wraps state-of-the-art OSS instead of reinventing. Every layer below has an explicit disposition.
+Atlas wraps proven open-source building blocks instead of reinventing core protocols, editors, terminals, parsers, or desktop runtime behavior. Every layer below has an explicit disposition.
 
 - Full manifest: `docs/opensrc-references.tsv` (50 entries).
-- Detailed reasoning: `ATLAS_EXECUTION_PLAN.md` §6.
-- Source-parity rule: `ATLAS.md` lines 39-52.
+- Release gate: `RELEASE_QUALIFICATION.md`.
+- Product direction: `ROADMAP.md`.
 
 Disposition meanings: `WRAP` use as-is via adapter, `ADAPT` port shape into Atlas, `STUDY` compare and inform, `REJECT` explicitly excluded, `BENCHMARK` measure before adopting.
 
@@ -15,7 +15,7 @@ Disposition meanings: `WRAP` use as-is via adapter, `ADAPT` port shape into Atla
 | Desktop runtime | `tauri-apps/tauri` | WRAP | Custom Rust commands, capability policy |
 | Editor | `codemirror/dev` | WRAP | Extensions, themes |
 | Terminal renderer | `xtermjs/xterm.js` | WRAP | OSC handlers, PTY bridge |
-| Substrate lineage | `crynta/terax-ai` | STUDY | Surgical mutation reference |
+| Substrate lineage | `crynta/terax-ai` | STUDY | Terax is credited for the original lightweight desktop-terminal substrate and project contribution |
 | Scaffold pattern | `tauri-apps/create-tauri-app` | STUDY | Reference only |
 
 ## Repo understanding

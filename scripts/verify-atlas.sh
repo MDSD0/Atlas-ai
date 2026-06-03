@@ -11,7 +11,7 @@
 #   --release  signed release contract preflight
 #   --launch   advisory launchability audit
 #   --all      everything required before merge
-# See ATLAS_EXECUTION_PLAN.md section 7.3.
+# See RELEASE_QUALIFICATION.md for the release gate.
 set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
