@@ -9,6 +9,7 @@
 #   --bench    optional SWE-bench host preflight
 #   --terminal-bench optional Terminal-Bench Harbor host preflight
 #   --release  signed release contract preflight
+#   --launch   advisory launchability audit
 #   --all      everything required before merge
 # See ATLAS_EXECUTION_PLAN.md section 7.3.
 set -euo pipefail
@@ -82,6 +83,10 @@ release() {
   run node scripts/release-preflight.mjs
 }
 
+launch() {
+  run node scripts/launchability-audit.mjs
+}
+
 case "$mode" in
   --fast)
     frontend
@@ -110,6 +115,9 @@ case "$mode" in
   --release)
     release
     ;;
+  --launch)
+    launch
+    ;;
   --all)
     frontend
     build
@@ -121,9 +129,10 @@ case "$mode" in
     bench
     terminal_bench
     release
+    launch
     ;;
   *)
-    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--deps|--graph|--bench|--terminal-bench|--release|--all]\n' >&2
+    printf 'Usage: bash scripts/verify-atlas.sh [--fast|--native|--desktop|--eval|--deps|--graph|--bench|--terminal-bench|--release|--launch|--all]\n' >&2
     exit 2
     ;;
 esac

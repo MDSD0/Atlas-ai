@@ -1599,9 +1599,10 @@ The accelerated V1 queue is a verified foundation, not the final coding harness.
 
 - Add explicit sample adapters for SWE-bench's official gold smoke and Harbor's official Terminal-Bench 2.0 oracle path without turning upstream benchmark infrastructure into product runtime.
 - Keep both external adapters preflight-only by default. Never install tools, start Docker, or run expensive samples implicitly.
-- Bound the Terminal-Bench smoke to one task through Harbor's source-defined `-l/--n-tasks` flag.
+- Bound the Terminal-Bench smoke to one task through Harbor's source-defined `--n-tasks` flag and the current `terminal-bench@2.0` dataset key.
 - Keep deterministic Atlas fixtures as merge gates.
 - Add click-driven desktop qualification where supported and retain an honest manual checklist where platform automation is unavailable.
+- Add an advisory launch audit that reports external blockers without failing normal CI, plus a strict mode for release signoff.
 
 ### Corrective release gate
 
@@ -1612,6 +1613,7 @@ Atlas is launch-candidate ready only when:
 3. Every optional provider reports real capability state and degrades independently.
 4. The full clean-shell release qualification passes.
 5. External benchmark samples and desktop interaction evidence are recorded.
+6. `bash scripts/verify-atlas.sh --launch` reports no blockers in strict release signoff mode.
 
 ### Corrective C5 evidence recorded
 
@@ -1619,6 +1621,14 @@ Atlas is launch-candidate ready only when:
 - Click-driven packaged macOS evidence covers launch, native workspace binding, terminal working directory, Reality state, source-control truthfulness, Settings, and silent updater boot behavior.
 - The release workflow requires signed updater assets plus `latest.json`; `v0.7.3` predates that fix and is not a launchable updater release.
 - Final release signoff still requires explicit Docker-backed SWE-bench and Terminal-Bench sample runs, a new signed draft release, and Linux plus Windows interactive checks.
+
+### Corrective C11 evidence recorded
+
+- The release workflow now uses `tauri-apps/tauri-action@v1`, explicitly uploads updater signatures, and keeps the post-publish `latest.json` plus `.sig` asset assertions.
+- The static release preflight rejects stale Tauri action versions and missing updater signature upload.
+- The Terminal-Bench adapter now uses Harbor's current `harbor run --dataset terminal-bench@2.0 --agent oracle --n-concurrent 1 --n-tasks 1` command.
+- `scripts/launchability-audit.mjs` reports version sync, release workflow state, CI launch audit coverage, SWE-bench and Terminal-Bench adapter parity, Docker readiness, `SWE_BENCH_ROOT`, Harbor CLI, GitHub auth/API, updater metadata publication, and local debug app signature state.
+- Advisory launch audit passes as a command while surfacing host blockers. Strict mode fails until Docker, official SWE-bench checkout, Harbor CLI, signed updater metadata publication, and platform interaction evidence are ready.
 
 ### Slice C6: visible harness reality inspector
 

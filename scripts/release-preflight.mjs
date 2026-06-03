@@ -19,7 +19,10 @@ assert.equal(config.build.beforeDevCommand, "pnpm dev");
 assert.equal(config.build.beforeBuildCommand, "pnpm build");
 assert.equal(config.bundle.createUpdaterArtifacts, true);
 assert.match(updater, /useUpdater\(\{ autoCheck = false \}/);
+assert.match(workflow, /tauri-apps\/tauri-action@v1/);
+assert.doesNotMatch(workflow, /tauri-apps\/tauri-action@v0/);
 assert.match(workflow, /uploadUpdaterJson: true/);
+assert.match(workflow, /uploadUpdaterSignatures: true/);
 assert.match(workflow, /grep -q '\^latest\\\.json\$'/);
 assert.match(workflow, /grep -q '\\\.sig\$'/);
 
@@ -28,6 +31,7 @@ console.log(JSON.stringify({
   status: "passed",
   updaterBootPolicy: "manual_until_signed_metadata_is_published",
   updaterArtifacts: "required_by_bundle_and_release_workflow",
+  tauriAction: "v1",
   lifecycleHooks: "pnpm_only",
   tauriFrontendApi: packageJson.dependencies["@tauri-apps/api"],
 }, null, 2));

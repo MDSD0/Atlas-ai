@@ -1144,3 +1144,39 @@ Packaged-host follow-up:
 - The generated local debug `.app` initially had an invalid local signature (`code has no resources but signature indicates they must be present`). It was ad-hoc signed with `codesign --force --deep --sign -` for local inspection only; verification then reported the bundle valid on disk and satisfying its designated requirement. This does not publish or replace release signing.
 - Normal macOS `open` launched the fresh packaged app and kept the process alive as `/Users/home/Downloads/Atlas-ai/src-tauri/target/debug/bundle/macos/Atlas.app/Contents/MacOS/atlas`. Direct terminal launch still exited without stdout, so `open` is the valid launch path for this debug bundle on the current host.
 - Click-level packaged inspection remains host-blocked: Computer Use first failed with LaunchServices `kLSServerCommunicationErr` and then timed out attaching to `Atlas`; Apple Events to System Events are not authorized; and `screencapture` returned `could not create image from display`. The app process was stopped afterward. Static desktop smoke already verifies the C9 Context and C10 Proof UI contracts; interactive packaged Proof/Context click evidence still needs a functioning macOS automation/capture service.
+
+## Corrective Slice C11: launchability audit and current external harness contracts
+
+Source-parity packet:
+
+- Slice: turn the post-C10 launchability verdict into a repeatable local audit, refresh stale release and benchmark command contracts, and keep external runners explicit rather than product runtime.
+- Atlas files inspected: `.github/workflows/{ci,release}.yml`, `scripts/{verify-atlas,release-qualify,release-preflight,external-benchmark-preflight,terminal-benchmark-preflight,consult-opensrc}.mjs`, `package.json`, `src-tauri/tauri.conf.json`, `source_pack.md`, and `ATLAS_EXECUTION_PLAN.md`.
+- opensrc hook: ran `bash scripts/consult-opensrc.sh --list` and `bash scripts/consult-opensrc.sh tauri release benchmark eval docker terminal-bench`. GitHub authentication resolved through the active `gh` keyring. The slice used the local opensrc snapshots because these cached exports do not include `.git` metadata.
+- Primary documentation refreshed: official Tauri action README and action input definition; official SWE-bench README and `run_evaluation.py`; official Harbor README, Terminal-Bench 2.0 README, Harbor CLI job options, and the Harbor registry task listing for `terminal-bench@2.0`.
+- Web evidence refreshed: GitHub `tauri-apps/tauri-action` shows `tauri-apps/tauri-action@v1`, `uploadUpdaterJson`, and `uploadUpdaterSignatures`; SWE-bench documentation shows Docker-backed `run_evaluation` and the `sympy__sympy-20590` gold smoke; Harbor documentation and registry show `terminal-bench@2.0`, `oracle`, and single-task execution through task selection.
+- opensrc inspected: `tauri-apps/tauri-action:README.md,action.yml,src/upload-version-json.ts`; `SWE-bench/SWE-bench:README.md,swebench/harness/run_evaluation.py`; `harbor-framework/harbor:README.md,pyproject.toml,src/harbor/cli/jobs.py,src/harbor/models/job/config.py`; `harbor-framework/terminal-bench-2:README.md`.
+- Tauri action finding: current action usage is `tauri-apps/tauri-action@v1`; the action runs on Node 24, supports updater JSON generation, and has an explicit `uploadUpdaterSignatures` switch defaulting to `true`. Atlas release workflow still used `@v0`, so the workflow and static preflight need to move to `@v1` and assert signature upload explicitly.
+- SWE-bench finding: the official sample remains Docker-backed `python -m swebench.harness.run_evaluation --predictions_path gold --max_workers 1 --instance_ids sympy__sympy-20590 --run_id validate-gold`, with `--namespace ''` on Apple Silicon. Atlas should keep this as an opt-in sample and audit Docker plus checkout readiness without starting containers implicitly.
+- Harbor finding: Terminal-Bench 2.0 now uses the Harbor dataset key `terminal-bench@2.0`; the CLI supports `--n-tasks` for bounded dataset runs and `--n-concurrent` for trial concurrency. Atlas should update the preflight command to `harbor run --dataset terminal-bench@2.0 --agent oracle --n-concurrent 1 --n-tasks 1`.
+- Host finding on `2026-06-03`: Docker CLI exists but the Docker daemon is unavailable; Docker.app could not be opened by the host launch service; `SWE_BENCH_ROOT` is unset; Harbor is not installed; the configured GitHub updater metadata endpoint is not published. `gh auth status` and `gh api repos/MDSD0/Atlas-ai` pass in the final audit. These are release signoff blockers, not code failures.
+- Disposition: `ADAPT` the Tauri action workflow to current `@v1` guidance; `WRAP` SWE-bench and Harbor as explicit external sample commands; `ADAPT` Harbor's current dataset and task-cap options; `ADD` a machine-readable launch audit that can pass in advisory mode and fail in strict mode; `REJECT` implicit Docker startup, hidden benchmark installation, silent GitHub publication, and treating static CI success as proof of a published signed updater release.
+- Tests required: release static preflight must reject stale action versions and missing signature upload; Terminal-Bench preflight must expose the current official command; launch audit must report local contracts, external blockers, and strict-mode failure without requiring network, Docker, Harbor, or GitHub success in normal CI.
+
+Applied:
+
+- Updated `.github/workflows/release.yml` from `tauri-apps/tauri-action@v0` to `@v1` and made `uploadUpdaterSignatures: true` explicit beside `uploadUpdaterJson: true`.
+- Extended `scripts/release-preflight.mjs` so the static signed-release contract rejects stale Tauri action usage and missing updater signature upload.
+- Updated `scripts/terminal-benchmark-preflight.mjs` to Harbor's current `terminal-bench@2.0` dataset command with `--agent oracle`, `--n-concurrent 1`, and `--n-tasks 1`.
+- Added `scripts/launchability-audit.mjs`, an advisory-by-default JSON audit with `--strict` release signoff mode. It checks local version sync, release workflow shape, CI audit coverage, benchmark adapter parity, Docker, `SWE_BENCH_ROOT`, Harbor CLI, GitHub auth/API, updater metadata publication, and local debug app signature state without printing token material.
+- Added `bash scripts/verify-atlas.sh --launch`, included it in `--all`, and added the advisory audit to CI.
+- Updated `ATLAS_EXECUTION_PLAN.md` with the current Harbor command and launch audit release gate.
+
+Measured verification:
+
+- `git diff --check` passed.
+- `node --check` passed for `scripts/launchability-audit.mjs`, `scripts/release-preflight.mjs`, and `scripts/terminal-benchmark-preflight.mjs`.
+- `node scripts/release-preflight.mjs` passed with `tauriAction: "v1"`.
+- `node scripts/external-benchmark-preflight.mjs` passed in preflight-only mode and reported Docker daemon plus `SWE_BENCH_ROOT` blockers.
+- `node scripts/terminal-benchmark-preflight.mjs` passed in preflight-only mode and reported the current Harbor command plus Docker and Harbor blockers.
+- `bash scripts/verify-atlas.sh --launch` passed in advisory mode while reporting four launch blockers: Docker daemon unavailable, `SWE_BENCH_ROOT` unset, Harbor CLI missing, and updater metadata endpoint unpublished.
+- Full clean-shell `CARGO_BUILD_JOBS=1 bash scripts/release-qualify.sh` passed: TypeScript 0, Vitest `232` passed across `47` files, production build `3210` modules warning-free, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional ignores, fixture harness `3` passed, golden eval passed, desktop smoke passed, dependency review passed, graph preflight passed, SWE-bench preflight passed, Terminal-Bench preflight passed, signed-release preflight passed, and advisory launch audit passed as a command while surfacing the external blockers.

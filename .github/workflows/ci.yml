@@ -57,6 +57,9 @@ jobs:
       - name: Signed release contract preflight
         run: bash scripts/verify-atlas.sh --release
 
+      - name: Launchability advisory audit
+        run: bash scripts/verify-atlas.sh --launch
+
   rust:
     runs-on: ubuntu-22.04
     steps:

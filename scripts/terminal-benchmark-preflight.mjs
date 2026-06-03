@@ -36,11 +36,13 @@ const docker = executable(platform === "win32" ? "docker.exe" : "docker");
 const dockerDaemon = probe(docker, ["info", "--format", "{{.ServerVersion}}"]);
 const args = [
   "run",
-  "-d",
-  "terminal-bench/terminal-bench-2",
-  "-a",
+  "--dataset",
+  "terminal-bench@2.0",
+  "--agent",
   "oracle",
-  "-l",
+  "--n-concurrent",
+  "1",
+  "--n-tasks",
   "1",
 ];
 
@@ -48,7 +50,7 @@ const report = {
   benchmark: "Terminal-Bench 2.0 official Harbor oracle smoke",
   mode: process.argv.includes("--run-sample") ? "run-sample" : "preflight-only",
   source: "github:harbor-framework/harbor",
-  dataset: "terminal-bench/terminal-bench-2",
+  dataset: "terminal-bench@2.0",
   taskLimit: 1,
   harbor: harbor ? "available" : "unavailable_not_installed",
   dockerCli: docker ? "available" : "unavailable_not_installed",
@@ -56,9 +58,10 @@ const report = {
   sampleCommand: [harbor ?? "harbor", ...args].join(" "),
 };
 
-assert.match(report.sampleCommand, /harbor run -d terminal-bench\/terminal-bench-2/);
-assert.match(report.sampleCommand, /-a oracle/);
-assert.match(report.sampleCommand, /-l 1/);
+assert.match(report.sampleCommand, /harbor run --dataset terminal-bench@2\.0/);
+assert.match(report.sampleCommand, /--agent oracle/);
+assert.match(report.sampleCommand, /--n-concurrent 1/);
+assert.match(report.sampleCommand, /--n-tasks 1/);
 
 if (process.argv.includes("--run-sample")) {
   assert.ok(harbor, "install the official Harbor CLI before running Terminal-Bench");
