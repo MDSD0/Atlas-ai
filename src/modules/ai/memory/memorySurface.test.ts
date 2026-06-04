@@ -73,7 +73,7 @@ function proofRun(id = "run-1"): ProofRun {
     workspaceRoot: "/repo",
     startedAt: 1,
     finishedAt: 2,
-    status: "passed",
+    status: "verified",
     nextSequence: 1,
     events: [
       {
@@ -92,7 +92,7 @@ function proofRun(id = "run-1"): ProofRun {
     artifactsDropped: 0,
     verdict: {
       runId: id,
-      status: "passed",
+      status: "verified",
       changedFiles: {
         items: [boundText("/repo/src/main.ts", 4_096)],
         truncated: false,

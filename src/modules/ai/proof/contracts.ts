@@ -22,10 +22,23 @@ export type BoundedList<T> = {
   originalCount: number;
 };
 
+// Soft, honest verdict tiers. The run is never blocked; the verdict only states
+// how strongly the result was checked, so a bare `echo ok` cannot read as fully
+// verified. Severity order (for the worst-wins finish rule):
+//   failed > unverified > completed > smoke_checked > verified
+//   (cancelled is terminal and set explicitly).
+//   - verified:      a recognized test/build/typecheck/lint command exited 0
+//   - smoke_checked: some non-trivial command ran successfully (not a known check)
+//   - completed:     work happened (edits) but no command was run
+//   - unverified:    nothing meaningful happened to check
+//   - failed:        a recorded tool/command failed
+//   - cancelled:     the run was aborted
 export type ProofVerdictStatus =
-  | "passed"
+  | "verified"
+  | "smoke_checked"
+  | "completed"
+  | "unverified"
   | "failed"
-  | "incomplete"
   | "cancelled";
 
 export type ProofRunStatus = "running" | ProofVerdictStatus;

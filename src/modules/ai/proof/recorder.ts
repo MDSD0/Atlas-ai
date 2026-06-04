@@ -111,6 +111,31 @@ function shellFailure(record: ToolStepRecord): string | null {
   return output.exit_code === 0 ? null : `exited ${output.exit_code}`;
 }
 
+// Recognized verification commands: a successful run of one of these earns the
+// "verified" tier. A bare echo/ls/cat does not — it is at most "smoke_checked".
+// Matched on the command token stream so wrappers (npm run test, pnpm -w lint,
+// npx tsc, python -m pytest, cargo test) are caught without overfitting.
+const VERIFICATION_PATTERNS: RegExp[] = [
+  /\b(test|tests|spec|specs)\b/, // jest/vitest/pytest/cargo test/go test wrappers
+  /\bvitest\b/,
+  /\bpytest\b/,
+  /\btsc\b/, // typecheck
+  /\b(typecheck|type-check)\b/,
+  /\b(lint|eslint|clippy|ruff|flake8|mypy)\b/,
+  /\bcargo\s+(test|check|clippy|build)\b/,
+  /\bgo\s+(test|build|vet)\b/,
+  /\b(build|compile)\b/,
+  /\bgradle(w)?\b.*\b(test|build|check)\b/,
+  /\bmvn\b.*\b(test|verify|package)\b/,
+  /\bmake\b.*\b(test|check|build)\b/,
+];
+
+/** True when a shell command is a recognized test/build/typecheck/lint check. */
+export function isRecognizedCheck(command: string): boolean {
+  const c = command.toLowerCase();
+  return VERIFICATION_PATTERNS.some((re) => re.test(c));
+}
+
 function shellCheckSummary(
   command: string,
   output: Record<string, unknown>,
@@ -272,6 +297,10 @@ export class RunRecorder {
   private readonly failures: string[] = [];
   private readonly shellChecks: string[] = [];
   private readonly diagnostics: string[] = [];
+  /** A recognized test/build/typecheck/lint command exited 0 this run. */
+  private verifiedCheckRan = false;
+  /** Some non-trivial command ran successfully (not necessarily a known check). */
+  private anyCommandRan = false;
   private eventCount = 0;
   private status: ProofRunStatus = "running";
   private finishedAt: number | null = null;
@@ -380,6 +409,10 @@ export class RunRecorder {
           record.output as Record<string, unknown>,
         ),
       );
+      this.anyCommandRan = true;
+      if (isRecognizedCheck(record.input.command)) {
+        this.verifiedCheckRan = true;
+      }
     }
     this.diagnostics.push(
       ...summarizeDiagnosticEvidence(
@@ -446,10 +479,11 @@ export class RunRecorder {
   }
 
   /**
-   * Close the run exactly once. The verdict is computed from observed evidence:
-   * a cancelled run is "cancelled"; any recorded failure makes it "failed";
-   * a successful foreground shell check makes it "passed"; otherwise it is
-   * "incomplete". Extra calls are ignored so the first verdict wins.
+   * Close the run exactly once with a soft, honest verdict (see
+   * ProofVerdictStatus): failed > unverified > completed > smoke_checked >
+   * verified, plus explicit cancelled. "verified" requires a recognized
+   * test/build/typecheck/lint command to exit 0; a bare command is only
+   * "smoke_checked". Extra calls are ignored so the first verdict wins.
    */
   finish(outcome: {
     cancelled?: boolean;
@@ -464,13 +498,23 @@ export class RunRecorder {
     cancelled?: boolean;
     errored?: boolean;
   }): Promise<void> {
+    // Soft 5-tier verdict (worst-wins). Honest, never blocking:
+    //   failed   - something we recorded actually failed
+    //   verified - a recognized test/build/typecheck/lint exited 0
+    //   smoke_checked - some command ran ok, but no recognized check
+    //   completed - edits happened but no command was run
+    //   unverified - nothing meaningful to check
     const status: ProofVerdictStatus = outcome.cancelled
       ? "cancelled"
       : outcome.errored || this.failures.length > 0
         ? "failed"
-        : this.shellChecks.length === 0
-          ? "incomplete"
-          : "passed";
+        : this.verifiedCheckRan
+          ? "verified"
+          : this.anyCommandRan
+            ? "smoke_checked"
+            : this.changedFiles.size > 0
+              ? "completed"
+              : "unverified";
     await this.recordLifecycleNow("verdict", { status });
     await this.recordLifecycleNow("run_finish", { status });
     const verdict = await this.journal.finishRun(this.run.id, {

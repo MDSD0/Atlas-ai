@@ -77,7 +77,7 @@ describe("RunRecorder", () => {
       "lifecycle.finish_verdict",
       "lifecycle.session_finished",
     ]);
-    expect(run?.status).toBe("passed");
+    expect(run?.status).toBe("verified");
     expect(run?.verdict?.changedFiles.items.map((f) => f.preview)).toEqual([
       "/repo/a.ts",
     ]);
@@ -192,7 +192,7 @@ describe("RunRecorder", () => {
     );
   });
 
-  it("keeps a mutation-only run incomplete", async () => {
+  it("marks a mutation-only run completed (edited, no check run)", async () => {
     const journal = makeJournal();
     const rec = await RunRecorder.start(journal, {
       sessionId: "s1",
@@ -206,9 +206,61 @@ describe("RunRecorder", () => {
     await rec.finish();
 
     const run = await journal.getRun(rec.runId);
-    expect(run?.status).toBe("incomplete");
+    expect(run?.status).toBe("completed");
     expect(run?.verdict?.changedFiles.originalCount).toBe(1);
     expect(run?.verdict?.checks.originalCount).toBe(0);
+  });
+
+  it("smoke-checks (not verifies) a bare successful command", async () => {
+    // The core honesty fix: `echo ok` ran fine, but it is not a real check.
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "bash_run",
+      input: { command: "echo ok" },
+      output: { exit_code: 0, stdout: "ok" },
+    });
+    await rec.finish();
+
+    const run = await journal.getRun(rec.runId);
+    expect(run?.status).toBe("smoke_checked");
+  });
+
+  it("verifies when a recognized check command passes", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "bash_run",
+      input: { command: "cargo test --locked" },
+      output: { exit_code: 0, stdout: "ok" },
+    });
+    await rec.finish();
+
+    const run = await journal.getRun(rec.runId);
+    expect(run?.status).toBe("verified");
+  });
+
+  it("is unverified when nothing meaningful happened", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "read_file",
+      input: { path: "/repo/a.ts" },
+      output: { content: "x", size: 1 },
+    });
+    await rec.finish();
+
+    const run = await journal.getRun(rec.runId);
+    expect(run?.status).toBe("unverified");
   });
 
   it("attaches explicit semantic-tool evidence", async () => {
@@ -290,7 +342,7 @@ describe("RunRecorder", () => {
     await toolWrite;
 
     const run = await journal.getRun(rec.runId);
-    expect(run?.status).toBe("passed");
+    expect(run?.status).toBe("verified");
     expect(run?.verdict?.checks.items[0].preview).toBe("pnpm test (exit 0)");
   });
 

@@ -1,5 +1,6 @@
 import {
   CheckCircle2 as PassIcon,
+  ShieldCheck as VerifiedIcon,
   XCircle as FailIcon,
   CircleDashed as RunningIcon,
   Ban as CancelIcon,
@@ -23,9 +24,11 @@ const STATUS_META: Record<
   { label: string; className: string; Icon: typeof PassIcon }
 > = {
   running: { label: "Running", className: "text-muted-foreground", Icon: RunningIcon },
-  passed: { label: "Passed", className: "text-emerald-500", Icon: PassIcon },
+  verified: { label: "Verified", className: "text-emerald-500", Icon: VerifiedIcon },
+  smoke_checked: { label: "Smoke-checked", className: "text-emerald-500/80", Icon: PassIcon },
+  completed: { label: "Completed", className: "text-foreground/80", Icon: PassIcon },
+  unverified: { label: "Unverified", className: "text-amber-500", Icon: RunningIcon },
   failed: { label: "Failed", className: "text-destructive", Icon: FailIcon },
-  incomplete: { label: "Incomplete", className: "text-amber-500", Icon: RunningIcon },
   cancelled: { label: "Cancelled", className: "text-muted-foreground", Icon: CancelIcon },
 };
 

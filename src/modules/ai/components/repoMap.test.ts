@@ -103,12 +103,13 @@ describe("summarizeReliability", () => {
 
     expect(
       summarizeReliability(
-        [run("passed", "passed"), run("failed", "failed"), run("live", "running")],
+        [run("verified", "verified"), run("failed", "failed"), run("live", "running")],
         metrics,
       ),
     ).toEqual({
       finishedRuns: 2,
       verifiedRuns: 1,
+      softPassRuns: 0,
       failedRuns: 1,
       incompleteRuns: 0,
       verifiedRatio: 50,
