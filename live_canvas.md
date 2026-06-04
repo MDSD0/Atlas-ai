@@ -15,3 +15,17 @@ unreliable and would desync plan text from comments). Instead, smart replan:
 Status: design only. Touches the agent loop + needs a textual-plan-with-comments
 UI (todos are currently a flat list, no comment field). Build deliberately after
 GUI verification; not part of the safe UI-polish batch.
+
+## Benchmark-ready milestone (GPT review response)
+
+Five-item pre-benchmark pass before the Windows local-model run:
+
+1. Honest 5-tier proof verdict (verified/smoke_checked/completed/unverified/failed) — echo-ok no longer reads as verified; recognized test/build/typecheck/lint commands earn "verified". Soft, non-blocking.
+2. Atlas Harness Eval trace (buildHarnessTrace) — per-run JSON: tool counts by name, edited files, checks, diagnostics, repo-map usage, duration. The instrument for "did the substrate help".
+3. Ablation modes (buildTools mode: plain | repo_map | repo_map_lsp | full) — restrict the toolbelt so a benchmark can compare layers. Default full = unchanged product behavior.
+4. README honesty — verified already clean (no universal/zero-halluc/SWE-ready overclaims; only disclaimers present). No change needed.
+5. Ollama path — verified: OLLAMA_DEFAULT_BASE_URL=http://localhost:11434/v1 via createOpenAICompatible. qwen2.5-coder:7b benchmark path is sound.
+
+Green (clean shell verify-atlas.sh --all): tsc 0, vitest 244 passed, build 0, cargo check/clippy 0, cargo test 144 + 3 harness.
+
+Next (user): Windows + Ollama qwen2.5-coder:7b, run mini-SWE-agent baseline vs Atlas on the same 3-5 SWE-bench Lite tasks, compare harness traces.

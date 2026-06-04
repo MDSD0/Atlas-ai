@@ -42,7 +42,22 @@ export {
  * against active file parent, then active folder, then workspace root. Active
  * terminal cwd is informational unless the execution mode explicitly selects it.
  */
-export function buildTools(ctx: import("./context").ToolContext) {
+/**
+ * Ablation modes for benchmarking which capability layers earn their keep.
+ * `full` (the default) is the normal product behavior — every tool. The
+ * narrower modes restrict the agent's toolbelt so a benchmark can compare
+ * plain vs +repo-map vs +LSP on the same task (GPT review: prove the substrate).
+ *   - plain:        fs + edit + search + shell + todo + verification (mini-swe baseline)
+ *   - repo_map:     plain + reality (repo_context/repo_map/find_symbol/…)
+ *   - repo_map_lsp: repo_map + semantic LSP tools
+ *   - full:         everything (memory, mcp, skills, subagents, work packets, …)
+ */
+export type AblationMode = "plain" | "repo_map" | "repo_map_lsp" | "full";
+
+
+// Full product toolbelt. This is the source of truth for ChatTools; the
+// ablation-narrowed modes return a subset cast to the same type.
+function buildFullTools(ctx: import("./context").ToolContext) {
   const base = {
     ...buildFsTools(ctx),
     ...buildEditTools(ctx),
@@ -66,4 +81,29 @@ export function buildTools(ctx: import("./context").ToolContext) {
   } as const;
 }
 
-export type ChatTools = ReturnType<typeof buildTools>;
+export type ChatTools = ReturnType<typeof buildFullTools>;
+
+export function buildTools(
+  ctx: import("./context").ToolContext,
+  mode: AblationMode = "full",
+): ChatTools {
+  if (mode === "full") return buildFullTools(ctx);
+
+  // Narrowed benchmark toolbelts: the irreducible coding loop, plus optional
+  // repo-map / LSP layers depending on the ablation mode.
+  let tools: Record<string, unknown> = {
+    ...buildFsTools(ctx),
+    ...buildEditTools(ctx),
+    ...buildSearchTools(ctx),
+    ...buildShellTools(ctx),
+    ...buildTodoTools(ctx),
+    ...buildVerificationTools(),
+  };
+  if (mode === "repo_map" || mode === "repo_map_lsp") {
+    tools = { ...tools, ...buildRealityTools(ctx) };
+  }
+  if (mode === "repo_map_lsp") {
+    tools = { ...tools, ...buildSemanticTools(ctx) };
+  }
+  return tools as unknown as ChatTools;
+}
