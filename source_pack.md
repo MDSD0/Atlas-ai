@@ -1180,3 +1180,29 @@ Measured verification:
 - `node scripts/terminal-benchmark-preflight.mjs` passed in preflight-only mode and reported the current Harbor command plus Docker and Harbor blockers.
 - `bash scripts/verify-atlas.sh --launch` passed in advisory mode while reporting four launch blockers: Docker daemon unavailable, `SWE_BENCH_ROOT` unset, Harbor CLI missing, and updater metadata endpoint unpublished.
 - Full clean-shell `CARGO_BUILD_JOBS=1 bash scripts/release-qualify.sh` passed: TypeScript 0, Vitest `232` passed across `47` files, production build `3210` modules warning-free, Cargo check 0, Clippy 0, Rust `144` passed plus `3` intentional ignores, fixture harness `3` passed, golden eval passed, desktop smoke passed, dependency review passed, graph preflight passed, SWE-bench preflight passed, Terminal-Bench preflight passed, signed-release preflight passed, and advisory launch audit passed as a command while surfacing the external blockers.
+
+## Corrective Slice C12: Atlas self-knowledge prompt context
+
+Source-parity packet:
+
+- Slice: make the Atlas agent's stable system prompt understand Atlas as a local-first coding harness, not just a generic terminal chatbot, without adding extra prompt files or a second context engine.
+- Atlas files inspected: `src/modules/ai/config.ts`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/lib/transport.ts`, `src/modules/ai/tools/tools.ts`, `src/modules/ai/proof/{contracts,recorder,harnessTrace}.ts`, and `src/modules/ai/contextLedger/contextLedger.test.ts`.
+- opensrc hook: ran `bash scripts/consult-opensrc.sh agent-loop context prompt proof`; GitHub authentication resolved through the active `gh` keyring.
+- opensrc inspected: `Aider-AI/aider` repo-map reference, `princeton-nlp/SWE-agent`, `SWE-agent/mini-swe-agent`, `All-Hands-AI/OpenHands`, and `anthropics/anthropic-quickstarts` were resolved for the current prompt/context slice. No upstream code was copied.
+- Atlas finding: the existing system prompt already described tools, workspace binding, edit discipline, and output style, but its identity line still framed Atlas as an agent embedded in a terminal emulator. It did not explicitly teach the model that CodeReality, repository-truth precedence, proof receipts, and honest verification tiers are the core Atlas behavior.
+- Disposition: `ADAPT` coding-agent prompt discipline into the existing single system prompt. `PRESERVE` the existing `ATLAS.md` per-workspace project memory injection. `REJECT` adding more root markdown files, hidden prompt fragments, benchmark-only special cases, or claims that every ablation mode has every tool.
+- Tests required: TypeScript must compile, prompt/context ledger tests must still pass, and the full frontend suite should remain green.
+
+Applied:
+
+- Updated `SYSTEM_PROMPT` with a compact `What makes you Atlas` block covering CodeReality, repo truth over memory, proof receipts, verification tiers, and workspace/secret boundaries.
+- Updated `SYSTEM_PROMPT_LITE` with the same self-knowledge in compressed form for smaller/local models.
+- Kept the prompt tool-aware but not ablation-fragile by saying repo_context/repo_map are used when available.
+
+Verification:
+
+- `git diff --check` passed.
+- Focused prompt/context verification passed with Node `v22.16.0`: `src/modules/ai/contextLedger/contextLedger.test.ts`, `src/modules/ai/tools/ablation.test.ts`, and `src/modules/ai/proof/harnessTrace.test.ts`; `10` tests across `3` files.
+- TypeScript passed with Node `v22.16.0` via `./node_modules/.bin/tsc --noEmit`.
+- Full frontend Vitest passed with Node `v22.16.0`: `244` tests across `49` files.
+- Note: `pnpm` was not visible on PATH in this shell, so equivalent local project binaries were used with explicit Node 22.
