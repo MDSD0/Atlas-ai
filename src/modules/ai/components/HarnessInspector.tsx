@@ -86,12 +86,14 @@ function MapTab({
   query,
   setQuery,
   submit,
+  onOpenFile,
 }: {
   snapshot: RepoContextResponse;
   stats: RealityStat[];
   query: string;
   setQuery: (query: string) => void;
   submit: (event: FormEvent<HTMLFormElement>) => void;
+  onOpenFile?: (path: string) => void;
 }) {
   const [selectedPath, setSelectedPath] = useState<string | null>(
     snapshot.included_files[0] ?? null,
@@ -139,6 +141,7 @@ function MapTab({
         focus={query}
         selectedPath={selectedPath}
         onSelectPath={setSelectedPath}
+        onOpenPath={onOpenFile}
       />
 
       <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
@@ -149,9 +152,20 @@ function MapTab({
 
       {selectedPath && (
         <div className="border-t border-border/60 pt-2">
-          <div className="truncate text-[11px] font-medium text-foreground/90">
-            {selectedPath}
-          </div>
+          {onOpenFile ? (
+            <button
+              type="button"
+              onClick={() => onOpenFile(selectedPath)}
+              title={`Open ${selectedPath}`}
+              className="w-full truncate text-left text-[11px] font-medium text-foreground/90 hover:text-emerald-500 hover:underline"
+            >
+              {selectedPath}
+            </button>
+          ) : (
+            <div className="truncate text-[11px] font-medium text-foreground/90">
+              {selectedPath}
+            </div>
+          )}
           {relations.length === 0 ? (
             <div className="mt-1 text-[10px] text-muted-foreground">
               No visible ranked links for this file.
@@ -570,12 +584,15 @@ export function HarnessInspector({
   workspaceRoot,
   task,
   onFocusTask,
+  onOpenFile,
 }: {
   snapshot: RepoContextResponse;
   stats: RealityStat[];
   workspaceRoot: string;
   task: string;
   onFocusTask: (task: string) => void;
+  /** Open a repository file in the editor from the map/symbol surfaces. */
+  onOpenFile?: (path: string) => void;
 }) {
   const activeSessionId = useChatStore((state) => state.activeSessionId);
   const packedContext = useContextLedgerStore(
@@ -688,6 +705,7 @@ export function HarnessInspector({
           query={query}
           setQuery={setQuery}
           submit={submit}
+          onOpenFile={onOpenFile}
         />
       )}
       {tab === "context" && (

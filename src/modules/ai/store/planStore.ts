@@ -39,6 +39,14 @@ type PlanState = {
   clear: () => void;
   /** Apply queued edits in order. Returns per-edit results. */
   applyAll: () => Promise<{ id: string; ok: boolean; error?: string }[]>;
+  /**
+   * Apply only the given queued edits, in queue order. Successfully applied
+   * edits leave the queue; edits that fail or were not selected remain so the
+   * user can review/retry. Enables per-file accept without all-or-nothing.
+   */
+  applySome: (
+    ids: readonly string[],
+  ) => Promise<{ id: string; ok: boolean; error?: string }[]>;
 };
 
 let nextId = 1;
@@ -69,29 +77,49 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
   clear: () => set({ queue: [] }),
   async applyAll() {
-    const items = get().queue;
-    const results: { id: string; ok: boolean; error?: string }[] = [];
-    for (const q of items) {
-      try {
-        if (q.kind === "create_directory") {
-          await agentNative.createDir(q.path, q.projectRoot);
-        } else {
-          await withFileMutationQueue(
-            q.path,
-            async () => {
-              await assertQueuedEditFresh(q);
-              await agentNative.writeFile(q.path, q.proposedContent, q.projectRoot);
-              await observePostEdit(q.projectRoot, q.path);
-            },
-            (p) => agentNative.canonicalize(p, q.projectRoot),
-          );
-        }
-        results.push({ id: q.id, ok: true });
-      } catch (e) {
-        results.push({ id: q.id, ok: false, error: String(e) });
-      }
-    }
-    set({ queue: [] });
-    return results;
+    return applyQueued(get, set, get().queue.map((q) => q.id));
+  },
+  async applySome(ids) {
+    return applyQueued(get, set, ids);
   },
 }));
+
+async function applyOne(q: QueuedEdit): Promise<void> {
+  if (q.kind === "create_directory") {
+    await agentNative.createDir(q.path, q.projectRoot);
+    return;
+  }
+  await withFileMutationQueue(
+    q.path,
+    async () => {
+      await assertQueuedEditFresh(q);
+      await agentNative.writeFile(q.path, q.proposedContent, q.projectRoot);
+      await observePostEdit(q.projectRoot, q.path);
+    },
+    (p) => agentNative.canonicalize(p, q.projectRoot),
+  );
+}
+
+// Apply the selected queued edits in queue order. Applied edits are removed
+// from the queue; failed and unselected edits stay so the user can retry.
+async function applyQueued(
+  get: () => PlanState,
+  set: (partial: Partial<PlanState>) => void,
+  ids: readonly string[],
+): Promise<{ id: string; ok: boolean; error?: string }[]> {
+  const selected = new Set(ids);
+  const items = get().queue.filter((q) => selected.has(q.id));
+  const results: { id: string; ok: boolean; error?: string }[] = [];
+  const appliedOk = new Set<string>();
+  for (const q of items) {
+    try {
+      await applyOne(q);
+      results.push({ id: q.id, ok: true });
+      appliedOk.add(q.id);
+    } catch (e) {
+      results.push({ id: q.id, ok: false, error: String(e) });
+    }
+  }
+  set({ queue: get().queue.filter((q) => !appliedOk.has(q.id)) });
+  return results;
+}

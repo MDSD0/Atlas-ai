@@ -86,3 +86,54 @@ describe("plan edit freshness", () => {
     );
   });
 });
+
+describe("plan per-file accept (applySome)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    usePlanStore.setState({ active: false, queue: [] });
+    mocks.lspDiagnostics.mockResolvedValue({
+      provider: "typescript",
+      status: "fresh",
+      file: "x",
+      diagnostics: [],
+      waited_ms: 1,
+      detail: "fresh",
+    });
+    mocks.createDir.mockResolvedValue(undefined);
+  });
+
+  function dirEdit(id: string, path: string): QueuedEdit {
+    return {
+      id,
+      kind: "create_directory",
+      path,
+      projectRoot: "/repo",
+      originalContent: "",
+      proposedContent: "",
+      isNewFile: true,
+    };
+  }
+
+  it("applies only the selected edit and keeps the rest queued", async () => {
+    usePlanStore.getState().enqueue(dirEdit("q-1", "/repo/a"));
+    usePlanStore.getState().enqueue(dirEdit("q-2", "/repo/b"));
+
+    await expect(usePlanStore.getState().applySome(["q-1"])).resolves.toEqual([
+      { id: "q-1", ok: true },
+    ]);
+    expect(mocks.createDir).toHaveBeenCalledTimes(1);
+    expect(mocks.createDir).toHaveBeenCalledWith("/repo/a", "/repo");
+
+    const remaining = usePlanStore.getState().queue.map((q) => q.id);
+    expect(remaining).toEqual(["q-2"]);
+  });
+
+  it("keeps a failed edit in the queue for retry", async () => {
+    usePlanStore.getState().enqueue(dirEdit("q-1", "/repo/a"));
+    mocks.createDir.mockRejectedValueOnce(new Error("boom"));
+
+    const [result] = await usePlanStore.getState().applySome(["q-1"]);
+    expect(result.ok).toBe(false);
+    expect(usePlanStore.getState().queue.map((q) => q.id)).toEqual(["q-1"]);
+  });
+});

@@ -1614,7 +1614,7 @@ export default function App() {
                         onFolderSelected={setActiveFolder}
                       />
                     ) : sidebarView === "reality" ? (
-                      <CodeRealityPanel />
+                      <CodeRealityPanel onOpenFile={handleOpenFile} />
                     ) : sidebarView === "sessions" ? (
                       <SessionsPanel />
                     ) : (

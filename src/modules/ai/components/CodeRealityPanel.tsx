@@ -70,7 +70,11 @@ const CHIP_TONE: Record<StatusChip["tone"], string> = {
   muted: "border-border/50 bg-card/50 text-muted-foreground",
 };
 
-export function CodeRealityPanel() {
+export function CodeRealityPanel({
+  onOpenFile,
+}: {
+  onOpenFile?: (path: string) => void;
+} = {}) {
   const workspaceRoot = useWorkspaceStore((s) => s.workspaceRoot);
   const status = useRealityStore((s) => s.status);
   const snapshot = useRealityStore((s) => s.snapshot);
@@ -139,6 +143,7 @@ export function CodeRealityPanel() {
               workspaceRoot={workspaceRoot}
               task={task}
               onFocusTask={(focusedTask) => void refresh(workspaceRoot, focusedTask)}
+              onOpenFile={onOpenFile}
             />
 
             {snapshot.degraded_files.length > 0 && (

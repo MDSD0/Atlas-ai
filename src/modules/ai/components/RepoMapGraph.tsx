@@ -7,6 +7,8 @@ type Props = {
   focus: string;
   selectedPath: string | null;
   onSelectPath: (path: string) => void;
+  /** Open the file in the editor (double-click / Enter on a focused node). */
+  onOpenPath?: (path: string) => void;
 };
 
 function trimLabel(label: string): string {
@@ -18,6 +20,7 @@ export function RepoMapGraph({
   focus,
   selectedPath,
   onSelectPath,
+  onOpenPath,
 }: Props) {
   const graph = useMemo(() => buildRepoMap(snapshot, focus), [focus, snapshot]);
   const byId = useMemo(
@@ -69,10 +72,14 @@ export function RepoMapGraph({
             key={node.id}
             role="button"
             tabIndex={0}
-            aria-label={`Inspect ${node.id}`}
+            aria-label={`Inspect ${node.id}. Double-click or press Enter to open.`}
             onClick={() => onSelectPath(node.id)}
+            onDoubleClick={() => onOpenPath?.(node.id)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onOpenPath ? onOpenPath(node.id) : onSelectPath(node.id);
+              } else if (event.key === " ") {
                 event.preventDefault();
                 onSelectPath(node.id);
               }
@@ -102,7 +109,7 @@ export function RepoMapGraph({
             >
               {trimLabel(node.label)}
             </text>
-            <title>{`${node.id} - ${node.degree} visible links`}</title>
+            <title>{`${node.id} - ${node.degree} visible links${onOpenPath ? " (double-click to open)" : ""}`}</title>
           </g>
         );
       })}

@@ -31,6 +31,7 @@ export function PlanDiffReview() {
   const removeOne = usePlanStore((s) => s.removeOne);
   const clear = usePlanStore((s) => s.clear);
   const applyAll = usePlanStore((s) => s.applyAll);
+  const applySome = usePlanStore((s) => s.applySome);
   const [busy, setBusy] = useState(false);
 
   if (queue.length === 0) return null;
@@ -43,6 +44,16 @@ export function PlanDiffReview() {
       if (failed.length) {
         console.error("plan apply failures:", failed);
       }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onAcceptOne = async (id: string) => {
+    setBusy(true);
+    try {
+      const [result] = await applySome([id]);
+      if (result && !result.ok) console.error("plan apply failure:", result);
     } finally {
       setBusy(false);
     }
@@ -85,7 +96,13 @@ export function PlanDiffReview() {
       </div>
       <ul className="flex flex-1 flex-col gap-1.5 overflow-auto p-3">
         {queue.map((q) => (
-          <PlanRow key={q.id} item={q} onReject={() => removeOne(q.id)} />
+          <PlanRow
+            key={q.id}
+            item={q}
+            busy={busy}
+            onAccept={() => onAcceptOne(q.id)}
+            onReject={() => removeOne(q.id)}
+          />
         ))}
       </ul>
     </div>
@@ -94,9 +111,13 @@ export function PlanDiffReview() {
 
 function PlanRow({
   item,
+  busy,
+  onAccept,
   onReject,
 }: {
   item: QueuedEdit;
+  busy: boolean;
+  onAccept: () => void;
   onReject: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -162,16 +183,32 @@ function PlanRow({
             </div>
           )}
         </div>
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          className="size-5 shrink-0 opacity-0 transition-opacity group-hover/row:opacity-100"
-          onClick={onReject}
-          aria-label="Reject"
-        >
-          <Cancel01Icon size={11} strokeWidth={1.5} />
-        </Button>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={busy}
+            className="size-6 text-muted-foreground hover:bg-emerald-500/15 hover:text-emerald-500"
+            onClick={onAccept}
+            aria-label="Accept this change"
+            title="Accept this change"
+          >
+            <Tick02Icon size={12} strokeWidth={2} />
+          </Button>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            disabled={busy}
+            className="size-6 text-muted-foreground hover:bg-destructive/15 hover:text-destructive"
+            onClick={onReject}
+            aria-label="Reject this change"
+            title="Reject this change"
+          >
+            <Cancel01Icon size={12} strokeWidth={1.5} />
+          </Button>
+        </div>
       </div>
       {open && !isDir ? (
         <div className="border-t border-border/40 bg-muted/20 px-2.5 py-2">

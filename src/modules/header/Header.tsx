@@ -130,45 +130,42 @@ export function Header({
           <SidebarLeftIcon size={18} strokeWidth={1.5} />
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
-              title="Split terminal"
-              disabled={!canSplit}
-            >
-              <GridViewIcon size={16} strokeWidth={1.5} />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="min-w-44">
-            <DropdownMenuItem onSelect={() => onSplit("row")}>
-              <LayoutTwoColumnIcon
-                size={14}
-                strokeWidth={1.5}
-              />
-              <span className="flex-1">Split right</span>
-              {splitRightTokens && (
-                <span className="text-xs text-muted-foreground">
-                  {splitRightTokens}
-                </span>
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onSplit("col")}>
-              <LayoutTwoRowIcon
-                size={14}
-                strokeWidth={1.5}
-              />
-              <span className="flex-1">Split down</span>
-              {splitDownTokens && (
-                <span className="text-xs text-muted-foreground">
-                  {splitDownTokens}
-                </span>
-              )}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Split is terminal-only; hide it entirely on other tabs rather than
+            showing a permanently-dead disabled button. */}
+        {canSplit && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                title="Split terminal"
+              >
+                <GridViewIcon size={16} strokeWidth={1.5} />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="min-w-44">
+              <DropdownMenuItem onSelect={() => onSplit("row")}>
+                <LayoutTwoColumnIcon size={14} strokeWidth={1.5} />
+                <span className="flex-1">Split right</span>
+                {splitRightTokens && (
+                  <span className="text-xs text-muted-foreground">
+                    {splitRightTokens}
+                  </span>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => onSplit("col")}>
+                <LayoutTwoRowIcon size={14} strokeWidth={1.5} />
+                <span className="flex-1">Split down</span>
+                {splitDownTokens && (
+                  <span className="text-xs text-muted-foreground">
+                    {splitDownTokens}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
 
         {!IS_MAC && <NotificationBell
             onActivate={onActivateAgent}
