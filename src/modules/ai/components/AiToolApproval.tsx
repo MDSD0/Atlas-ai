@@ -135,14 +135,15 @@ function PreviewBlock({
     const removed = oldStr ? oldStr.split("\n").length : 0;
     const added = newStr ? newStr.split("\n").length : 0;
     return (
-      <div className="space-y-0.5 font-mono text-[11px]">
+      <div className="space-y-1 font-mono text-[11px]">
         <div className="text-muted-foreground">
           {String(input.path ?? "")}
           {input.replace_all ? " · replace all" : ""}
         </div>
+        <InlineMiniDiff oldStr={oldStr} newStr={newStr} />
         <div className="text-[10.5px] text-muted-foreground/80">
           −{removed} / +{added} line{added === 1 && removed === 1 ? "" : "s"} ·
-          review in the diff tab
+          full review in the diff tab
         </div>
       </div>
     );
@@ -172,5 +173,43 @@ function PreviewBlock({
     <pre className="overflow-auto rounded-md bg-muted/60 p-2 font-mono text-[11px] leading-relaxed">
       {JSON.stringify(input, null, 2)}
     </pre>
+  );
+}
+
+// Compact removed/added preview for an `edit` approval, so the change is
+// visible in chat without opening the diff tab. Bounded so a large edit can
+// never thrash the card.
+const MINI_DIFF_MAX_LINES = 6;
+
+function InlineMiniDiff({ oldStr, newStr }: { oldStr: string; newStr: string }) {
+  if (!oldStr && !newStr) return null;
+  const clip = (s: string) => {
+    const lines = s.split("\n");
+    const shown = lines.slice(0, MINI_DIFF_MAX_LINES);
+    return { shown, more: lines.length - shown.length };
+  };
+  const removed = clip(oldStr);
+  const added = clip(newStr);
+  return (
+    <div className="overflow-hidden rounded-md border border-border/50 text-[10.5px] leading-relaxed">
+      {removed.shown.map((line, i) => (
+        <div key={`r${i}`} className="flex bg-destructive/10 text-destructive">
+          <span className="w-4 shrink-0 select-none text-center opacity-70">−</span>
+          <span className="min-w-0 flex-1 overflow-x-auto whitespace-pre pr-2">{line || " "}</span>
+        </div>
+      ))}
+      {removed.more > 0 && (
+        <div className="px-2 text-[10px] italic text-muted-foreground">…{removed.more} more removed</div>
+      )}
+      {added.shown.map((line, i) => (
+        <div key={`a${i}`} className="flex bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <span className="w-4 shrink-0 select-none text-center opacity-70">+</span>
+          <span className="min-w-0 flex-1 overflow-x-auto whitespace-pre pr-2">{line || " "}</span>
+        </div>
+      ))}
+      {added.more > 0 && (
+        <div className="px-2 text-[10px] italic text-muted-foreground">…{added.more} more added</div>
+      )}
+    </div>
   );
 }
