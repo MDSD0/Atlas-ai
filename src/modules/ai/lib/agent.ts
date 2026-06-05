@@ -27,6 +27,10 @@ import {
   type PackedContextSource,
 } from "../contextLedger";
 import { buildTools, type AblationMode, type ToolContext } from "../tools/tools";
+import {
+  activeToolNames,
+  clearPromotedCapabilities,
+} from "../tools/capabilities";
 import { wrapToolsWithLifecycle } from "../tools/lifecycle";
 import type { AtlasLifecycleEvent } from "../skills";
 import { compactModelMessagesDetailed } from "./compact";
@@ -558,12 +562,29 @@ export async function runAgentStream(opts: RunAgentOptions) {
       .catch(() => {});
   }
 
+  // Capability Gateway: in the product (`full`) toolbelt, gate the model to the
+  // small core set plus whatever it has unlocked via `capability_search`. The
+  // full `tools` object is still defined, so promoted tools are callable the
+  // moment the model searches for them — we only narrow which schemas are sent
+  // each step. Ablation modes already restrict their toolbelt and opt out.
+  const gatewayActive = (opts.toolMode ?? "full") === "full";
+  const sessionId = opts.toolContext.getSessionId() ?? "unknown";
+  if (gatewayActive) clearPromotedCapabilities(sessionId);
+  const allToolNames = new Set(Object.keys(tools));
+
   let stepsSeen = 0;
   return streamText({
     model,
     messages: finalMessages,
     tools,
     stopWhen: stepCountIs(MAX_AGENT_STEPS),
+    prepareStep: gatewayActive
+      ? () => ({
+          activeTools: activeToolNames(sessionId).filter((name) =>
+            allToolNames.has(name),
+          ) as (keyof typeof tools)[],
+        })
+      : undefined,
     abortSignal: opts.abortSignal,
     onStepFinish: (step) => {
       stepsSeen++;

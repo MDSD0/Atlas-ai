@@ -1,4 +1,5 @@
 import { buildManagedAgentTools } from "./agent";
+import { buildCapabilityTools } from "./capabilities";
 import { buildEditTools } from "./edit";
 import { buildFsTools } from "./fs";
 import { buildMemoryTools } from "./memory";
@@ -80,6 +81,7 @@ function buildFullTools(ctx: import("./context").ToolContext) {
     ...buildTerminalTools(ctx),
     ...buildTodoTools(ctx),
     ...buildManagedAgentTools(ctx),
+    ...buildCapabilityTools(ctx),
   } as const;
   return {
     ...base,

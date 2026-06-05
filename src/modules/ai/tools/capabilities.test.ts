@@ -1,0 +1,50 @@
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  CORE_TOOL_NAMES,
+  activeToolNames,
+  clearPromotedCapabilities,
+  getPromotedCapabilities,
+  promoteCapabilities,
+  searchCapabilities,
+} from "./capabilities";
+
+const SESSION = "test-session";
+
+afterEach(() => clearPromotedCapabilities(SESSION));
+
+describe("capability gateway", () => {
+  it("default active toolbelt is just the small core set", () => {
+    expect(activeToolNames(SESSION).sort()).toEqual([...CORE_TOOL_NAMES].sort());
+    expect(activeToolNames(SESSION)).toContain("capability_search");
+    expect(activeToolNames(SESSION)).not.toContain("lsp_references");
+  });
+
+  it("ranks capabilities by keyword overlap", () => {
+    const refs = searchCapabilities("find all callers of this function");
+    expect(refs.map((c) => c.id)).toContain("repo_intel");
+
+    const mem = searchCapabilities("what did we decide in past sessions");
+    expect(mem.map((c) => c.id)).toContain("memory");
+
+    expect(searchCapabilities("")).toEqual([]);
+  });
+
+  it("promotes searched capabilities into the active set for the run", () => {
+    promoteCapabilities(SESSION, ["code_intel_lsp"]);
+    expect(getPromotedCapabilities(SESSION)).toEqual(["code_intel_lsp"]);
+    const active = activeToolNames(SESSION);
+    expect(active).toContain("lsp_references");
+    expect(active).toContain("read_file"); // core stays
+  });
+
+  it("ignores unknown capability ids", () => {
+    promoteCapabilities(SESSION, ["not_a_capability"]);
+    expect(getPromotedCapabilities(SESSION)).toEqual([]);
+  });
+
+  it("clears promotions between runs", () => {
+    promoteCapabilities(SESSION, ["memory"]);
+    clearPromotedCapabilities(SESSION);
+    expect(activeToolNames(SESSION).sort()).toEqual([...CORE_TOOL_NAMES].sort());
+  });
+});
