@@ -22,6 +22,11 @@ import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
 import { buildActiveWorkPacketContext } from "../workPackets";
 import { contextLedger, type PackedContextSource } from "../contextLedger";
 import { selectAgentRunPolicy } from "./lanePolicy";
+import {
+  beginRunResources,
+  killRunResourcesForSignal,
+  releaseRunResources,
+} from "./runResources";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -79,6 +84,7 @@ type Deps = {
   onUsage?: (delta: AgentUsageDelta) => void;
   onCompact?: (info: { droppedCount: number }) => void;
   onFinishMeta?: (info: { hitStepCap: boolean; finishReason: string }) => void;
+  onCancel?: () => void;
   getPlanMode?: () => boolean;
 };
 
@@ -92,6 +98,8 @@ export function createContextAwareTransport(deps: Deps) {
   const run = async (options: SendOptions) => {
     const live = deps.getLive();
     const prompt = lastUserText(options.messages);
+    const sessionId = deps.toolContext.getSessionId() ?? "unknown";
+    beginRunResources(sessionId, options.abortSignal);
     const planMode = deps.getPlanMode?.() ?? false;
     const runPolicy = selectAgentRunPolicy({
       prompt: recentUserText(options.messages),
@@ -101,7 +109,7 @@ export function createContextAwareTransport(deps: Deps) {
     const simpleMem = runPolicy.includeSimpleMem
       ? await SimpleMemRunObserver.start({
           workspaceRoot: live.workspaceRoot,
-          contentSessionId: deps.toolContext.getSessionId() ?? "unknown",
+          contentSessionId: sessionId,
           userPrompt: prompt,
         }).catch(() => null)
       : null;
@@ -175,7 +183,7 @@ export function createContextAwareTransport(deps: Deps) {
     const recorder = await RunRecorder.start(
       proofJournal,
       {
-        sessionId: deps.toolContext.getSessionId() ?? "unknown",
+        sessionId,
         workspaceRoot: live.workspaceRoot,
       },
       { onUpdate: (summary) => useProofStore.getState().setSummary(summary) },
@@ -202,6 +210,11 @@ export function createContextAwareTransport(deps: Deps) {
     const finishObservers = async (
       outcome: { cancelled?: boolean; errored?: boolean } = {},
     ) => {
+      if (outcome.cancelled) {
+        killRunResourcesForSignal(sessionId, options.abortSignal);
+      } else {
+        releaseRunResources(sessionId, options.abortSignal);
+      }
       await Promise.all([
         (async () => {
           await recorder?.finish(outcome).catch(() => {});
@@ -215,10 +228,13 @@ export function createContextAwareTransport(deps: Deps) {
       ]);
     };
 
-    if (options.abortSignal && (recorder || simpleMem)) {
+    if (options.abortSignal) {
       options.abortSignal.addEventListener(
         "abort",
-        () => void finishObservers({ cancelled: true }),
+        () => {
+          deps.onCancel?.();
+          void finishObservers({ cancelled: true });
+        },
         { once: true },
       );
     }
@@ -257,7 +273,7 @@ export function createContextAwareTransport(deps: Deps) {
         contextLedger: live.workspaceRoot
           ? {
               projectId: live.workspaceRoot,
-              sessionId: deps.toolContext.getSessionId() ?? "unknown",
+              sessionId,
               activeFile: live.activeFile,
               sessionBinding: contextBlock,
               projectSources,
@@ -267,14 +283,13 @@ export function createContextAwareTransport(deps: Deps) {
         uiMessages: messagesForRun,
         abortSignal: options.abortSignal,
       });
-      if (recorder || simpleMem) {
-        // Close the receipt when the model stream resolves. finish() is
-        // idempotent, so an earlier abort-driven close wins over this one.
-        void result.finishReason.then(
-          () => finishObservers(),
-          () => finishObservers({ errored: true }),
-        );
-      }
+      // Close the receipt and release run resources when the model stream
+      // resolves. finish() and resource cleanup are idempotent, so an earlier
+      // abort-driven close wins over this one.
+      void result.finishReason.then(
+        () => finishObservers(),
+        () => finishObservers({ errored: true }),
+      );
       return result.toUIMessageStream({
         originalMessages: options.messages,
       });

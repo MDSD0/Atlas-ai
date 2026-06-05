@@ -35,6 +35,7 @@ import { pushRecentModel } from "../lib/modelPrefs";
 import type { ApprovalMode } from "../lib/permissions";
 import { createContextAwareTransport } from "../lib/transport";
 import { formatAgentError } from "../lib/errors";
+import { killRunResourcesForSession } from "../lib/runResources";
 import type {
   AtlasToolProjectContext,
   ExecutionCwdMode,
@@ -357,6 +358,9 @@ function makeChat(sessionId: string): Chat<UIMessage> {
           .getState()
           .completeTerminalInProgressTodo(sessionId);
       }
+    },
+    onCancel: () => {
+      useTodosStore.getState().pauseInProgressTodo(sessionId);
     },
     onUsage: (delta) => {
       const cur = useChatStore.getState().agentMeta.tokens;
@@ -687,7 +691,13 @@ export async function sendMessage(text: string): Promise<boolean> {
 export function stop(): void {
   const id = useChatStore.getState().activeSessionId;
   if (!id) return;
+  stopSession(id);
+}
+
+export function stopSession(id: string): void {
   void chats.get(id)?.stop();
+  killRunResourcesForSession(id);
+  useTodosStore.getState().pauseInProgressTodo(id);
   useChatStore.getState().patchAgentMeta({
     status: "idle",
     step: null,

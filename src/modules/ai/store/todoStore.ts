@@ -14,6 +14,7 @@ type TodosState = {
   hydrate: (sessionId: string) => Promise<void>;
   setTodos: (sessionId: string, todos: Todo[]) => void;
   completeTerminalInProgressTodo: (sessionId: string) => void;
+  pauseInProgressTodo: (sessionId: string) => void;
   clearSession: (sessionId: string) => Promise<void>;
 };
 
@@ -49,6 +50,20 @@ export const useTodosStore = create<TodosState>((set, get) => ({
     const next = todos.map((todo) =>
       todo.status === "in_progress"
         ? { ...todo, status: "completed" as const }
+        : todo,
+    );
+    set((s) => ({
+      bySession: { ...s.bySession, [sessionId]: next },
+    }));
+    void persistSave(sessionId, next);
+  },
+
+  pauseInProgressTodo(sessionId) {
+    const todos = get().bySession[sessionId] ?? [];
+    if (!todos.some((todo) => todo.status === "in_progress")) return;
+    const next = todos.map((todo) =>
+      todo.status === "in_progress"
+        ? { ...todo, status: "pending" as const }
         : todo,
     );
     set((s) => ({

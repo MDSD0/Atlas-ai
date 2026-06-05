@@ -489,3 +489,32 @@ Green receipts:
 - Vite build `0`.
 - Clean-shell `verify-atlas.sh --all` `RC=0`, frontend `263/263`, Rust
   `157 passed / 0 failed / 3 ignored`, harness `3 passed`.
+
+## Corrective slice: stop cancels run-owned background resources
+
+Done.
+
+- Added `src/modules/ai/lib/runResources.ts` to track run-owned shell background
+  handles by session and `AbortSignal`.
+- `serve_preview` and `bash_background` register handles only when they spawn a
+  new background process during the active run.
+- Reused preview/background processes remain user/app-owned and are not killed
+  by Stop.
+- Transport abort handling now kills active run-owned resources and pauses
+  visible todos.
+- `stopSession` centralizes chat abort, resource cleanup, todo pause, and agent
+  meta reset. The composer now calls that shared path.
+- Todo cancellation now returns `in_progress` items to `pending` instead of
+  leaving a spinner or marking unfinished work complete.
+
+Focused green receipts:
+
+- TypeScript `0`.
+- Focused Vitest `14/14`.
+- Full frontend Vitest `270/270`.
+- Vite build `0`.
+- `git diff --check` `0`.
+- Clean-shell `verify-atlas.sh --all` `RC=0`, frontend `270/270`, Rust
+  `157 passed / 0 failed / 3 ignored`, harness `3 passed`.
+
+Next: continue the bug ledger with provider/API robustness and latency receipts.

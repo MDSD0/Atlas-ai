@@ -1,9 +1,10 @@
-import { tool } from "ai";
+import { tool, type ToolExecutionOptions } from "ai";
 import { z } from "zod";
 import { native } from "../lib/native";
 import { checkShellCommand } from "../lib/security";
 import { shellNeedsApproval } from "../lib/permissions";
 import { redactSensitive } from "../lib/redact";
+import { registerRunBackgroundHandle } from "../lib/runResources";
 import { resolvePath, type ToolContext } from "./context";
 import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace/env";
 
@@ -202,7 +203,10 @@ export function buildShellTools(ctx: ToolContext) {
       }),
       needsApproval: ({ command }) =>
         shellNeedsApproval(command, ctx.getApprovalMode()),
-      execute: async ({ command, url, cwd, wait_ms }) => {
+      execute: async (
+        { command, url, cwd, wait_ms },
+        options: ToolExecutionOptions,
+      ) => {
         const safety = checkShellCommand(command);
         if (!safety.ok) return { error: safety.reason };
         const project = ctx.getProjectContext();
@@ -226,8 +230,16 @@ export function buildShellTools(ctx: ToolContext) {
             command,
             effectiveCwd,
           );
+          const spawned = !existing;
           const handle =
-            existing?.handle ?? (await native.shellBgSpawn(command, effectiveCwd));
+            existing?.handle ??
+            (await native.shellBgSpawn(command, effectiveCwd));
+          if (spawned) {
+            const sid = ctx.getSessionId();
+            if (sid) {
+              registerRunBackgroundHandle(sid, options.abortSignal, handle);
+            }
+          }
           const wait = wait_ms ?? 1200;
           if (wait > 0 && !existing) {
             await new Promise((resolve) => setTimeout(resolve, wait));
@@ -267,7 +279,10 @@ export function buildShellTools(ctx: ToolContext) {
       }),
       needsApproval: ({ command }) =>
         shellNeedsApproval(command, ctx.getApprovalMode()),
-      execute: async ({ command, cwd }) => {
+      execute: async (
+        { command, cwd },
+        options: ToolExecutionOptions,
+      ) => {
         const safety = checkShellCommand(command);
         if (!safety.ok) return { error: safety.reason };
         const project = ctx.getProjectContext();
@@ -278,6 +293,10 @@ export function buildShellTools(ctx: ToolContext) {
         try {
           await maybeAuthorizeTerminalExecution(ctx, effectiveCwd);
           const handle = await native.shellBgSpawn(command, effectiveCwd);
+          const sid = ctx.getSessionId();
+          if (sid) {
+            registerRunBackgroundHandle(sid, options.abortSignal, handle);
+          }
           return { handle, command, cwd: effectiveCwd, ok: true };
         } catch (e) {
           return { error: String(e) };

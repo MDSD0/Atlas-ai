@@ -9,7 +9,7 @@ import {
 import { useWhisperRecording } from "../hooks/useWhisperRecording";
 import { expandSnippetTokens, type Snippet } from "../lib/snippets";
 import { tryRunSlashCommand, type SlashCommandMeta } from "./slashCommands";
-import { getOrCreateChat, useChatStore } from "../store/chatStore";
+import { getOrCreateChat, stopSession, useChatStore } from "../store/chatStore";
 import { useSnippetsStore } from "../store/snippetsStore";
 import { currentWorkspaceEnv } from "@/modules/workspace/env";
 
@@ -321,12 +321,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
   const stop = () => {
     if (!sessionId) return;
-    void getOrCreateChat(sessionId).stop();
-    useChatStore.getState().patchAgentMeta({
-      status: "idle",
-      step: null,
-      approvalsPending: 0,
-    });
+    stopSession(sessionId);
   };
 
   const canSend =

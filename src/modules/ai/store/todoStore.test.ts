@@ -47,4 +47,20 @@ describe("todoStore completion reconciliation", () => {
       { id: "c", title: "Verify interactions", status: "pending" },
     ]);
   });
+
+  it("pauses in-progress todos on cancellation without completing them", () => {
+    useTodosStore.getState().setTodos("s1", [
+      { id: "a", title: "Write files", status: "completed" },
+      { id: "b", title: "Run preview", status: "in_progress" },
+      { id: "c", title: "Verify interactions", status: "pending" },
+    ]);
+
+    useTodosStore.getState().pauseInProgressTodo("s1");
+
+    expect(useTodosStore.getState().bySession.s1).toEqual([
+      { id: "a", title: "Write files", status: "completed" },
+      { id: "b", title: "Run preview", status: "pending" },
+      { id: "c", title: "Verify interactions", status: "pending" },
+    ]);
+  });
 });

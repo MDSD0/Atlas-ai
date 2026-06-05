@@ -1304,3 +1304,34 @@ Verification:
 - Vite production build returned `0`.
 - `git diff --check` returned `0`.
 - Clean-shell `bash scripts/verify-atlas.sh --all` returned `0` and printed `verify-atlas --all: OK`; frontend Vitest `263/263`, Rust `157 passed / 0 failed / 3 ignored`, harness `3 passed`.
+
+## Corrective Slice C20: stop cancels run-owned background resources
+
+Source-parity packet:
+
+- Slice: make the Stop button a real run cancellation boundary for run-owned background processes and visible todo state, without killing reused or user-owned servers.
+- Atlas files inspected: `src/modules/ai/store/chatStore.ts`, `src/modules/ai/lib/composer.tsx`, `src/modules/ai/lib/transport.ts`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/tools/shell.ts`, `src/modules/ai/lib/native.ts`, `src/modules/ai/store/todoStore.ts`, `src/modules/ai/components/TodoStrip.tsx`, and `src-tauri/src/modules/shell/mod.rs`.
+- opensrc hook: explicit Git Bash `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh agent-loop tools shell terminal permission opencode mini-swe-agent` returned `0` and resolved the focused source set through the active `gh` keyring.
+- opensrc inspected: `anomalyco/opencode/packages/opencode/src/session/run-state.ts`, `anomalyco/opencode/packages/opencode/src/session/session.ts`, `anomalyco/opencode/packages/opencode/src/tool/tool.ts`, `SWE-agent/mini-swe-agent/docs/usage/mini.md`, and `SWE-agent/mini-swe-agent/docs/usage/swebench.md`.
+- Local dependency source inspected: `node_modules/ai/src/generate-text/execute-tool-call.ts`, `node_modules/ai/src/generate-text/stream-text.ts`, and `@ai-sdk/provider-utils/src/types/tool.ts` from the installed package store.
+- Web docs refreshed: AI SDK Advanced Stopping Streams and AI SDK Core `streamText` reference.
+- Finding: Atlas passed `abortSignal` into `streamText`, and the visible stop path patched status to idle, but background processes spawned by `serve_preview` or `bash_background` were not registered against the run abort signal. Stop could therefore end the stream while leaving run-owned preview servers alive and leaving an `in_progress` todo spinner visible.
+- Disposition: `ADAPT` opencode's session cancellation idea by tracking only Atlas run-owned background handles and cancelling them on abort. `PRESERVE` normal successful preview behavior by leaving spawned servers alive after a completed run. `PRESERVE` reused server behavior by not registering existing handles for cancellation. `REJECT` broad kill-all-background or native process-manager rewrites in this slice.
+- Tests required: run resource tracker must kill registered handles exactly once on abort; normal release must not kill; reused handles must not be registered by shell tools; stopping must reset in-progress todos to pending so the UI cannot keep a spinner after cancellation.
+
+Applied:
+
+- Added `runResources`, a small per-run `AbortSignal` resource tracker for shell background handles spawned by the active agent run.
+- Registered only newly spawned `serve_preview` and `bash_background` handles. Existing preview/background processes that Atlas reuses are deliberately not registered against the active run.
+- Wired transport abort handling so cancellation always closes proof/memory observers, kills run-owned background handles, and asks the todo store to pause any `in_progress` item.
+- Replaced duplicate composer stop logic with a session-level stop path that aborts the chat, kills active run resources, pauses the visible todo, and resets agent status.
+- Added todo pause semantics so cancellation returns `in_progress` todos to `pending` instead of leaving a spinner or falsely marking work complete.
+
+Verification:
+
+- Focused TypeScript returned `0`.
+- Focused Vitest for `runResources`, `todoStore`, and `shell` returned `0` with `14/14` tests.
+- Full frontend Vitest returned `0` with `270/270` tests across `55` files.
+- Vite production build returned `0`.
+- `git diff --check` returned `0`.
+- Clean-shell `bash scripts/verify-atlas.sh --all` returned `0`, printed `RC=0` and `verify-atlas --all: OK`; frontend Vitest `270/270`, Rust `157 passed / 0 failed / 3 ignored`, harness `3 passed`.

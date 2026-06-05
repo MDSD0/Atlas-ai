@@ -82,3 +82,34 @@ Verification receipts:
 - Clean-shell `bash scripts/verify-atlas.sh --all` `RC=0`, printed
   `verify-atlas --all: OK`; Rust `157 passed / 0 failed / 3 ignored`, harness
   `3 passed`.
+
+## Stop/cancellation resource correction
+
+Observed failure class: Stop could abort the visible model stream while leaving
+run-owned background resources alive. In the calculator flow this showed up as a
+server continuing after the user tried to stop, plus todo UI that could remain
+visibly stuck on an `in_progress` item.
+
+Applied:
+
+- Added a small per-run resource tracker keyed by the AI SDK `AbortSignal`.
+- `serve_preview` and `bash_background` now register only newly spawned handles
+  against the active run. Reused preview servers are not run-owned and survive
+  cancellation.
+- Transport abort handling now kills active run-owned background handles and
+  pauses any `in_progress` todo back to `pending`.
+- Composer and chat-store stop paths now share the same session-level stop
+  behavior.
+- Normal successful runs release resource tracking without killing preview
+  servers, preserving the expected "run then inspect" workflow.
+
+Focused verification:
+
+- TypeScript `0`.
+- Focused Vitest `14/14` for run resource cancellation, todo cancellation, and
+  shell preview spawned-vs-reused behavior.
+- Full frontend Vitest `270/270`.
+- Vite build `0`.
+- Clean-shell `bash scripts/verify-atlas.sh --all` `RC=0`, printed
+  `verify-atlas --all: OK`; Rust `157 passed / 0 failed / 3 ignored`, harness
+  `3 passed`.
