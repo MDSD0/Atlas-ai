@@ -29,3 +29,14 @@ Five-item pre-benchmark pass before the Windows local-model run:
 Green (clean shell verify-atlas.sh --all): tsc 0, vitest 244 passed, build 0, cargo check/clippy 0, cargo test 144 + 3 harness.
 
 Next (user): Windows + Ollama qwen2.5-coder:7b, run mini-SWE-agent baseline vs Atlas on the same 3-5 SWE-bench Lite tasks, compare harness traces.
+
+## Windows benchmark/verification correction
+
+After the local/API benchmark pass, the Windows verification floor was recovered.
+
+- Host PATH now exposes Git Bash, pnpm, Cargo, Python, and git to explicit Git Bash runs. The stable command is `& "C:\Program Files\Git\bin\bash.exe" --noprofile --norc -lc "cd /c/Users/name/Downloads/Atlas-ai && bash scripts/verify-atlas.sh --all"`.
+- The Rust symlink escape test still verifies the security invariant when symlinks can be created, but skips the fixture on Windows hosts that deny symlink privilege with OS error `1314`.
+- Release preflight now normalizes lockfile line endings before matching the Tauri dependency contract, so CRLF does not create a false blocker.
+- Final receipt: explicit Git Bash `bash scripts/verify-atlas.sh --all` exited `0` and printed `verify-atlas --all: OK`; frontend Vitest `255/255`, Rust `157 passed / 0 failed / 3 ignored`, harness `3 passed`.
+
+Next: commit and push the benchmark safety, API-first loop, UX error normalization, and Windows verification-floor fixes.

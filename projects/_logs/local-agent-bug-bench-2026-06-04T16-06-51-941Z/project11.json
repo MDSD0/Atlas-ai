@@ -1,0 +1,52 @@
+{
+  "index": 11,
+  "name": "path-resolution-active-folder",
+  "projectDir": "C:\\Users\\name\\Downloads\\Atlas-ai\\projects\\project11",
+  "prompt": "Create README.md for this project with a one-sentence description.",
+  "duration_ms": 962,
+  "passed": false,
+  "strictToolCalls": 0,
+  "rawJsonToolCalls": 1,
+  "todoWrites": 0,
+  "malformed": 0,
+  "final": "{\"name\": \"write_file\", \"arguments\": {\"path\": \"README.md\", \"content\": \"# Project 11\\nA local-first project for Atlas AI.\"}}",
+  "checkResults": [
+    {
+      "command": "test -f README.md",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "files": [
+    "src/app.js"
+  ],
+  "events": [
+    {
+      "turn": 1,
+      "response": {
+        "role": "assistant",
+        "content": "{\"name\": \"write_file\", \"arguments\": {\"path\": \"README.md\", \"content\": \"# Project 11\\nA local-first project for Atlas AI.\"}}"
+      },
+      "usage": {
+        "prompt_tokens": 477,
+        "completion_tokens": 36,
+        "total_tokens": 513
+      }
+    },
+    {
+      "turn": 1,
+      "anomaly": "raw_json_tool_call_in_content",
+      "source": "ollama-openai-compatible-response",
+      "parsed": {
+        "name": "write_file",
+        "arguments": {
+          "path": "README.md",
+          "content": "# Project 11\nA local-first project for Atlas AI."
+        }
+      },
+      "impact": "strict OpenAI tool-call harness would not execute this"
+    }
+  ]
+}

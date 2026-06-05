@@ -30,6 +30,7 @@ describe("buildTools ablation modes", () => {
     expect(t.has("edit")).toBe(true);
     expect(t.has("grep")).toBe(true);
     expect(t.has("bash_run")).toBe(true);
+    expect(t.has("serve_preview")).toBe(true);
     expect(t.has("todo_write")).toBe(true);
     // No repo map, LSP, memory, or MCP in plain.
     expect(t.has("repo_context")).toBe(false);

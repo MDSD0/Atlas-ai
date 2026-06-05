@@ -106,6 +106,8 @@ const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
     write_file: (i) => `Writing ${shortPath(i.path)}`,
     create_directory: (i) => `Creating ${shortPath(i.path)}`,
     bash_run: (i) => `Running ${ellipsize(String(i.command ?? ""), 60)}`,
+    serve_preview: (i) =>
+      `Serving ${ellipsize(String(i.command ?? ""), 60)}`,
     bash_background: (i) =>
       `Spawning ${ellipsize(String(i.command ?? ""), 60)}`,
     bash_logs: () => `Reading logs`,

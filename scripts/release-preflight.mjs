@@ -4,8 +4,9 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
+const readNormalized = (path) => read(path).replace(/\r\n/g, "\n");
 const packageJson = JSON.parse(read("package.json"));
-const lockfile = read("pnpm-lock.yaml");
+const lockfile = readNormalized("pnpm-lock.yaml");
 const config = JSON.parse(read("src-tauri/tauri.conf.json"));
 const updater = read("src/modules/updater/useUpdater.ts");
 const workflow = read(".github/workflows/release.yml");

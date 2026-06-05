@@ -3,6 +3,7 @@ import { z } from "zod";
 import { native } from "../lib/native";
 import { checkShellCommand } from "../lib/security";
 import { shellNeedsApproval } from "../lib/permissions";
+import { redactSensitive } from "../lib/redact";
 import { resolvePath, type ToolContext } from "./context";
 import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace/env";
 
@@ -32,6 +33,107 @@ function shellSessionKey(sessionId: string, cwd: string | null): string {
   return `${workspaceSessionKey(sessionId)}:${cwd ?? "none"}`;
 }
 
+const LONG_RUNNING_FOREGROUND_PATTERNS: RegExp[] = [
+  /\b(?:python|python3|py)\s+-m\s+http\.server\b/i,
+  /\b(?:pnpm|yarn|bun)\s+(?:run\s+)?(?:dev|start|serve|preview)\b/i,
+  /\bnpm\s+(?:run\s+)?(?:dev|start|serve|preview)\b/i,
+  /\b(?:vite|next|astro|remix)\s+dev\b/i,
+  /\bwebpack\s+serve\b/i,
+  /\bcargo\s+watch\b/i,
+  /\bnodemon\b/i,
+  /\bnode\s+--watch\b/i,
+  /\btail\s+-f\b/i,
+  /\b(?:http-server|live-server)\b/i,
+  /(?:^|[;&|]\s*)serve(?:\s|$)/i,
+];
+
+const SENSITIVE_ENV_DUMP_PATTERNS: RegExp[] = [
+  /(?:^|[;&|]\s*)(?:env|printenv|set)(?:\s|$)/i,
+  /(?:^|[;&|]\s*)(?:export)(?:\s+-p)?(?:\s*$|[;&|])/i,
+  /\b(?:Get-ChildItem|gci|dir|ls)\s+env:/i,
+];
+
+type BackgroundProcess = Awaited<ReturnType<typeof native.shellBgList>>[number];
+
+export function foregroundCommandBlockReason(command: string): string | null {
+  const normalized = command.replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  if (LONG_RUNNING_FOREGROUND_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "This looks like a long-running server or watcher. Use bash_background, then bash_logs and bash_kill, instead of bash_run.";
+  }
+  return null;
+}
+
+export function sensitiveShellOutputBlockReason(command: string): string | null {
+  const normalized = command.replace(/\s+/g, " ").trim();
+  if (!normalized) return null;
+  if (SENSITIVE_ENV_DUMP_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return "This command can dump environment secrets. Ask for a specific variable name or run a targeted check instead.";
+  }
+  return null;
+}
+
+export function redactShellOutput(text: string): string {
+  return redactSensitive(text);
+}
+
+function normalizeCommand(command: string): string {
+  return command.replace(/\s+/g, " ").trim();
+}
+
+function inferPreviewUrl(command: string): string | null {
+  const normalized = normalizeCommand(command);
+  const explicitPort = normalized.match(/(?:--port|-p)\s+(\d{2,5})\b/i);
+  if (explicitPort) return `http://localhost:${explicitPort[1]}`;
+  if (/\b(?:python|python3|py)\s+-m\s+http\.server\b/i.test(normalized)) {
+    const port = normalized.match(/\bhttp\.server\s+(\d{2,5})\b/i)?.[1] ?? "8000";
+    return `http://localhost:${port}`;
+  }
+  if (/\b(?:vite|pnpm\s+(?:run\s+)?dev|npm\s+(?:run\s+)?dev|yarn\s+(?:run\s+)?dev|bun\s+(?:run\s+)?dev)\b/i.test(normalized)) {
+    return "http://localhost:5173";
+  }
+  if (/\bnext\s+dev\b/i.test(normalized)) return "http://localhost:3000";
+  return null;
+}
+
+function validateLocalPreviewUrl(url: string): { ok: true } | { ok: false; error: string } {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { ok: false, error: "invalid preview URL" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { ok: false, error: "preview URL must use http or https" };
+  }
+  const host = parsed.hostname;
+  const local =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "0.0.0.0" ||
+    host === "[::1]" ||
+    host === "::1" ||
+    host.endsWith(".localhost");
+  if (!local) return { ok: false, error: "preview URL must be localhost/loopback" };
+  return { ok: true };
+}
+
+function findReusableProcess(
+  processes: BackgroundProcess[],
+  command: string,
+  cwd: string,
+): BackgroundProcess | null {
+  const normalized = normalizeCommand(command);
+  return (
+    processes.find(
+      (p) =>
+        !p.exited &&
+        normalizeCommand(p.command) === normalized &&
+        (p.cwd ?? null) === cwd,
+    ) ?? null
+  );
+}
+
 async function maybeAuthorizeTerminalExecution(ctx: ToolContext, cwd: string | null) {
   const project = ctx.getProjectContext();
   if (project.executionCwdMode === "activeTerminal" && cwd) {
@@ -53,6 +155,10 @@ export function buildShellTools(ctx: ToolContext) {
       execute: async ({ command, timeout_secs }) => {
         const safety = checkShellCommand(command);
         if (!safety.ok) return { error: safety.reason };
+        const sensitiveOutputBlock = sensitiveShellOutputBlockReason(command);
+        if (sensitiveOutputBlock) return { error: sensitiveOutputBlock };
+        const foregroundBlock = foregroundCommandBlockReason(command);
+        if (foregroundBlock) return { error: foregroundBlock };
         const sid = ctx.getSessionId();
         if (!sid) return { error: "no active chat session" };
         try {
@@ -70,14 +176,81 @@ export function buildShellTools(ctx: ToolContext) {
           );
           return {
             command,
-            stdout: r.stdout,
-            stderr: r.stderr,
+            stdout: redactShellOutput(r.stdout),
+            stderr: redactShellOutput(r.stderr),
             exit_code: r.exit_code,
             timed_out: r.timed_out,
             truncated: r.truncated,
             cwd,
             cwd_after: r.cwd_after,
             duration_ms: Date.now() - startedAt,
+          };
+        } catch (e) {
+          return { error: String(e) };
+        }
+      },
+    }),
+
+    serve_preview: tool({
+      description:
+        "Start or reuse a long-running local dev server and open its preview in one step. Prefer this over manually chaining bash_list, bash_background, bash_logs, and open_preview when the user asks to run/open/preview a web app. Pass the server command and URL when known; common ports are inferred for python -m http.server, Vite, and Next. Asks for user approval.",
+      inputSchema: z.object({
+        command: z.string(),
+        url: z.string().optional(),
+        cwd: z.string().nullable().optional(),
+        wait_ms: z.number().int().min(0).max(5000).optional(),
+      }),
+      needsApproval: ({ command }) =>
+        shellNeedsApproval(command, ctx.getApprovalMode()),
+      execute: async ({ command, url, cwd, wait_ms }) => {
+        const safety = checkShellCommand(command);
+        if (!safety.ok) return { error: safety.reason };
+        const project = ctx.getProjectContext();
+        const effectiveCwd = cwd
+          ? resolvePath(cwd, project)
+          : project.executionCwd;
+        if (!effectiveCwd) return { error: "no execution_cwd is available" };
+        const previewUrl = url?.trim() || inferPreviewUrl(command);
+        if (!previewUrl) {
+          return {
+            error:
+              "preview URL could not be inferred; pass a localhost URL such as http://localhost:5173",
+          };
+        }
+        const urlOk = validateLocalPreviewUrl(previewUrl);
+        if (!urlOk.ok) return { error: urlOk.error, url: previewUrl };
+        try {
+          await maybeAuthorizeTerminalExecution(ctx, effectiveCwd);
+          const existing = findReusableProcess(
+            await native.shellBgList(),
+            command,
+            effectiveCwd,
+          );
+          const handle =
+            existing?.handle ?? (await native.shellBgSpawn(command, effectiveCwd));
+          const wait = wait_ms ?? 1200;
+          if (wait > 0 && !existing) {
+            await new Promise((resolve) => setTimeout(resolve, wait));
+          }
+          const logs = await native.shellBgLogs(handle, 0).catch(() => null);
+          const opened = ctx.openPreview(previewUrl);
+          return {
+            ok: opened,
+            reused: !!existing,
+            handle,
+            command,
+            cwd: effectiveCwd,
+            url: previewUrl,
+            logs: logs
+              ? {
+                  bytes: redactShellOutput(logs.bytes.slice(-4000)),
+                  exited: logs.exited,
+                  exit_code: logs.exit_code,
+                  dropped: logs.dropped,
+                  next_offset: logs.next_offset,
+                }
+              : null,
+            error: opened ? undefined : "preview surface unavailable",
           };
         } catch (e) {
           return { error: String(e) };
@@ -122,7 +295,7 @@ export function buildShellTools(ctx: ToolContext) {
       execute: async ({ handle, since_offset }) => {
         try {
           const r = await native.shellBgLogs(handle, since_offset);
-          return r;
+          return { ...r, bytes: redactShellOutput(r.bytes) };
         } catch (e) {
           return { error: String(e) };
         }

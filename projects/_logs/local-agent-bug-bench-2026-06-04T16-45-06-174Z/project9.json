@@ -1,0 +1,416 @@
+{
+  "index": 9,
+  "name": "todo-churn-observation",
+  "projectDir": "C:\\Users\\name\\Downloads\\Atlas-ai\\projects\\project9",
+  "prompt": "Make the one-line change in note.md. This is intentionally simple; do not create a plan.",
+  "duration_ms": 15666,
+  "passed": false,
+  "strictToolCalls": 6,
+  "rawJsonToolCalls": 0,
+  "todoWrites": 0,
+  "malformed": 0,
+  "final": null,
+  "checkResults": [
+    {
+      "command": "grep -q 'status: done' note.md",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "files": [
+    "note.md"
+  ],
+  "events": [
+    {
+      "turn": 1,
+      "response": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "index": 0,
+            "id": "tool_read_file_OV4mLRBmFdq0iBI2up90",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"note.md\"}"
+            }
+          }
+        ],
+        "reasoning_details": [
+          {
+            "type": "reasoning.encrypted",
+            "data": "AY89a1/RMWXlE06Ci4MOlbZLZOw6cXxRorJ8VDHrAWm2MXv81HcnxXLluDisgA78NBdRJlBJJSYfIqcA/VM9lC3FSejgcLRchsJX1MOQAnLFdRUpTzPthLM+Y0xWi+bvIKqoLVYjmvmJOz571ArVxPMiW6yQ56TBdmQ4916rIuv0r7sU6ZXwf2eY40ZAHuhEN7s5Ot3ZE9zjYCenqri+Kzvz1XiZySA18heAvZHLCOn/VDdjHlp7fsKXLqZ8rYdx4GW9MvB3Y7Ew/0okBcVt/yVK0mDgN+uMghh5Gi2r3fZmvUT/hcSpeNSRk/P2jujkPjtQsiHyF4AUDDtyXOBaW34usEMlede8syxBz/t9wc/AWgq01cwHYPgE4Cqt1HJn7uBG35ZOFSdjDmcdAMacHZA/gtA4FhO7Y67G7xqjLi+3gakT3rC20MD0Og==",
+            "format": "google-gemini-v1",
+            "id": "tool_read_file_OV4mLRBmFdq0iBI2up90",
+            "index": 0
+          }
+        ]
+      },
+      "usage": {
+        "prompt_tokens": 298,
+        "completion_tokens": 89,
+        "total_tokens": 387,
+        "cost": 0.001248,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.001248,
+          "upstream_inference_prompt_cost": 0.000447,
+          "upstream_inference_completions_cost": 0.000801
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 71,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "turn": 1,
+      "tool": "read_file",
+      "args": {
+        "path": "note.md"
+      },
+      "result": {
+        "content": "status: draft\n"
+      }
+    },
+    {
+      "turn": 2,
+      "response": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "index": 0,
+            "id": "tool_list_directory_cJ5y7ybWejJsInvgLOIe",
+            "function": {
+              "name": "list_directory",
+              "arguments": "{\"path\":\".\"}"
+            }
+          }
+        ],
+        "reasoning_details": [
+          {
+            "type": "reasoning.encrypted",
+            "data": "AY89a18S17G/p5NOuizQCG1N2I60WX+XT/BnIgdBfnr6EjPZ8SRQt7Mxdd07xZbat8mfrPLabZPIalTtK1k4pqLtHdqy2ys10SON2f8Bubb3HZtAE+l/zjrMQqM/60FToj+JWYmiUiwbg0B2UZUEmFmxoUvzDmYvDJZfJg8lwjx7V4s9BD1puGms5D+a2QD3ZCf7PS0mwuHjiaksndulGlWuUXBR2vYPUu+5vjDhRTxFlQsJ1SU+iqe7MrjsCP2GajcMPF1bYgapXw7cyw02jRFKC2+b73z4g2pFwKOi0vcZ5D5YIhQh7fOs1+Ql1+EXfUzixg45ZwZi7TGkbhYpWN/SNa3+6Nmr+GPbiOeMJezf+3MgMHYE38nqBcgo5pFvKrOSgnEUg0AEPzUSgGhl5yIvpt7Jh7loLbzFwN2nJnfcSpeqLznF0OW3AuPp9Y1fZ5BMLlu9mokgDG74zW+P5NbKs2w/GWumJ/30naT1gOo7nY+MWCe6hgCTm/lDqalW8ar2vAidZBRTupelBxIK0QxhbV9NQ621NRZ1DriFVV2W8ZGphjbRZmROPW0F4IViIF5h9teJ+zj4BX0VKuAatJT9RbUpvTQHLcOHYCklPtCAwlbbVGDtfDGYs4w9YM+0xdDPMLIiRGFQhXbLezb/RjlkOh6P5yERa0OWG71a7t79",
+            "format": "google-gemini-v1",
+            "id": "tool_list_directory_cJ5y7ybWejJsInvgLOIe",
+            "index": 0
+          }
+        ]
+      },
+      "usage": {
+        "prompt_tokens": 392,
+        "completion_tokens": 111,
+        "total_tokens": 503,
+        "cost": 0.001587,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.001587,
+          "upstream_inference_prompt_cost": 0.000588,
+          "upstream_inference_completions_cost": 0.000999
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 95,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "turn": 2,
+      "tool": "list_directory",
+      "args": {
+        "path": "."
+      },
+      "result": {
+        "entries": [
+          "note.md"
+        ]
+      }
+    },
+    {
+      "turn": 3,
+      "response": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "index": 0,
+            "id": "tool_bash_run_cH1gLjheKi5oQSXbaE36",
+            "function": {
+              "name": "bash_run",
+              "arguments": "{\"command\":\"git status\"}"
+            }
+          }
+        ],
+        "reasoning_details": [
+          {
+            "type": "reasoning.encrypted",
+            "data": "AY89a1/eyB7wRUCfoiAatZU20yWdPzrLjOmxH4EZ9wN0zkhvNuc7CvFDOSfNqoru+ML4HlDjrG10fwWjjUfQMI87gd/uzLwzlq4DrCzTpTI+WG8x8MoSWkTG76nOWggqd45qsyu/xVUVTUL1zijjsrf+pmKiaEX8sZRcZqtnhQK9eDxRbW8FDHAW2WUMAWU8TqutV9TFoAQR+12Utxfbk4u0RvnvuOHujPbTTw5+1Cx0RHhEDkVtlMBRIWcDQvYFia3PocWf5tLpmcPPfWl52hDUMCPpTVzCmB8s3gj9330t5J91cd/AMajb73RZuwf4yy/EsVA9pde0QOGVL8x0u5Qv7AX3kTm7mlhb7cVyLUWHZUKxD1IqZjkEaIgUB8CLJ7q4B3PPi+6lln37jW0+n6ueMAMtgCW1g0K9hCXQIAqC8CNYWOSvcO5eTb1rkhK7J3JzpOWkhJ5pPIj8vEsntlhYQciDSWgPm8Bk+4yGfpoR+uFVVw07y5Xl",
+            "format": "google-gemini-v1",
+            "id": "tool_bash_run_cH1gLjheKi5oQSXbaE36",
+            "index": 0
+          }
+        ]
+      },
+      "usage": {
+        "prompt_tokens": 507,
+        "completion_tokens": 93,
+        "total_tokens": 600,
+        "cost": 0.0015975,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0015975,
+          "upstream_inference_prompt_cost": 0.0007605,
+          "upstream_inference_completions_cost": 0.000837
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 76,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "turn": 3,
+      "tool": "bash_run",
+      "args": {
+        "command": "git status"
+      },
+      "result": {
+        "stdout": "On branch m0-verification-floor\nYour branch is up to date with 'origin/m0-verification-floor'.\n\nChanges not staged for commit:\n  (use \"git add <file>...\" to update what will be committed)\n  (use \"git restore <file>...\" to discard changes in working directory)\n\tmodified:   ../../source_pack.md\n\tmodified:   ../../src-tauri/Cargo.toml\n\tmodified:   ../../src-tauri/src/lib.rs\n\tmodified:   ../../src-tauri/tauri.windows.conf.json\n\tmodified:   ../../src/modules/ai/config.ts\n\tmodified:   ../../src/modules/ai/lib/composer.tsx\n\tmodified:   ../../src/modules/ai/store/chatStore.ts\n\tmodified:   ../../src/modules/ai/tools/shell.ts\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t../\n\t../../scripts/local-agent-bug-bench.mjs\n\t../../src/modules/ai/tools/shell.test.ts\n\nno changes added to commit (use \"git add\" and/or \"git commit -a\")\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      }
+    },
+    {
+      "turn": 4,
+      "response": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "index": 0,
+            "id": "tool_bash_run_cG9NUyZK5PlvhciUnMdS",
+            "function": {
+              "name": "bash_run",
+              "arguments": "{\"command\":\"git log -n 5\"}"
+            }
+          }
+        ],
+        "reasoning_details": [
+          {
+            "type": "reasoning.encrypted",
+            "data": "AY89a1/5ikgo/wtlJ/CoyDjLWmfOztCPqjecqDHxrZei0+yxIaW8wuDzLuRLJ7A541zGQD588x7gKggipLKriCmDMMz4mpDOQwNtDvg0I/45ZtJ3QlaZN2XnPNz75kUWX54cHW5EhqdbbxmvLjnx1Wq1Uk561HJS23tNWwQbh3P2P6e/dcaANHUTHXOn1TwV/z6VQDXFDx4TH/8dL0BY14nEMIl+3+m8lkzLkSw8yZvEpCGSuACu",
+            "format": "google-gemini-v1",
+            "id": "tool_bash_run_cG9NUyZK5PlvhciUnMdS",
+            "index": 0
+          }
+        ]
+      },
+      "usage": {
+        "prompt_tokens": 887,
+        "completion_tokens": 47,
+        "total_tokens": 934,
+        "cost": 0.0017535,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0017535,
+          "upstream_inference_prompt_cost": 0.0013305,
+          "upstream_inference_completions_cost": 0.000423
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 26,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "turn": 4,
+      "tool": "bash_run",
+      "args": {
+        "command": "git log -n 5"
+      },
+      "result": {
+        "stdout": "commit 89a1f1dc46a1a1e5bf773c1ccf10508dfc4f068f\nAuthor: MDSD0 <crypticmite@gmail.com>\nDate:   Thu Jun 4 18:34:54 2026 +0530\n\n    Teach Atlas its harness context\n\ncommit 1d608987339092490a666606b0224ed4b219ea4d\nAuthor: MDSD0 <crypticmite@gmail.com>\nDate:   Thu Jun 4 18:05:20 2026 +0530\n\n    Restore internal planning docs on the working branch\n    \n    The public-prep commit (2624ff4) removed the internal brain (ATLAS.md,\n    execution plan, plan.md, source_pack.md, CLAUDE.md, AGENTS.md) from git to keep\n    the public README clean, but the agents (Claude/Codex) need these to understand\n    the project. Restore them on the working branch so git is the single source of\n    truth across Mac and Windows. The public main branch stays clean.\n    \n    Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\ncommit 9dda3596d1de50a81c7c5158ac87253bb32ccdc9\nAuthor: MDSD0 <crypticmite@gmail.com>\nDate:   Thu Jun 4 17:42:20 2026 +0530\n\n    Add ablation toolbelt modes for benchmarking the substrate\n    \n    buildTools(ctx, mode) gates which tool families the agent gets so a benchmark\n    can prove each layer earns its keep (GPT review): plain (fs+edit+search+shell+\n    todo+verification, the mini-swe baseline), repo_map (+reality), repo_map_lsp\n    (+semantic), full (everything, the default = unchanged product behavior).\n    Extracted buildFullTools as the ChatTools source of truth to avoid circular\n    return-type inference. +4 tests asserting each mode's tool set.\n    \n    Completes the benchmark-ready milestone: honest 5-tier proof, harness trace,\n    ablation modes; README + Ollama path verified clean.\n    \n    Verified (clean shell, verify-atlas.sh --all exit 0): tsc 0, vitest 244 passed,\n    build 0, cargo check/clippy 0, cargo test 144 + 3 harness.\n    \n    Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\ncommit 93feb216b8fe54a8f4a2b38f908dd2eba1e19feb\nAuthor: MDSD0 <crypticmite@gmail.com>\nDate:   Thu Jun 4 12:54:56 2026 +0530\n\n    Add Atlas Harness Eval trace (per-run benchmark instrument)\n    \n    buildHarnessTrace flattens a recorded ProofRun into a flat JSON trace for\n    benchmarking the architecture, not just the outcome: tool-call counts by name\n    (parsed from event kinds), edited files, checks, diagnostics, failures, repo-map\n    usage, duration, drop counts. Pure and derived only from recorded data - token\n    counts are deliberately omitted (live-run only, not in the journal) rather than\n    faked. +3 tests.\n    \n    This is GPT review P0: the instrument that answers 'did repo map / LSP / memory\n    actually help' once benchmark runs are recorded.\n    \n    Verified (clean shell): tsc 0, harnessTrace tests 3/3.\n    \n    Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n\ncommit a054c67e507e804af7699d35987149ec4fe18062\nAuthor: MDSD0 <crypticmite@gmail.com>\nDate:   Thu Jun 4 12:51:13 2026 +0530\n\n    Honest 5-tier proof verdict (no more echo-ok = passed)\n    \n    GPT review flagged the proof verdict as too weak: any exit-0 foreground shell\n    marked a run 'passed', so a bare 'echo ok' looked verified - dishonest for a\n    proof-oriented harness. Replace the binary passed/incomplete with soft,\n    non-blocking tiers that never overclaim:\n    \n      verified      - a recognized test/build/typecheck/lint command exited 0\n      smoke_checked - some command ran ok, but no recognized check\n      completed     - edits happened, no command run\n      unverified    - nothing meaningful to check\n      failed / cancelled - unchanged\n    \n    isRecognizedCheck() matches test/vitest/pytest/tsc/lint/cargo/go/build/etc.\n    The run is never blocked; only the verdict label gets honest. ReceiptStrip,\n    reliabilitySummary (verified vs softPass), and the affected fixtures updated.\n    +3 tests: echo->smoke_checked, cargo test->verified, read-only->unverified.\n    \n    Verified (clean shell, verify-atlas.sh --all exit 0): tsc 0, vitest 237 passed,\n    build 0, cargo check/clippy 0, cargo test 144 + 3 harness.\n    \n    Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      }
+    },
+    {
+      "turn": 5,
+      "response": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": "**Exploring Project Context**\n\nI'm currently investigating the project's broader context. My recent focus has been on examining the parent directory and other files within the repository. I'm also checking Git status and diffs at the root to understand the overall state and any recent changes.\n\n",
+        "tool_calls": [
+          {
+            "type": "function",
+            "index": 0,
+            "id": "tool_bash_run_fIrjnSkGt7ag79JXDruD",
+            "function": {
+              "name": "bash_run",
+              "arguments": "{\"command\":\"git status .\"}"
+            }
+          }
+        ],
+        "reasoning_details": [
+          {
+            "type": "reasoning.text",
+            "text": "**Exploring Project Context**\n\nI'm currently investigating the project's broader context. My recent focus has been on examining the parent directory and other files within the repository. I'm also checking Git status and diffs at the root to understand the overall state and any recent changes.\n\n",
+            "format": "google-gemini-v1",
+            "index": 0
+          },
+          {
+            "type": "reasoning.encrypted",
+            "data": "AY89a1/D3rPmBJhbXn0K9eXdWf36av157M2Y5U2lIsAf5HXcvfcinWNBjpmG25l6t3+EqgJSYfHLHj5b/TokAiIYyy9XDNuITufFe1LhDPmK/fxmtJJq1zEgy82sNAAo8yCddoanzPbhPc+jwUvy9wet9Q1yAZQSZRn3+VcIE7yttmD/oXnq7s2ShJYHKV03pmqU/XDD0RSjMrpPdI+V0nmNPMLh1bvCN9oMd64M5Nb5RE9DWcd2dZD0WYp5ayFqz8F2rlxLKYyZNnW/Nn+TZWHSS6Gpr90meVF0XM5QPSoG8wzu+yBBd/SeDVl6ei5+nEBHaCHyPtIJ00K2xpJOU5qLCp7JmiyP7OeKBt2NTk52DRPqkWXtO5Neii6zDt4tGFgLFPZkxr3r1XqHOQusTsZxwQmP63bKTPJaFYjpOAgZ18I7PB+0R3H/UdN5ct5noT6dYy2SQAfdKJ8WZqHyeEcR42KngB3ttJlS8HJfjsCAGomp0wSW2+YT8aObZOixF1vVgGpJk/WIZgRKMqLLif+8QfMAfDZv9AkYs7gTFfTbz8P3m5bOD2oCpV8aGkGrir5dTshnJD395qeE5F61NMZrJS8kFD/YkQtKeIAvjypwe7+rgpNmUX3LNOXpTdDQWgjWxoiSONZGtOgmpGxoW+t91i4vDQgtlBka4hDmJPCHOb5T97hs7Xmu4f5UqqbIBXF7FEkAxcy6tRcSl5vjWgsJcJknwHexdLtMBcu5E918YNOCDfNhVctx60449kgR0xVa4DcJNLl8QcuXCRmWKJjVCtzv0BYE8mNyc0DCDrBa51kyKcM+++p10BsTcewB4UGZucbut6DpluXp/JWvX8j+rGAg7dlFN8qcjsOB7Vl49GEbMvYhAlq36YYyIUc0AxT7hWFAOj/GkuNHuebPOzQ0Kp3u3g1Ree9GjZjfS6dNhAwKVJ/WT5D5XwYGRTqh4G2Bi+gTuuSQ0/0H2oR29/A2hAe3SywKhElai3I5CLyR9+iK3URZTBzTdhFJw/G1M54PGyTpoiV2sirQLbBBPBn0bUyHA5fKgYHwytA+uWpyFGMZtYJIH8pv2t2Gu8qaWJJCxXlhjhvkdBU6uzLW+ypQaL7njcZ9SOezJJzTkCqr/ppRyWJnZcWpGu4zxfrteQqjbqh5SsGBy8UPLtKdk/PH7dJufMzfX2TCnEjWkdvro808oxvSqgh2FN4cSQZnzTnXeVG2kkWbROUNxb4kSp7VWuVGwQ+hZ8ZdKzC+o7K/D7C1LDmNyvasIJtgKsoUiEJNs4wWN01Cbs4sMjV2lBtThgCfddsoXtjbOfIUNxfMIF8JUYnlOPft/jubeoMviFiuC//ig7N7GYYrHf5Y0zIDIf9V+eF5CREEsdLB1DVwY9+PJEgMVugxGYvUnF3M0hJfOC1C75UWFJq+79j2/0aTK10Wdx2QhT4q+8bSL1CW1712L6E7YSfIbzk+J5nvcSN/ctY4khQi+/JC3iK71itvxqt0b2csV8lzqrGacpPy2BKZkc3AcDQmjnrtnuEcuqhQmJa4sw==",
+            "format": "google-gemini-v1",
+            "id": "tool_bash_run_fIrjnSkGt7ag79JXDruD",
+            "index": 1
+          }
+        ]
+      },
+      "usage": {
+        "prompt_tokens": 2269,
+        "completion_tokens": 300,
+        "total_tokens": 2569,
+        "cost": 0.0061035,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0061035,
+          "upstream_inference_prompt_cost": 0.0034035,
+          "upstream_inference_completions_cost": 0.0027
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 282,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "turn": 5,
+      "tool": "bash_run",
+      "args": {
+        "command": "git status ."
+      },
+      "result": {
+        "stdout": "On branch m0-verification-floor\nYour branch is up to date with 'origin/m0-verification-floor'.\n\nUntracked files:\n  (use \"git add <file>...\" to include in what will be committed)\n\t./\n\nnothing added to commit but untracked files present (use \"git add\" to track)\n",
+        "stderr": "",
+        "exit_code": 0,
+        "timed_out": false
+      }
+    },
+    {
+      "turn": 6,
+      "response": {
+        "role": "assistant",
+        "content": null,
+        "refusal": null,
+        "reasoning": null,
+        "tool_calls": [
+          {
+            "type": "function",
+            "index": 0,
+            "id": "tool_list_directory_TnPuAzrKjpsmzEFk3pMJ",
+            "function": {
+              "name": "list_directory",
+              "arguments": "{\"path\":\"..\"}"
+            }
+          }
+        ],
+        "reasoning_details": [
+          {
+            "type": "reasoning.encrypted",
+            "data": "AY89a1/xdqPqQMI37UNJIHiO3LkbFnjgz9zKph0BTLol6ybX6Xi/FZc6SZLiGbk2AuiqzsmaZ3lh/YMccDx01QpYOqinvEe8sbvIfFM3Ra4rgl92I5r7PsOkXr4Gy0FVA4qzBM0duoT5ZAf6P1tr+BHjrieJ5+QOdgtdOtls/C0NN8Uuvtn/8HL6OU0uTO6UEV5R2g8UIzti6FTbKDmv+ZflI3KQDafgYtlL//arlXZDhR7EuBL+7/iQP3HQ4ib7XpCPl3wNsAVWMwBAkUHzdSgno4hjgzcYMKyMxBnY1TUpqeYcz196ZzXIMupjfpo/ZDslZovq2kGgm5qrxwSh9Uvy+zmPAYq4Whey9emkmYPuQLVhxJN3SHr4",
+            "format": "google-gemini-v1",
+            "id": "tool_list_directory_TnPuAzrKjpsmzEFk3pMJ",
+            "index": 0
+          }
+        ]
+      },
+      "usage": {
+        "prompt_tokens": 2654,
+        "completion_tokens": 72,
+        "total_tokens": 2726,
+        "cost": 0.004629,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.004629,
+          "upstream_inference_prompt_cost": 0.003981,
+          "upstream_inference_completions_cost": 0.000648
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 56,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "turn": 6,
+      "tool": "list_directory",
+      "args": {
+        "path": ".."
+      },
+      "result": {
+        "error": "Error: unsafe path: .."
+      }
+    }
+  ]
+}

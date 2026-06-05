@@ -1206,3 +1206,60 @@ Verification:
 - TypeScript passed with Node `v22.16.0` via `./node_modules/.bin/tsc --noEmit`.
 - Full frontend Vitest passed with Node `v22.16.0`: `244` tests across `49` files.
 - Note: `pnpm` was not visible on PATH in this shell, so equivalent local project binaries were used with explicit Node 22.
+
+## Corrective Slice C13: local-model foreground-run guard
+
+Source-parity packet:
+
+- Slice: address the Windows Ollama/qwen2.5-coder smoke failure where a generated calculator run used foreground `python -m http.server`, left the UI looking stuck, and local-model output drifted into unrelated JSON.
+- Atlas files inspected: `src/modules/ai/tools/shell.ts`, `src/modules/ai/lib/composer.tsx`, `src/modules/ai/store/chatStore.ts`, `src/modules/ai/config.ts`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/components/AgentRunBridge.tsx`, and shell/security permission tests.
+- opensrc hook: `bash scripts/consult-opensrc.sh agent-loop tools permission opencode` was attempted in the clean shell and returned `1` because `opensrc`/`pnpm` is unavailable on PATH in this Windows runtime. No upstream code was copied.
+- Atlas finding: `bash_run` only described the short-lived-command rule, so small local models could still launch dev servers in a foreground tool call and wait on native shell timeout. Stop requested AI stream cancellation but did not immediately clear the visible busy state. `ollama-local` also received the full Atlas system prompt instead of the compact prompt already used for smaller/free local models.
+- Disposition: `ADAPT` the existing shell split by enforcing obvious long-running server/watch commands in `bash_run`; `PRESERVE` `bash_background` as the execution path for servers/watchers; `ADAPT` the stop UI path for immediate user feedback; `ADAPT` Ollama local to the lite prompt. `REJECT` broad native shell cancellation or JSON-tool-call parsing in this slice.
+
+## Corrective Slice C14: API-first run/preview and todo churn fixes
+
+Source-parity packet:
+
+- Slice: make strong API models spend fewer turns on run/open/preview flows, reduce todo churn, and keep provider benchmark evidence separate from product fixes.
+- Atlas files inspected: `src/modules/ai/tools/{shell,todo,terminal,tools}.ts`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/config.ts`, `src/modules/ai/store/todoStore.ts`, `src/modules/ai/lib/todos.ts`, `src/modules/preview/PreviewPane.tsx`, and `scripts/local-agent-bug-bench.mjs`.
+- opensrc hook: `bash scripts/consult-opensrc.sh agent-loop tools shell terminal preview todo opencode` was attempted in the clean shell and returned `1` because `opensrc`/`pnpm` is unavailable on PATH in this Windows runtime. No upstream code was copied.
+- Benchmark finding: OpenRouter Gemini produced valid OpenAI tool calls but still spent too many turns on run/open/preview and simple-edit continuations. OpenRouter credits then exhausted; Groq `llama-3.3-70b-versatile` failed provider-side tool validation; direct OpenAI key returned quota-exhausted `429`.
+- Disposition: `ADAPT` the shell tool surface by adding `serve_preview`, a fused start/reuse/open local preview tool. `ADAPT` prompt guidance to prefer `serve_preview` and use todos only for multi-phase work. `ADAPT` `todo_write` to ignore single-item lists, cap lists at eight items, and no-op duplicate writes. `PRESERVE` provider-native tool calls as the primary API path. `REJECT` local raw-JSON parsing in this slice because it is a separate Ollama/qwen compatibility layer and should not slow the API path.
+- Verification: clean-shell `./node_modules/.bin/tsc --noEmit` returned `0`; focused Vitest for shell/todo/ablation returned `0` with `8/8` tests; full frontend Vitest returned `0` with `248/248` tests across `51` files; `./node_modules/.bin/vite build` returned `0`; `git diff --check` returned `0`. Full `bash scripts/verify-atlas.sh --all` returned `127` at `pnpm: command not found`.
+
+## Corrective Slice C15: provider error UX normalization
+
+Source-parity packet:
+
+- Slice: make API-provider failures understandable during benchmark/debug loops without retrying paid requests or masking the underlying failure class.
+- Atlas files inspected: `src/modules/ai/store/chatStore.ts`, `src/modules/ai/components/{AiChat,AgentStatusPill}.tsx`, benchmark logs under `projects/_logs`, and `src/modules/ai/lib/errors.ts`.
+- opensrc hook: no new upstream code was required for this UI-only normalization. The earlier C14 opensrc attempt for the surrounding agent/tool loop returned `1` because `opensrc`/`pnpm` is unavailable on PATH in this Windows runtime.
+- Benchmark finding: OpenRouter returned credit exhaustion, OpenAI returned quota exhaustion, and Groq returned provider-side `tool_use_failed`. The raw strings were technically accurate but poor UX for deciding whether to buy credits, switch providers, or stop the run.
+- Disposition: `ADAPT` provider errors into concise local UI language; `PRESERVE` raw unknown errors after whitespace compaction and truncation; `REJECT` automatic retries or hidden fallback spending in this slice.
+- Verification: clean-shell focused Vitest for provider errors plus shell/todo/ablation returned `0` with `12/12` tests; clean-shell `./node_modules/.bin/tsc --noEmit` returned `0`; clean-shell full frontend Vitest returned `0` with `252/252` tests across `52` files; clean-shell Vite build returned `0`; clean-shell `node --check scripts/local-agent-bug-bench.mjs` returned `0`; clean-shell `git diff --check` returned `0`.
+- Gate blocker: clean-shell `bash scripts/verify-atlas.sh --all` still failed before product checks because `pnpm` is unavailable on PATH. The script printed `RC=127` for `pnpm exec tsc --noEmit` and exited `1`.
+
+## Corrective Slice C16: benchmark key safety and model baseline
+
+Source-parity packet:
+
+- Slice: finish the local/API benchmark pass without leaking test keys, separate model/provider behavior from Atlas bugs, and pick a current cheap API baseline.
+- Atlas files inspected: `src/modules/ai/tools/shell.ts`, `src/modules/ai/lib/redact.ts`, `src/modules/ai/config.ts`, `scripts/local-agent-bug-bench.mjs`, `.gitignore`, and benchmark logs under `projects/_logs`.
+- opensrc hook: clean-shell `bash scripts/consult-opensrc.sh agent-loop tools benchmark opencode mini-swe-agent` returned `1` because `opensrc`/`pnpm` was unavailable. A second attempt with the Windows pnpm shim installed `opensrc` but its postinstall failed with `ELIFECYCLE -4058`, and all repo paths returned `FETCH_FAILED`.
+- Benchmark finding: API behavior and local behavior are materially different. OpenRouter/OpenAI-compatible `openai/gpt-4.1-mini` produced valid tool calls and passed the fixed 12-task suite. OpenRouter Gemini produced valid tool calls but was slower and sometimes stopped on reasoning text. Groq llama generated provider-rejected function syntax on many tasks. Ollama qwen emitted raw JSON in assistant content instead of strict OpenAI tool calls.
+- Safety finding: a benchmark model ran `env`, which exposed test-only key env vars in local generated logs. The logs were scrubbed, `.env` was ignored, shell output redaction was extended, and whole-environment dump commands are now refused.
+- Disposition: `ADAPT` shell safety by refusing env dumps and redacting outputs. `ADAPT` benchmark tooling with key rotation, redaction, collision-proof run IDs, Python normalization, and token/latency receipts. `ADAPT` system prompts with loop-efficiency rules. `PRESERVE` API-native tool calling as the primary validation path. `REJECT` Groq llama and Ollama qwen as default tool-call baselines for now.
+- Verification: clean-shell focused Vitest for shell/errors/todo/ablation returned `0` with `15/15` tests; clean-shell `./node_modules/.bin/tsc --noEmit` returned `0`; clean-shell full frontend Vitest returned `0` with `255/255` tests across `52` files; clean-shell Vite build returned `0`; clean-shell `node --check scripts/local-agent-bug-bench.mjs` returned `0`; clean-shell `git diff --check` returned `0`.
+- Gate blocker: clean-shell `bash scripts/verify-atlas.sh --all` still failed before product checks because `pnpm` is unavailable on PATH. The script printed `RC=127` for `pnpm exec tsc --noEmit` and exited `1`.
+
+## Corrective Slice C17: Windows verification floor recovery
+
+Source-parity packet:
+
+- Slice: recover the full Atlas gate on the Windows host after the benchmark safety/API loop fixes, without weakening filesystem containment or release contracts.
+- Atlas files inspected: `scripts/release-preflight.mjs`, `src-tauri/src/modules/workspace.rs`, `scripts/verify-atlas.sh`, and `projects/_logs/LOCAL_AGENT_BUG_LEDGER.md`.
+- opensrc hook: not required; this is a verification-floor/platform-fixture repair, not a subsystem behavior change.
+- Atlas finding: after the host PATH exposed Git Bash, pnpm, Cargo, Python, and git, `verify-atlas.sh --all` reached product checks. It then failed on two Windows-specific fixture/format issues: the symlink escape test could not create a symlink on hosts without symlink privilege (`OS error 1314`), and the release preflight lockfile regex assumed LF while the Windows worktree supplied CRLF.
+- Disposition: `ADAPT` the symlink test so it skips only the fixture setup when Windows denies symlink privilege, while preserving the symlink-escape assertion wherever the fixture can be created. `ADAPT` release preflight by normalizing lockfile line endings before semantic matching. `PRESERVE` the agent filesystem containment invariant and the signed-release dependency contract.
+- Verification: explicit Git Bash `node scripts/release-preflight.mjs` returned `0` with `"status": "passed"`; explicit Git Bash `cargo test --locked --manifest-path src-tauri/Cargo.toml authorize_spawn_cwd_blocks_symlink_escape` returned `0`; explicit Git Bash `bash scripts/verify-atlas.sh --all` returned `0` and printed `verify-atlas --all: OK`, with frontend Vitest `255/255`, Rust `157 passed / 0 failed / 3 ignored`, and harness `3 passed`.

@@ -1,0 +1,36 @@
+{
+  "index": 1,
+  "name": "frontend-calculator-create",
+  "projectDir": "C:\\Users\\name\\Downloads\\Atlas-ai\\projects\\project1",
+  "prompt": "Build a simple scientific calculator in index.html, style.css, and script.js. Include sin, cos, tan, log, sqrt, power, memory buttons, keyboard input, and a clear display.",
+  "duration_ms": 1914,
+  "passed": false,
+  "strictToolCalls": 0,
+  "rawJsonToolCalls": 0,
+  "todoWrites": 0,
+  "malformed": 0,
+  "runError": "Error: 429 {\n    \"error\": {\n        \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.\",\n        \"type\": \"insufficient_quota\",\n        \"param\": null,\n        \"code\": \"insufficient_quota\"\n    }\n}\n",
+  "final": null,
+  "checkResults": [
+    {
+      "command": "test -s index.html && test -s script.js",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "files": [
+    "index.html",
+    "script.js",
+    "style.css"
+  ],
+  "events": [
+    {
+      "turn": 1,
+      "anomaly": "provider_error",
+      "source": "openai",
+      "error": "Error: 429 {\n    \"error\": {\n        \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.\",\n        \"type\": \"insufficient_quota\",\n        \"param\": null,\n        \"code\": \"insufficient_quota\"\n    }\n}\n"
+    }
+  ]
+}

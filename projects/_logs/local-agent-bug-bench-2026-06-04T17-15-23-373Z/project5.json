@@ -1,0 +1,34 @@
+{
+  "index": 5,
+  "name": "avoid-foreground-server",
+  "projectDir": "C:\\Users\\name\\Downloads\\Atlas-ai\\projects\\project5",
+  "prompt": "Run this tiny web app so I can preview it. Do not hang the foreground command.",
+  "duration_ms": 520,
+  "passed": true,
+  "strictToolCalls": 0,
+  "rawJsonToolCalls": 0,
+  "todoWrites": 0,
+  "malformed": 0,
+  "runError": "Error: 429 {\n    \"error\": {\n        \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.\",\n        \"type\": \"insufficient_quota\",\n        \"param\": null,\n        \"code\": \"insufficient_quota\"\n    }\n}\n",
+  "final": null,
+  "checkResults": [
+    {
+      "command": "test -f index.html",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": 0,
+      "timed_out": false
+    }
+  ],
+  "files": [
+    "index.html"
+  ],
+  "events": [
+    {
+      "turn": 1,
+      "anomaly": "provider_error",
+      "source": "openai",
+      "error": "Error: 429 {\n    \"error\": {\n        \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, read the docs: https://platform.openai.com/docs/guides/error-codes/api-errors.\",\n        \"type\": \"insufficient_quota\",\n        \"param\": null,\n        \"code\": \"insufficient_quota\"\n    }\n}\n"
+    }
+  ]
+}

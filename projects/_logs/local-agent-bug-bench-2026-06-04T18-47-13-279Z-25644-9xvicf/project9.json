@@ -1,0 +1,39 @@
+{
+  "index": 9,
+  "name": "todo-churn-observation",
+  "projectDir": "C:\\Users\\name\\Downloads\\Atlas-ai\\projects\\project9",
+  "prompt": "Make the one-line change in note.md: change status from draft to done. This is intentionally simple; do not create a plan.",
+  "duration_ms": 823,
+  "usageTotals": {
+    "prompt_tokens": 0,
+    "completion_tokens": 0,
+    "total_tokens": 0
+  },
+  "passed": false,
+  "strictToolCalls": 0,
+  "rawJsonToolCalls": 0,
+  "todoWrites": 0,
+  "malformed": 0,
+  "runError": "Error: 400 key=gq8 {\"error\":{\"message\":\"tool call validation failed: attempted to call tool 'read_file {\\\"path\\\": \\\"note.md\\\"}' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"\\u003cfunction=read_file {\\\"path\\\": \\\"note.md\\\"}\\u003e\\u003c/function\\u003e\\n\"}}\n",
+  "final": null,
+  "checkResults": [
+    {
+      "command": "grep -q 'status: done' note.md",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "files": [
+    "note.md"
+  ],
+  "events": [
+    {
+      "turn": 1,
+      "anomaly": "provider_error",
+      "source": "groq",
+      "error": "Error: 400 key=gq8 {\"error\":{\"message\":\"tool call validation failed: attempted to call tool 'read_file {\\\"path\\\": \\\"note.md\\\"}' which was not in request.tools\",\"type\":\"invalid_request_error\",\"code\":\"tool_use_failed\",\"failed_generation\":\"\\u003cfunction=read_file {\\\"path\\\": \\\"note.md\\\"}\\u003e\\u003c/function\\u003e\\n\"}}\n"
+    }
+  ]
+}

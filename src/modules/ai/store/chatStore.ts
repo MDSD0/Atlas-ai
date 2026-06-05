@@ -34,6 +34,7 @@ import {
 import { pushRecentModel } from "../lib/modelPrefs";
 import type { ApprovalMode } from "../lib/permissions";
 import { createContextAwareTransport } from "../lib/transport";
+import { formatAgentError } from "../lib/errors";
 import type {
   AtlasToolProjectContext,
   ExecutionCwdMode,
@@ -377,7 +378,7 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     onError: (e) => {
       useChatStore.getState().patchAgentMeta({
         status: "error",
-        error: e instanceof Error ? e.message : String(e),
+        error: formatAgentError(e),
       });
     },
   });
@@ -682,4 +683,9 @@ export function stop(): void {
   const id = useChatStore.getState().activeSessionId;
   if (!id) return;
   void chats.get(id)?.stop();
+  useChatStore.getState().patchAgentMeta({
+    status: "idle",
+    step: null,
+    approvalsPending: 0,
+  });
 }

@@ -322,6 +322,11 @@ export function AiComposerProvider({ children }: ProviderProps) {
   const stop = () => {
     if (!sessionId) return;
     void getOrCreateChat(sessionId).stop();
+    useChatStore.getState().patchAgentMeta({
+      status: "idle",
+      step: null,
+      approvalsPending: 0,
+    });
   };
 
   const canSend =

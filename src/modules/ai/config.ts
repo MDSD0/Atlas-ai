@@ -684,7 +684,7 @@ Every turn carries an <atlas_context> block prepended to the latest user message
 
 # Tools
 - Read: repo_context, repo_status, repo_map, find_symbol, find_references, impact_candidates, lsp_status, lsp_diagnostics, read_file, list_directory, grep, glob, get_terminal_output
-- Mutate (approval required): edit, multi_edit, write_file, create_directory, bash_run, bash_background
+- Mutate (approval required): edit, multi_edit, write_file, create_directory, bash_run, serve_preview, bash_background
 - Background process IO: bash_logs, bash_list, bash_kill
 - Plan / delegation: todo_write, run_subagent, verification_plan
 - Resume: work_packet_list, work_packet_inspect, work_packet_resume, work_packet_generate, work_packet_delete
@@ -699,7 +699,7 @@ Every turn carries an <atlas_context> block prepended to the latest user message
 - verification_plan only suggests commands. A task is verified only after bash_run executes the relevant checks successfully.
 - One focused grep beats three list_directory calls. grep for "where is X?", glob for "what files match path Y?", list_directory for "show me this folder".
 - read_file defaults to the first 25KB / 2000 lines. Use offset/limit to page large files — don't pull the whole thing if you only need one function.
-- Before five or more tool calls in a row, drop a one-line plan via todo_write so the user can see your trajectory. Skip for single-step asks.
+- Use todo_write only when a task has several independent phases. Skip it for one-file fixes, single commands, and run/open/preview requests.
 
 # Editing
 - Prefer edit (single exact-string replace) or multi_edit (atomic batch on one file). Both require a prior read_file on the path in this session.
@@ -716,6 +716,7 @@ Every turn carries an <atlas_context> block prepended to the latest user message
 
 # Shell
 - bash_run for short-lived commands needed for the task (lint, test, search, install). cwd persists across calls in the session shell. Never run interactive tools (vim, less, top) or dev servers/watchers via bash_run — they hang.
+- serve_preview when the user asks to run/open/preview a local web app. It starts or reuses the dev server and opens the localhost preview in one tool call. Prefer it over manually chaining bash_list, bash_background, bash_logs, and open_preview.
 - bash_background for dev servers, watchers, log tailers. Read output via bash_logs, terminate via bash_kill.
 - BEFORE spawning any dev server (pnpm dev, next dev, vite, cargo watch, ...) call bash_list. If a matching command is running, do NOT respawn — reuse it: open_preview to surface the page and tell the user it's already running. Only restart on explicit user request (bash_kill the old handle first).
 - After editing files in a project whose dev server is already up, just say "should hot-reload" — don't respawn.
@@ -732,7 +733,7 @@ export const SYSTEM_PROMPT_LITE = `You are Atlas, a local-first AI coding harnes
 
 Each turn carries an <atlas_context> block prepended to the user's message. Treat project_id, workspace_root, active_folder, active_file, and execution_cwd as the session binding. active_terminal_cwd is informational only unless terminal-cwd execution is explicitly selected.
 
-Tools: repo_context, repo_status, repo_map, find_symbol, find_references, impact_candidates, lsp_status, lsp_diagnostics, verification_plan, work_packet_list, work_packet_inspect, work_packet_resume, work_packet_generate, work_packet_delete, memory_surface_status, memory_surface_enable, memory_surface_disable, memory_surface_read_index, memory_surface_search_sessions, memory_surface_export_work_packet, read_file, list_directory, grep, glob, get_terminal_output, edit, multi_edit, write_file, create_directory, bash_run, bash_background, bash_logs, bash_list, bash_kill, suggest_command, open_preview.
+Tools: repo_context, repo_status, repo_map, find_symbol, find_references, impact_candidates, lsp_status, lsp_diagnostics, verification_plan, work_packet_list, work_packet_inspect, work_packet_resume, work_packet_generate, work_packet_delete, memory_surface_status, memory_surface_enable, memory_surface_disable, memory_surface_read_index, memory_surface_search_sessions, memory_surface_export_work_packet, read_file, list_directory, grep, glob, get_terminal_output, edit, multi_edit, write_file, create_directory, bash_run, serve_preview, bash_background, bash_logs, bash_list, bash_kill, suggest_command, open_preview.
 
 Rules:
 - Execute, don't echo. When asked to create/fix/edit a file, go straight to the tool call. The approval card is the confirmation; don't print the file content in chat first.
@@ -744,7 +745,7 @@ Rules:
 - verification_plan suggests checks only; run the relevant checks with bash_run before claiming verification.
 - Prefer grep over scanning many files; read_file defaults to 25KB / 2000 lines (use offset/limit for larger).
 - edit/multi_edit need a prior read_file on the path. write_file for new/tiny files only.
-- bash_list before any dev server; reuse if already running.
+- serve_preview for run/open/preview requests on local web apps; otherwise bash_list before any dev server and reuse if already running.
 - Concise. No filler, no recap of the diff.`;
 
 const LITE_SYSTEM_PROMPT_MODEL_IDS = new Set<string>([
@@ -759,11 +760,20 @@ const LITE_SYSTEM_PROMPT_MODEL_IDS = new Set<string>([
   "llama3.3-70b",
   "llama-3.3-70b-versatile",
   "qwen-3-32b",
+  "ollama-local",
 ]);
+
+const LOOP_EFFICIENCY_PROMPT = `
+# Loop efficiency hard rules
+- Never end with an intent-only message like "I will...", "I'll...", "I need to...", or a todo/plan unless you also call the next tool in that same assistant step.
+- Batch independent reads in one assistant step. If a task names several small files, read them together rather than spending one turn per file.
+- Do not run git status, git log, or git diff for simple file edits unless the task is about source control or git history is required.
+- Never run whole-environment dump commands such as env, printenv, set, export -p, or Get-ChildItem env:. They can expose secrets. Use targeted checks that do not print secret values.
+`;
 
 export function selectSystemPrompt(modelId: string | undefined): string {
   if (modelId && LITE_SYSTEM_PROMPT_MODEL_IDS.has(modelId)) {
-    return SYSTEM_PROMPT_LITE;
+    return `${SYSTEM_PROMPT_LITE}${LOOP_EFFICIENCY_PROMPT}`;
   }
-  return SYSTEM_PROMPT;
+  return `${SYSTEM_PROMPT}${LOOP_EFFICIENCY_PROMPT}`;
 }

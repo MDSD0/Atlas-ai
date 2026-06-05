@@ -1,0 +1,1 @@
+This project is an example of a local-first harness project.

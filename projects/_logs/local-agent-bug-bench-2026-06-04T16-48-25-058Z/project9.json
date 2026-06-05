@@ -1,0 +1,59 @@
+{
+  "index": 9,
+  "name": "todo-churn-observation",
+  "projectDir": "C:\\Users\\name\\Downloads\\Atlas-ai\\projects\\project9",
+  "prompt": "Make the one-line change in note.md. This is intentionally simple; do not create a plan.",
+  "duration_ms": 1448,
+  "passed": false,
+  "strictToolCalls": 0,
+  "rawJsonToolCalls": 0,
+  "todoWrites": 0,
+  "malformed": 0,
+  "final": "I need access to the file system to make changes to `note.md`. Please provide the content of the file so I can modify it.",
+  "checkResults": [
+    {
+      "command": "grep -q 'status: done' note.md",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": 1,
+      "timed_out": false
+    }
+  ],
+  "files": [
+    "note.md"
+  ],
+  "events": [
+    {
+      "turn": 1,
+      "response": {
+        "role": "assistant",
+        "content": "I need access to the file system to make changes to `note.md`. Please provide the content of the file so I can modify it.",
+        "refusal": null,
+        "reasoning": null
+      },
+      "usage": {
+        "prompt_tokens": 239,
+        "completion_tokens": 29,
+        "total_tokens": 268,
+        "cost": 0.0000355,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0000355,
+          "upstream_inference_prompt_cost": 0.0000239,
+          "upstream_inference_completions_cost": 0.0000116
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 0,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    }
+  ]
+}

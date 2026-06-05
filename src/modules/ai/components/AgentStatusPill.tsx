@@ -1,8 +1,6 @@
 import { AlertCircle as AlertCircleIcon } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-
-
 import { AnimatePresence, motion } from "motion/react";
 import { useChatStore, type AgentMeta } from "../store/chatStore";
 
@@ -51,9 +49,7 @@ function describe(meta: AgentMeta): {
     return {
       tone:
         "border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/15",
-      icon: (
-        <AlertCircleIcon size={12} strokeWidth={1.5} />
-      ),
+      icon: <AlertCircleIcon size={12} strokeWidth={1.5} />,
       label: meta.error ?? "Error",
     };
   }

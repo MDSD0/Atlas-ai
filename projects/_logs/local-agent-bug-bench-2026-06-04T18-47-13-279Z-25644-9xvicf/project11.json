@@ -1,0 +1,86 @@
+{
+  "index": 11,
+  "name": "path-resolution-active-folder",
+  "projectDir": "C:\\Users\\name\\Downloads\\Atlas-ai\\projects\\project11",
+  "prompt": "Create README.md for this project with a one-sentence description.",
+  "duration_ms": 1539,
+  "usageTotals": {
+    "prompt_tokens": 1600,
+    "completion_tokens": 47,
+    "total_tokens": 1647
+  },
+  "passed": true,
+  "strictToolCalls": 1,
+  "rawJsonToolCalls": 0,
+  "todoWrites": 0,
+  "malformed": 0,
+  "runError": null,
+  "final": "The README.md file has been created with a one-sentence description.",
+  "checkResults": [
+    {
+      "command": "test -f README.md",
+      "stdout": "",
+      "stderr": "",
+      "exit_code": 0,
+      "timed_out": false
+    }
+  ],
+  "files": [
+    "README.md",
+    "src/app.js"
+  ],
+  "events": [
+    {
+      "turn": 1,
+      "response": {
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "id": "yjxqdnwnp",
+            "type": "function",
+            "function": {
+              "name": "write_file",
+              "arguments": "{\"content\":\"This project is an example of a local-first harness project.\",\"path\":\"README.md\"}"
+            }
+          }
+        ]
+      },
+      "usage": {
+        "queue_time": 0.252058972,
+        "prompt_tokens": 778,
+        "prompt_time": 0.175195184,
+        "completion_tokens": 32,
+        "completion_time": 0.184811371,
+        "total_tokens": 810,
+        "total_time": 0.360006555
+      }
+    },
+    {
+      "turn": 1,
+      "tool": "write_file",
+      "args": {
+        "content": "This project is an example of a local-first harness project.",
+        "path": "README.md"
+      },
+      "result": {
+        "ok": true
+      }
+    },
+    {
+      "turn": 2,
+      "response": {
+        "role": "assistant",
+        "content": "The README.md file has been created with a one-sentence description."
+      },
+      "usage": {
+        "queue_time": 0.3390486,
+        "prompt_tokens": 822,
+        "prompt_time": 0.121326008,
+        "completion_tokens": 15,
+        "completion_time": 0.064834287,
+        "total_tokens": 837,
+        "total_time": 0.186160295
+      }
+    }
+  ]
+}
