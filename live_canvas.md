@@ -52,3 +52,33 @@ Applied:
 - Prompt/tool guidance now distinguishes static HTML external open commands from localhost preview: use `cmd.exe /c start "" "index.html"` on Windows, `open` on macOS, or `xdg-open` on Linux when explicitly asked to use the OS opener.
 
 Focused verification: explicit Git Bash TypeScript `0`; focused Vitest `30/30`.
+
+## Static web lane policy correction
+
+Observed failure class: calculator/static HTML tasks were being run through the
+same full Atlas harness surface as repository patching. That packed memory
+index, LocalRecords recall, SimpleMem loopback, active work packets, local
+skills, repo/LSP/MCP tools, terminal tools, and todo tools before the model
+acted. The result was slower turns, todo churn, and fragile run/open behavior.
+
+Applied:
+
+- Added a request-time lane policy before `streamText`.
+- Static HTML/CSS/JS app prompts now select a `static_web_app` lane.
+- Added `simple` tool mode for static flows: fs/edit/search/shell/preview and
+  verification only, with no `todo_write`.
+- Static web turns skip optional memory index, local memory recall, SimpleMem
+  observer/context, active work packet, and local skill prompt packing.
+- Full harness behavior remains the default for repo work, plan mode, and
+  ambiguous prompts.
+- Prompt-submit proof payload now records the selected lane and tool mode.
+
+Verification receipts:
+
+- Focused TypeScript `0`.
+- Focused Vitest `9/9` for lane policy plus ablation.
+- Full frontend Vitest `263/263`.
+- Vite build `0`.
+- Clean-shell `bash scripts/verify-atlas.sh --all` `RC=0`, printed
+  `verify-atlas --all: OK`; Rust `157 passed / 0 failed / 3 ignored`, harness
+  `3 passed`.

@@ -24,6 +24,19 @@ function names(mode: Parameters<typeof buildTools>[1]) {
 }
 
 describe("buildTools ablation modes", () => {
+  it("simple mode exposes the no-todo static coding loop", () => {
+    const t = names("simple");
+    expect(t.has("read_file")).toBe(true);
+    expect(t.has("edit")).toBe(true);
+    expect(t.has("grep")).toBe(true);
+    expect(t.has("bash_run")).toBe(true);
+    expect(t.has("serve_preview")).toBe(true);
+    expect(t.has("todo_write")).toBe(false);
+    expect(t.has("repo_context")).toBe(false);
+    expect(t.has("lsp_status")).toBe(false);
+    expect(t.has("mcp_call")).toBe(false);
+  });
+
   it("plain mode exposes the irreducible coding loop only", () => {
     const t = names("plain");
     expect(t.has("read_file")).toBe(true);

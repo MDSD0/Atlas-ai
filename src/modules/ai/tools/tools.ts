@@ -47,12 +47,18 @@ export {
  * `full` (the default) is the normal product behavior — every tool. The
  * narrower modes restrict the agent's toolbelt so a benchmark can compare
  * plain vs +repo-map vs +LSP on the same task (GPT review: prove the substrate).
- *   - plain:        fs + edit + search + shell + todo + verification (mini-swe baseline)
+ *   - simple:       fs + edit + search + shell + verification (small static flows)
+ *   - plain:        simple + todo (mini-swe baseline)
  *   - repo_map:     plain + reality (repo_context/repo_map/find_symbol/…)
  *   - repo_map_lsp: repo_map + semantic LSP tools
  *   - full:         everything (memory, mcp, skills, subagents, work packets, …)
  */
-export type AblationMode = "plain" | "repo_map" | "repo_map_lsp" | "full";
+export type AblationMode =
+  | "simple"
+  | "plain"
+  | "repo_map"
+  | "repo_map_lsp"
+  | "full";
 
 
 // Full product toolbelt. This is the source of truth for ChatTools; the
@@ -96,9 +102,11 @@ export function buildTools(
     ...buildEditTools(ctx),
     ...buildSearchTools(ctx),
     ...buildShellTools(ctx),
-    ...buildTodoTools(ctx),
     ...buildVerificationTools(),
   };
+  if (mode === "plain" || mode === "repo_map" || mode === "repo_map_lsp") {
+    tools = { ...tools, ...buildTodoTools(ctx) };
+  }
   if (mode === "repo_map" || mode === "repo_map_lsp") {
     tools = { ...tools, ...buildRealityTools(ctx) };
   }

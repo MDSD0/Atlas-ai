@@ -1274,3 +1274,33 @@ Source-parity packet:
 - Atlas finding: the model can complete the visible work and finish normally without sending a final `todo_write`; Atlas then keeps the last `in_progress` todo rendered. The list tool also treated empty strings as fatal, even though models commonly use `path: ""` to mean the current project base. Finally, prompt/tool guidance over-emphasized localhost preview and did not explicitly tell models to use OS opener commands for static HTML when the user asks for `open`.
 - Disposition: `ADAPT` todo lifecycle by completing only the final dangling `in_progress` todo when no `pending` work remains and hiding the strip once all items are complete. `ADAPT` empty-path resolution to the default project base. `ADAPT` shell/preview guidance for static HTML external open commands. `PRESERVE` iframe restriction against `file://` URLs and preserve unfinished pending todos.
 - Verification: explicit Git Bash `pnpm exec tsc --noEmit` returned `0`; focused Vitest for `todoStore`, `context`, `todo`, and `shell` returned `0` with `30/30` tests.
+
+## Corrective Slice C19: request-time lane policy for static web flows
+
+Source-parity packet:
+
+- Slice: choose a narrow request-time tool and context policy before `streamText` for obvious static HTML/CSS/JS app flows, starting with the calculator/open-preview failure mode.
+- Atlas files inspected: `src/modules/ai/lib/transport.ts`, `src/modules/ai/lib/agent.ts`, `src/modules/ai/tools/tools.ts`, `src/modules/ai/tools/ablation.test.ts`, `src/modules/ai/memory/index.ts`, `src/modules/ai/memory/memorySurface.ts`, `src/modules/ai/memory/simpleMemObserver.ts`, `src/modules/ai/skills/index.ts`, and `src/modules/ai/workPackets/index.ts`.
+- opensrc hook: explicit Git Bash `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh agent-loop tools permissions minimalism context-projection memory` returned `0` and resolved the configured source-pack repositories through the active `gh` keyring.
+- opensrc inspected: `anomalyco/opencode` agent profile and permission code, `SWE-agent/mini-swe-agent` FAQ and control-flow docs, `aiming-lab/SimpleMem` README and `EvolveMem` retrieval-budget docs, plus the local `ai` package source for `streamText`, `activeTools`, and `prepareStep`.
+- Web docs refreshed: Vercel AI SDK v6 tool docs, Hermes agent loop/prompt assembly/memory docs, Claude Code large-codebase guidance, and LangChain's harness-memory essay.
+- Finding: Atlas still packed memory index, local recall, SimpleMem loopback, active work packet, local skills, and every advanced tool for tiny static app tasks. This makes small/local models slower and more likely to churn todos or pick the wrong run path. Prompt text alone is not enough because the available tool/schema surface is itself part of the behavior.
+- Disposition: `ADAPT` request-time tool profile selection and context projection before the model call. `PRESERVE` full default behavior for repo patching, plan mode, and ambiguous work. `REJECT` a hardcoded multi-step pipeline, hidden benchmark special cases, or disabling memory globally.
+- Tests required: static HTML/CSS/JS prompts should select the narrow no-todo tool mode and omit optional memory/work-packet/skill surfaces; repo-edit and plan-mode prompts should keep full behavior; ablation tests should prove the new simple toolbelt is smaller than the mini-swe-like plain mode.
+
+Applied:
+
+- Added a request-time lane policy that recognizes obvious static HTML/CSS/JS app flows and maps them to a `static_web_app` lane.
+- Added a `simple` tool mode: filesystem, edit, search, shell, preview, and verification tools, but no `todo_write`, repo map, LSP, MCP, memory, skills, subagents, terminal, or work packets.
+- Routed `runAgentStream` through the selected tool mode while keeping full mode as the default.
+- Skipped optional memory index, local memory recall, SimpleMem loopback, active work packet, and skill prompt builders for the static web lane. `ATLAS.md` remains allowed when present.
+- Recorded the selected lane and tool mode in the prompt-submit lifecycle payload for proof/debug receipts.
+
+Verification:
+
+- Focused TypeScript returned `0`.
+- Focused Vitest for `lanePolicy` and `ablation` returned `0` with `9/9` tests.
+- Full frontend Vitest returned `0` with `263/263` tests across `54` files.
+- Vite production build returned `0`.
+- `git diff --check` returned `0`.
+- Clean-shell `bash scripts/verify-atlas.sh --all` returned `0` and printed `verify-atlas --all: OK`; frontend Vitest `263/263`, Rust `157 passed / 0 failed / 3 ignored`, harness `3 passed`.

@@ -21,6 +21,7 @@ import {
 import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
 import { buildActiveWorkPacketContext } from "../workPackets";
 import { contextLedger, type PackedContextSource } from "../contextLedger";
+import { selectAgentRunPolicy } from "./lanePolicy";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -91,17 +92,35 @@ export function createContextAwareTransport(deps: Deps) {
   const run = async (options: SendOptions) => {
     const live = deps.getLive();
     const prompt = lastUserText(options.messages);
-    const simpleMem = await SimpleMemRunObserver.start({
-      workspaceRoot: live.workspaceRoot,
-      contentSessionId: deps.toolContext.getSessionId() ?? "unknown",
-      userPrompt: prompt,
-    }).catch(() => null);
+    const planMode = deps.getPlanMode?.() ?? false;
+    const runPolicy = selectAgentRunPolicy({
+      prompt: recentUserText(options.messages),
+      planMode,
+      activeFile: live.activeFile,
+    });
+    const simpleMem = runPolicy.includeSimpleMem
+      ? await SimpleMemRunObserver.start({
+          workspaceRoot: live.workspaceRoot,
+          contentSessionId: deps.toolContext.getSessionId() ?? "unknown",
+          userPrompt: prompt,
+        }).catch(() => null)
+      : null;
     const [atlasMd, fileMemory, localMemory, activeWorkPacket, localSkills] = await Promise.all([
-      readAtlasMd(live.workspaceRoot),
-      buildMemorySurfaceContext(live.workspaceRoot),
-      buildLocalMemoryContext(live.workspaceRoot, prompt),
-      buildActiveWorkPacketContext(live.workspaceRoot),
-      buildLocalSkillsContext(),
+      runPolicy.includeAtlasMd
+        ? readAtlasMd(live.workspaceRoot)
+        : Promise.resolve(null),
+      runPolicy.includeMemoryIndex
+        ? buildMemorySurfaceContext(live.workspaceRoot)
+        : Promise.resolve(null),
+      runPolicy.includeLocalMemory
+        ? buildLocalMemoryContext(live.workspaceRoot, prompt)
+        : Promise.resolve(null),
+      runPolicy.includeWorkPacket
+        ? buildActiveWorkPacketContext(live.workspaceRoot)
+        : Promise.resolve(null),
+      runPolicy.includeSkills
+        ? buildLocalSkillsContext()
+        : Promise.resolve(null),
     ]);
     const projectSources: PackedContextSource[] = [
       {
@@ -175,6 +194,9 @@ export function createContextAwareTransport(deps: Deps) {
     await observeLifecycle("run_start");
     await observeLifecycle("prompt_submit", {
       text: prompt,
+      lane: runPolicy.lane,
+      toolMode: runPolicy.toolMode,
+      reason: runPolicy.reason,
     });
 
     const finishObservers = async (
@@ -208,6 +230,7 @@ export function createContextAwareTransport(deps: Deps) {
         customInstructions: deps.getCustomInstructions(),
         agentPersona: deps.getAgentPersona(),
         toolContext: deps.toolContext,
+        toolMode: runPolicy.toolMode,
         onStep: deps.onStep,
         onUsage: deps.onUsage,
         onCompact: deps.onCompact,
@@ -229,7 +252,7 @@ export function createContextAwareTransport(deps: Deps) {
         openaiCompatibleModelId: deps.getOpenaiCompatibleModelId?.(),
         openaiCompatibleContextLimit: deps.getOpenaiCompatibleContextLimit?.(),
         openrouterModelId: deps.getOpenrouterModelId?.(),
-        planMode: deps.getPlanMode?.(),
+        planMode,
         projectMemory,
         contextLedger: live.workspaceRoot
           ? {
@@ -280,6 +303,21 @@ function lastUserText(messages: UIMessage[]): string {
       .slice(0, 4096);
   }
   return "";
+}
+
+function recentUserText(messages: UIMessage[], maxMessages = 4): string {
+  const chunks: string[] = [];
+  for (let i = messages.length - 1; i >= 0 && chunks.length < maxMessages; i--) {
+    const message = messages[i];
+    if (message.role !== "user") continue;
+    const text = (message.parts as ReadonlyArray<{ type: string; text?: string }>)
+      .filter((part) => part.type === "text")
+      .map((part) => part.text ?? "")
+      .join("\n")
+      .trim();
+    if (text) chunks.unshift(text);
+  }
+  return chunks.join("\n\n").slice(-8192);
 }
 
 function injectEnvIntoLastUser(

@@ -464,3 +464,28 @@ Done. Surfaces the 2.2 receipts on the agent surface.
 Green (clean shell verify-atlas.sh --all): tsc 0, vitest 136 passed (16 files), build 0, cargo check/clippy 0, cargo test 115 + 3 harness.
 
 Phase 2 complete. Next: Phase 3 Slice 3.1 shared repository ignore policy.
+
+## Corrective slice: static web lane policy
+
+Done.
+
+- Added `src/modules/ai/lib/lanePolicy.ts`, a request-time lane selector before
+  the model call.
+- Added `simple` tool mode for static HTML/CSS/JS flows: fs/edit/search/shell,
+  preview, and verification, without todos or advanced harness tools.
+- `transport.ts` now skips optional memory index, local recall, SimpleMem,
+  active work packet, and skill prompt builders when the static web lane is
+  selected.
+- `agent.ts` now accepts the selected tool mode instead of always building full.
+- Added tests for static calculator prompts, static run follow-ups with an
+  active HTML file, full repo-edit fallback, plan-mode fallback, and the
+  no-todo simple toolbelt.
+
+Green receipts:
+
+- TypeScript `0`.
+- Focused Vitest `9/9`.
+- Full frontend Vitest `263/263`.
+- Vite build `0`.
+- Clean-shell `verify-atlas.sh --all` `RC=0`, frontend `263/263`, Rust
+  `157 passed / 0 failed / 3 ignored`, harness `3 passed`.

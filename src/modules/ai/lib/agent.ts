@@ -26,7 +26,7 @@ import {
   type PackedContextSnapshot,
   type PackedContextSource,
 } from "../contextLedger";
-import { buildTools, type ToolContext } from "../tools/tools";
+import { buildTools, type AblationMode, type ToolContext } from "../tools/tools";
 import { wrapToolsWithLifecycle } from "../tools/lifecycle";
 import type { AtlasLifecycleEvent } from "../skills";
 import { compactModelMessagesDetailed } from "./compact";
@@ -449,6 +449,7 @@ export type RunAgentOptions = {
   customInstructions?: string;
   agentPersona?: { name: string; instructions: string } | null;
   toolContext: ToolContext;
+  toolMode?: AblationMode;
   onStep?: (step: string | null) => void;
   onUsage?: (delta: AgentUsageDelta) => void;
   onCompact?: (info: { droppedCount: number }) => void;
@@ -535,7 +536,7 @@ export async function runAgentStream(opts: RunAgentOptions) {
 
   const finalMessages = applyCacheBreakpoints(messages, provider);
   const tools = wrapToolsWithLifecycle(
-    buildTools(opts.toolContext),
+    buildTools(opts.toolContext, opts.toolMode ?? "full"),
     opts.onLifecycleEvent,
   );
   if (opts.contextLedger && opts.onContextPacked) {
