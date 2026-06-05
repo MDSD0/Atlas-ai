@@ -135,14 +135,19 @@ export function resolvePath(
   ctx: AtlasToolProjectContext,
 ): string {
   const path = rawPath.trim();
-  if (!path) throw new Error("cannot resolve empty path");
   if (isAbsolutePath(path)) return path;
   const base = defaultBase(ctx);
   if (!base) {
+    if (!path) {
+      throw new Error(
+        "cannot resolve empty path: no project, active folder, or active file is bound.",
+      );
+    }
     throw new Error(
       `cannot resolve relative path "${rawPath}": no project, active folder, or active file is bound.`,
     );
   }
+  if (!path) return base;
   return joinPath(base, path);
 }
 

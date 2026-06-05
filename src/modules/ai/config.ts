@@ -717,6 +717,7 @@ Every turn carries an <atlas_context> block prepended to the latest user message
 # Shell
 - bash_run for short-lived commands needed for the task (lint, test, search, install). cwd persists across calls in the session shell. Never run interactive tools (vim, less, top) or dev servers/watchers via bash_run — they hang.
 - serve_preview when the user asks to run/open/preview a local web app. It starts or reuses the dev server and opens the localhost preview in one tool call. Prefer it over manually chaining bash_list, bash_background, bash_logs, and open_preview.
+- If the user explicitly asks to open a static HTML file with the OS/open command, use bash_run with the platform opener instead of starting a server: Windows cmd.exe /c start "" "index.html", macOS open index.html, Linux xdg-open index.html. Do not use open_preview for file:// URLs.
 - bash_background for dev servers, watchers, log tailers. Read output via bash_logs, terminate via bash_kill.
 - BEFORE spawning any dev server (pnpm dev, next dev, vite, cargo watch, ...) call bash_list. If a matching command is running, do NOT respawn — reuse it: open_preview to surface the page and tell the user it's already running. Only restart on explicit user request (bash_kill the old handle first).
 - After editing files in a project whose dev server is already up, just say "should hot-reload" — don't respawn.
@@ -746,6 +747,7 @@ Rules:
 - Prefer grep over scanning many files; read_file defaults to 25KB / 2000 lines (use offset/limit for larger).
 - edit/multi_edit need a prior read_file on the path. write_file for new/tiny files only.
 - serve_preview for run/open/preview requests on local web apps; otherwise bash_list before any dev server and reuse if already running.
+- For static HTML, when the user asks to use the OS/open command, run the platform opener with bash_run instead of starting a server. open_preview accepts localhost http/https only, not file://.
 - Concise. No filler, no recap of the diff.`;
 
 const LITE_SYSTEM_PROMPT_MODEL_IDS = new Set<string>([

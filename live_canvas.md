@@ -40,3 +40,15 @@ After the local/API benchmark pass, the Windows verification floor was recovered
 - Final receipt: explicit Git Bash `bash scripts/verify-atlas.sh --all` exited `0` and printed `verify-atlas --all: OK`; frontend Vitest `255/255`, Rust `157 passed / 0 failed / 3 ignored`, harness `3 passed`.
 
 Next: commit and push the benchmark safety, API-first loop, UX error normalization, and Windows verification-floor fixes.
+
+## Calculator-flow UX correction
+
+Observed user run: Atlas eventually opened `http://localhost:8000`, but the mini agent still showed stale todos (`3/4`) and a spinner. The model also called list with an empty path and hit `cannot resolve empty path`, then tried `file://` preview even though the in-app preview is restricted to localhost HTTP.
+
+Applied:
+
+- Normal finish completes the final dangling `in_progress` todo only when there are no pending todos, then the todo strip hides once all todos are complete.
+- Empty paths resolve to the default project base, so list/read-style tool calls can mean "here".
+- Prompt/tool guidance now distinguishes static HTML external open commands from localhost preview: use `cmd.exe /c start "" "index.html"` on Windows, `open` on macOS, or `xdg-open` on Linux when explicitly asked to use the OS opener.
+
+Focused verification: explicit Git Bash TypeScript `0`; focused Vitest `30/30`.

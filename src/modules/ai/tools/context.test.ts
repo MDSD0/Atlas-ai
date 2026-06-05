@@ -44,6 +44,12 @@ describe("Atlas path resolution", () => {
     expect(resolvePath("notes.md", ctx())).toBe("/repo/notes.md");
   });
 
+  it("resolves an empty path to the default project base", () => {
+    expect(resolvePath("", ctx({ activeFolder: "/repo/project" }))).toBe(
+      "/repo/project",
+    );
+  });
+
   it("does not resolve relative paths against activeTerminalCwd by default", () => {
     expect(resolvePath("notes.md", ctx({ activeTerminalCwd: "/tmp" }))).toBe(
       "/repo/notes.md",

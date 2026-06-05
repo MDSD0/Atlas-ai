@@ -352,6 +352,11 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     },
     onFinishMeta: (info) => {
       useChatStore.getState().patchAgentMeta({ hitStepCap: info.hitStepCap });
+      if (!info.hitStepCap) {
+        useTodosStore
+          .getState()
+          .completeTerminalInProgressTodo(sessionId);
+      }
     },
     onUsage: (delta) => {
       const cur = useChatStore.getState().agentMeta.tokens;

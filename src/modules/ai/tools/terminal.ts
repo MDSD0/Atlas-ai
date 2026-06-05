@@ -62,7 +62,7 @@ export function buildTerminalTools(ctx: ToolContext) {
 
     open_preview: tool({
       description:
-        "Open a preview tab (in-app iframe) at the given URL — restricted to localhost/loopback addresses for the local dev server. Use this after starting a dev server (e.g. `pnpm dev`, `npm run dev`) to surface the rendered page next to the terminal. To preview external sites, the user should paste the URL into the preview address bar themselves.",
+        "Open a preview tab (in-app iframe) at the given URL — restricted to localhost/loopback addresses for the local dev server. Use this after starting a dev server (e.g. `pnpm dev`, `npm run dev`) to surface the rendered page next to the terminal. Do not use this for file:// URLs; if the user asks to open a static HTML file externally, use bash_run with the platform opener instead. To preview external sites, the user should paste the URL into the preview address bar themselves.",
       inputSchema: z.object({
         url: z
           .url()

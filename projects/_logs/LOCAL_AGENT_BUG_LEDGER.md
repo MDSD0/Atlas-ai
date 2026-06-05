@@ -203,3 +203,10 @@ Run set:
 - Host guidance: do not create environment variables for individual executables like `bash.exe` or `git.exe`; add their directories to `PATH`. For the Atlas gate on Windows, the stable form is `& "C:\Program Files\Git\bin\bash.exe" --noprofile --norc -lc "cd /c/Users/name/Downloads/Atlas-ai && bash scripts/verify-atlas.sh --all"`.
 - Focused receipts: explicit Git Bash `node scripts/release-preflight.mjs` returned `0` with `"status": "passed"`; explicit Git Bash `cargo test --locked --manifest-path src-tauri/Cargo.toml authorize_spawn_cwd_blocks_symlink_escape` returned `0` with the targeted test passing.
 - Full gate receipt: explicit Git Bash `bash scripts/verify-atlas.sh --all` returned exit code `0` and printed `verify-atlas --all: OK`; frontend Vitest reported `255/255` tests across `52` files; Rust reported `157 passed`, `0 failed`, `3 ignored`, plus harness `3 passed`; launchability audit remained advisory-blocked on external environment items only: Docker daemon, `SWE_BENCH_ROOT`, Harbor CLI, and updater endpoint publication.
+
+## Fix Slice F005: stale todo and static-open UX
+
+- Product changes: normal agent finish now completes the final dangling `in_progress` todo only when there are no `pending` items left, and the todo strip hides once every item is complete. This fixes the screenshot state where the app preview was open but the UI still showed `3/4` todos and a spinner.
+- Product changes: empty tool paths now resolve to the default project base instead of failing with `cannot resolve empty path`, so `list_directory` with `path: ""` behaves like "list here".
+- Product changes: prompt/tool guidance now tells models to use short-lived OS opener commands for static HTML when the user explicitly asks for the open command, and to avoid `open_preview` for `file://` URLs.
+- Verification receipts: explicit Git Bash `pnpm exec tsc --noEmit` returned `0`; focused Vitest for todo store, path resolution, todo tool, and shell guard returned `0` with `30/30` tests.

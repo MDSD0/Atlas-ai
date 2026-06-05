@@ -1263,3 +1263,14 @@ Source-parity packet:
 - Atlas finding: after the host PATH exposed Git Bash, pnpm, Cargo, Python, and git, `verify-atlas.sh --all` reached product checks. It then failed on two Windows-specific fixture/format issues: the symlink escape test could not create a symlink on hosts without symlink privilege (`OS error 1314`), and the release preflight lockfile regex assumed LF while the Windows worktree supplied CRLF.
 - Disposition: `ADAPT` the symlink test so it skips only the fixture setup when Windows denies symlink privilege, while preserving the symlink-escape assertion wherever the fixture can be created. `ADAPT` release preflight by normalizing lockfile line endings before semantic matching. `PRESERVE` the agent filesystem containment invariant and the signed-release dependency contract.
 - Verification: explicit Git Bash `node scripts/release-preflight.mjs` returned `0` with `"status": "passed"`; explicit Git Bash `cargo test --locked --manifest-path src-tauri/Cargo.toml authorize_spawn_cwd_blocks_symlink_escape` returned `0`; explicit Git Bash `bash scripts/verify-atlas.sh --all` returned `0` and printed `verify-atlas --all: OK`, with frontend Vitest `255/255`, Rust `157 passed / 0 failed / 3 ignored`, and harness `3 passed`.
+
+## Corrective Slice C18: stale todo and static-open UX
+
+Source-parity packet:
+
+- Slice: fix the observed calculator flow where the preview eventually opened but the agent UI stayed visually stuck on todos, and where `list_directory` failed on `path: ""`.
+- Atlas files inspected: `src/modules/ai/store/todoStore.ts`, `src/modules/ai/store/chatStore.ts`, `src/modules/ai/components/TodoStrip.tsx`, `src/modules/ai/tools/context.ts`, `src/modules/ai/config.ts`, `src/modules/ai/tools/shell.ts`, and `src/modules/ai/tools/terminal.ts`.
+- opensrc hook: not required; this is a local UX/lifecycle repair over existing Atlas tools, not a new subsystem.
+- Atlas finding: the model can complete the visible work and finish normally without sending a final `todo_write`; Atlas then keeps the last `in_progress` todo rendered. The list tool also treated empty strings as fatal, even though models commonly use `path: ""` to mean the current project base. Finally, prompt/tool guidance over-emphasized localhost preview and did not explicitly tell models to use OS opener commands for static HTML when the user asks for `open`.
+- Disposition: `ADAPT` todo lifecycle by completing only the final dangling `in_progress` todo when no `pending` work remains and hiding the strip once all items are complete. `ADAPT` empty-path resolution to the default project base. `ADAPT` shell/preview guidance for static HTML external open commands. `PRESERVE` iframe restriction against `file://` URLs and preserve unfinished pending todos.
+- Verification: explicit Git Bash `pnpm exec tsc --noEmit` returned `0`; focused Vitest for `todoStore`, `context`, `todo`, and `shell` returned `0` with `30/30` tests.

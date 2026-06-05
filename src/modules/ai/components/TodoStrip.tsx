@@ -31,6 +31,7 @@ export function TodoStrip({ sessionId }: Props) {
   if (!sessionId || todos.length === 0) return null;
 
   const completed = todos.filter((t) => t.status === "completed").length;
+  if (completed === todos.length) return null;
   const pct = Math.round((completed / todos.length) * 100);
 
   return (
