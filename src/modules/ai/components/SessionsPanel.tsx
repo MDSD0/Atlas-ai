@@ -315,11 +315,21 @@ export function SessionsList({
 
   const [staleMap, setStaleMap] = useState<Map<string, boolean>>(new Map());
 
-  // Batch-check stale workspace paths once on mount
+  // Stable key of the unique workspace roots. Sessions hydrate asynchronously
+  // after mount, so keying the stale-check on this (not `[]`) lets it run once
+  // the roots actually arrive — and re-run only when the set of roots changes,
+  // not on every title/timestamp edit.
+  const rootsKey = useMemo(
+    () =>
+      [...new Set(sessions.map((s) => s.workspaceRoot).filter(Boolean) as string[])]
+        .sort()
+        .join("\n"),
+    [sessions],
+  );
+
+  // Batch-check which workspace paths still exist on disk.
   useEffect(() => {
-    const uniqueRoots = [
-      ...new Set(sessions.map((s) => s.workspaceRoot).filter(Boolean) as string[]),
-    ];
+    const uniqueRoots = rootsKey ? rootsKey.split("\n") : [];
     if (uniqueRoots.length === 0) return;
 
     let alive = true;
@@ -343,7 +353,7 @@ export function SessionsList({
     return () => {
       alive = false;
     };
-  }, []); // only on mount
+  }, [rootsKey]);
 
   const groups = useMemo(() => {
     const raw = groupByWorkspace(sessions);

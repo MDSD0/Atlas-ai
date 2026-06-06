@@ -356,8 +356,8 @@ mod tests {
         // Surface the measured go/no-go numbers so "we measured it" is itself
         // provable (run with --nocapture; the release qualifier parses this).
         let recall = recalled as f32 / expected.len() as f32;
-        let token_ratio = (result.projected_tokens as f32 / result.naive_tokens.max(1) as f32)
-            * 100.0;
+        let token_ratio =
+            (result.projected_tokens as f32 / result.naive_tokens.max(1) as f32) * 100.0;
         let wrong_file_hits = result
             .included_files
             .iter()

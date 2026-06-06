@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shouldShowReceipt } from "./ReceiptStrip";
+import { receiptNeedsAttention, shouldShowReceipt } from "./ReceiptStrip";
 import type { ReceiptSummary } from "../proof/recorder";
 
 function summary(patch: Partial<ReceiptSummary> = {}): ReceiptSummary {
@@ -47,5 +47,22 @@ describe("shouldShowReceipt", () => {
     expect(
       shouldShowReceipt(summary({ status: "completed", changedFiles: ["/a.ts"] })),
     ).toBe(true);
+  });
+});
+
+describe("receiptNeedsAttention", () => {
+  it("auto-expands runs that need eyes — failures or diagnostics", () => {
+    expect(receiptNeedsAttention(summary({ status: "failed", failures: ["boom"] }))).toBe(true);
+    expect(receiptNeedsAttention(summary({ diagnostics: ["TS2345 on foo.ts"] }))).toBe(true);
+  });
+
+  it("stays collapsed for clean runs (quiet by default)", () => {
+    expect(
+      receiptNeedsAttention(summary({ status: "verified", checks: ["npm test (exit 0)"] })),
+    ).toBe(false);
+    expect(
+      receiptNeedsAttention(summary({ status: "completed", changedFiles: ["/a.ts", "/b.ts"] })),
+    ).toBe(false);
+    expect(receiptNeedsAttention(summary({ status: "smoke_checked", eventCount: 3 }))).toBe(false);
   });
 });

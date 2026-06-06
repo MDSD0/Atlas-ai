@@ -111,6 +111,8 @@
     "tempfile",
     "tokio",
     "tree-sitter",
+    "tree-sitter-go",
+    "tree-sitter-java",
     "tree-sitter-javascript",
     "tree-sitter-python",
     "tree-sitter-rust",
@@ -132,6 +134,20 @@
       "reason": "official MCP stdio client lifecycle and child-process transport",
       "startupEffect": "none: configured MCP servers remain disabled by default and connect lazily after approved calls",
       "graphEffect": "default features disabled; only client and transport-child-process enabled"
+    },
+    {
+      "dependency": "tree-sitter-go",
+      "manifest": "src-tauri/Cargo.toml",
+      "reason": "Reality map symbol extraction for Go workspaces",
+      "startupEffect": "none: parser is used only during explicit Reality indexing",
+      "graphEffect": "tree-sitter grammar crate matching the existing parser stack"
+    },
+    {
+      "dependency": "tree-sitter-java",
+      "manifest": "src-tauri/Cargo.toml",
+      "reason": "Reality map symbol extraction for Java workspaces",
+      "startupEffect": "none: parser is used only during explicit Reality indexing",
+      "graphEffect": "tree-sitter grammar crate matching the existing parser stack"
     }
   ]
 }

@@ -12,9 +12,9 @@ import {
   getModel,
   getModelContextLimit,
   LMSTUDIO_DEFAULT_BASE_URL,
-  MAX_AGENT_STEPS,
   MLX_DEFAULT_BASE_URL,
   modelKeepsReasoning,
+  modelStepBudget,
   OLLAMA_DEFAULT_BASE_URL,
   providerNeedsKey,
   selectSystemPrompt,
@@ -38,6 +38,10 @@ import type { ProviderKeys } from "./keyring";
 import { createProxyFetch } from "./proxyFetch";
 
 const localProxyFetch = createProxyFetch({ allowPrivateNetwork: true });
+// Cloud providers must also route through the Rust HTTP proxy: a raw webview
+// fetch to api.anthropic.com / api.openai.com / etc. is blocked by CORS
+// ("Failed to fetch"). Public networks only — no localhost.
+const cloudProxyFetch = createProxyFetch({ allowPrivateNetwork: false });
 
 const TOOL_LABELS: Record<string, (input: Record<string, unknown>) => string> =
   {
@@ -168,27 +172,35 @@ export async function buildLanguageModel(
   switch (provider) {
     case "openai": {
       const { createOpenAI } = await import("@ai-sdk/openai");
-      built = createOpenAI({ apiKey: key })(resolvedModelId);
+      built = createOpenAI({ apiKey: key, fetch: cloudProxyFetch })(resolvedModelId);
       break;
     }
     case "anthropic": {
       const { createAnthropic } = await import("@ai-sdk/anthropic");
-      built = createAnthropic({ apiKey: key })(resolvedModelId);
+      // Pin the API base explicitly: @ai-sdk/anthropic@3.0.71's default resolves
+      // to a path that 404s, so every Anthropic model fails without this.
+      built = createAnthropic({
+        apiKey: key,
+        baseURL: "https://api.anthropic.com/v1",
+        fetch: cloudProxyFetch,
+      })(resolvedModelId);
       break;
     }
     case "google": {
       const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
-      built = createGoogleGenerativeAI({ apiKey: key })(resolvedModelId);
+      built = createGoogleGenerativeAI({ apiKey: key, fetch: cloudProxyFetch })(
+        resolvedModelId,
+      );
       break;
     }
     case "xai": {
       const { createXai } = await import("@ai-sdk/xai");
-      built = createXai({ apiKey: key })(resolvedModelId);
+      built = createXai({ apiKey: key, fetch: cloudProxyFetch })(resolvedModelId);
       break;
     }
     case "cerebras": {
       const { createCerebras } = await import("@ai-sdk/cerebras");
-      built = createCerebras({ apiKey: key })(resolvedModelId);
+      built = createCerebras({ apiKey: key, fetch: cloudProxyFetch })(resolvedModelId);
       break;
     }
     case "deepseek": {
@@ -198,6 +210,7 @@ export async function buildLanguageModel(
         name: "deepseek",
         baseURL: "https://api.deepseek.com",
         apiKey: key,
+        fetch: cloudProxyFetch,
       })(resolvedModelId);
       break;
     }
@@ -208,12 +221,13 @@ export async function buildLanguageModel(
         name: "mistral",
         baseURL: "https://api.mistral.ai/v1",
         apiKey: key,
+        fetch: cloudProxyFetch,
       })(resolvedModelId);
       break;
     }
     case "groq": {
       const { createGroq } = await import("@ai-sdk/groq");
-      built = createGroq({ apiKey: key })(resolvedModelId);
+      built = createGroq({ apiKey: key, fetch: cloudProxyFetch })(resolvedModelId);
       break;
     }
     case "openrouter": {
@@ -223,6 +237,7 @@ export async function buildLanguageModel(
         name: "openrouter",
         baseURL: "https://openrouter.ai/api/v1",
         apiKey: key,
+        fetch: cloudProxyFetch,
         headers: {
           "HTTP-Referer": "https://atlas.ai",
           "X-Title": "Atlas",
@@ -348,16 +363,73 @@ export function buildConfiguredLanguageModel(
   });
 }
 
+/**
+ * Make persisted history safe to replay to a provider. Two failure modes seen
+ * with weaker models and aborted runs:
+ *   1. A run stopped mid-tool-call leaves a tool part in a non-terminal state
+ *      (`input-streaming`/`input-available`) with no result. Converted, that
+ *      becomes an orphaned `tool_use` with no `tool_result`, which Anthropic
+ *      rejects ("messages.N.content.0.tool_use.input: Input should be an object").
+ *   2. A model can emit malformed JSON tool arguments, leaving a tool part whose
+ *      `input` is not a plain object — also rejected.
+ * Drop incomplete tool parts; coerce non-object inputs to `{}`.
+ */
+export function sanitizeToolParts(messages: UIMessage[]): UIMessage[] {
+  let changed = false;
+  const out = messages.map((message) => {
+    const parts = message.parts as
+      | Array<{ type?: string; state?: string; input?: unknown }>
+      | undefined;
+    if (!Array.isArray(parts)) return message;
+    let local = false;
+    const next: typeof parts = [];
+    for (const part of parts) {
+      const type = part.type ?? "";
+      const isTool = type.startsWith("tool-") || type === "dynamic-tool";
+      if (!isTool) {
+        next.push(part);
+        continue;
+      }
+      if (part.state !== "output-available" && part.state !== "output-error") {
+        local = true; // incomplete/aborted tool call — would orphan a tool_use
+        continue;
+      }
+      if (typeof part.input !== "object" || part.input === null) {
+        local = true;
+        next.push({ ...part, input: {} });
+        continue;
+      }
+      next.push(part);
+    }
+    if (!local) return message;
+    changed = true;
+    return { ...message, parts: next } as UIMessage;
+  });
+  return changed ? out : messages;
+}
+
 const PLAN_MODE_PROMPT = `## PLAN MODE — ACTIVE
 Mutating tools (write_file, edit, multi_edit, create_directory) will queue their changes for the user to review as a single diff. Do NOT execute bash_run or bash_background while plan mode is active; restrict yourself to reads (repo_context, read_file, grep, glob, list_directory) and the queued mutations. After queueing the full set of edits, stop and return a brief summary; do not continue acting until the user has accepted/rejected.`;
 
-function buildStableSystem(
+/**
+ * Prompt-layer split. Two layers with different lifetimes:
+ *   - stableText: base system prompt + session-stable persona/custom instructions.
+ *     This is the prefix-cache target — it must stay byte-identical across turns.
+ *   - volatileText: project/memory/work-packet/skill context, each under an
+ *     honest heading. Sent as a separate system message *after* the cache
+ *     breakpoint, so changes here never invalidate the cached stable prefix.
+ *
+ * Previously everything was concatenated into messages[0] under a single
+ * `## PROJECT — ATLAS.md` label, which both mislabeled heterogeneous sources and
+ * poisoned the cache (any memory change busted the whole system prefix).
+ */
+export function buildStableSystem(
   modelId: ModelId,
   persona: { name: string; instructions: string } | null,
   customInstructions: string | undefined,
   projectMemory: string | null,
   projectSources: readonly PackedContextSource[] = [],
-): { text: string; sources: PackedContextSource[] } {
+): { stableText: string; volatileText: string | null; sources: PackedContextSource[] } {
   const base = selectSystemPrompt(getModel(modelId).id);
   const personaBlock = persona?.instructions.trim()
     ? `\n\n## ACTIVE AGENT — ${persona.name}\n${persona.instructions.trim()}`
@@ -365,31 +437,30 @@ function buildStableSystem(
   const customBlock = customInstructions?.trim()
     ? `\n\n## USER CUSTOM INSTRUCTIONS — follow unless they conflict with safety rules above\n${customInstructions.trim()}`
     : "";
-  const memoryBlock =
-    projectMemory && projectMemory.trim().length > 0
-      ? `\n\n## PROJECT — ATLAS.md\n${projectMemory.trim()}`
-      : "";
+
+  // Volatile layer: render each project source under its own honest heading.
   const loadedProjectSources = projectSources.filter((source) =>
     source.content?.trim(),
   );
+  let volatileText: string | null = null;
+  if (loadedProjectSources.length > 0) {
+    volatileText = loadedProjectSources
+      .map((source) => `## ${source.label}\n${source.content!.trim()}`)
+      .join("\n\n");
+  } else if (projectMemory && projectMemory.trim().length > 0) {
+    // Fallback when structured sources aren't available (no workspace root).
+    volatileText = `## PROJECT CONTEXT\n${projectMemory.trim()}`;
+  }
+
   return {
-    text: `${base}${memoryBlock}${personaBlock}${customBlock}`,
+    stableText: `${base}${personaBlock}${customBlock}`,
+    volatileText,
     sources: [
       {
         id: "system_prompt",
         label: "System prompt",
         source: "Atlas selected system prompt",
         content: base,
-      },
-      {
-        id: "project_context_overhead",
-        label: "Project-context framing",
-        source: "Atlas stable-system packer",
-        content: memoryBlock
-          ? `\n\n## PROJECT — ATLAS.md\n${"\n\n".repeat(
-              Math.max(0, loadedProjectSources.length - 1),
-            )}`
-          : null,
       },
       ...projectSources,
       {
@@ -454,6 +525,10 @@ export type RunAgentOptions = {
   agentPersona?: { name: string; instructions: string } | null;
   toolContext: ToolContext;
   toolMode?: AblationMode;
+  /** Lane-level step ceiling; combined (min) with the per-model budget. */
+  laneMaxSteps?: number;
+  /** Benchmark ablation: disable the capability gateway (expose every tool). */
+  gatewayDisabled?: boolean;
   onStep?: (step: string | null) => void;
   onUsage?: (delta: AgentUsageDelta) => void;
   onCompact?: (info: { droppedCount: number }) => void;
@@ -515,7 +590,7 @@ export async function runAgentStream(opts: RunAgentOptions) {
     opts.contextLedger?.projectSources,
   );
 
-  const history = await convertToModelMessages(opts.uiMessages);
+  const history = await convertToModelMessages(sanitizeToolParts(opts.uiMessages));
   const prunedHistory = pruneMessages({
     messages: history,
     reasoning: modelKeepsReasoning(modelId) ? "none" : "before-last-message",
@@ -530,9 +605,14 @@ export async function runAgentStream(opts: RunAgentOptions) {
     opts.onCompact?.({ droppedCount: compact.droppedCount });
   }
 
+  // Stable prefix first (cache target), then the volatile project/memory layer,
+  // then plan-mode, then history. Only messages[0] is marked for prefix caching.
   const messages: ModelMessage[] = [
-    { role: "system", content: stableSystem.text },
+    { role: "system", content: stableSystem.stableText },
   ];
+  if (stableSystem.volatileText) {
+    messages.push({ role: "system", content: stableSystem.volatileText });
+  }
   if (opts.planMode) {
     messages.push({ role: "system", content: PLAN_MODE_PROMPT });
   }
@@ -567,17 +647,25 @@ export async function runAgentStream(opts: RunAgentOptions) {
   // full `tools` object is still defined, so promoted tools are callable the
   // moment the model searches for them — we only narrow which schemas are sent
   // each step. Ablation modes already restrict their toolbelt and opt out.
-  const gatewayActive = (opts.toolMode ?? "full") === "full";
+  const gatewayActive =
+    (opts.toolMode ?? "full") === "full" && !opts.gatewayDisabled;
   const sessionId = opts.toolContext.getSessionId() ?? "unknown";
   if (gatewayActive) clearPromotedCapabilities(sessionId);
   const allToolNames = new Set(Object.keys(tools));
+
+  // Effective step cap = min(model budget, lane ceiling). Replaces the single
+  // global MAX_AGENT_STEPS so a local/lite model or a short lane stops sooner.
+  const effectiveMaxSteps = Math.min(
+    modelStepBudget(getModel(modelId).id),
+    opts.laneMaxSteps ?? Number.POSITIVE_INFINITY,
+  );
 
   let stepsSeen = 0;
   return streamText({
     model,
     messages: finalMessages,
     tools,
-    stopWhen: stepCountIs(MAX_AGENT_STEPS),
+    stopWhen: stepCountIs(effectiveMaxSteps),
     prepareStep: gatewayActive
       ? () => ({
           activeTools: activeToolNames(sessionId).filter((name) =>
@@ -630,7 +718,7 @@ export async function runAgentStream(opts: RunAgentOptions) {
       const finishReason =
         (result as { finishReason?: string } | undefined)?.finishReason ?? "";
       opts.onFinishMeta?.({
-        hitStepCap: stepsSeen >= MAX_AGENT_STEPS,
+        hitStepCap: stepsSeen >= effectiveMaxSteps,
         finishReason,
       });
     },

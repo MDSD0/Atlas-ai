@@ -1,12 +1,30 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  CAPABILITIES,
   CORE_TOOL_NAMES,
   activeToolNames,
+  capabilityToolNames,
   clearPromotedCapabilities,
   getPromotedCapabilities,
   promoteCapabilities,
   searchCapabilities,
 } from "./capabilities";
+import { buildTools, type ToolContext } from "./tools";
+
+const ctx = {
+  getCwd: () => null,
+  getWorkspaceRoot: () => "/repo",
+  getProjectContext: () => ({}),
+  getTerminalContext: () => null,
+  isActiveTerminalPrivate: () => false,
+  injectIntoActivePty: () => false,
+  openPreview: () => false,
+  spawnAgent: () => null,
+  readAgentOutput: () => null,
+  readCache: new Map(),
+  getSessionId: () => "s1",
+  getApprovalMode: () => "default",
+} as unknown as ToolContext;
 
 const SESSION = "test-session";
 
@@ -40,6 +58,16 @@ describe("capability gateway", () => {
   it("ignores unknown capability ids", () => {
     promoteCapabilities(SESSION, ["not_a_capability"]);
     expect(getPromotedCapabilities(SESSION)).toEqual([]);
+  });
+
+  it("leaves no orphaned tool — every full-mode tool is core or in a capability", () => {
+    const reachable = new Set<string>([
+      ...CORE_TOOL_NAMES,
+      ...capabilityToolNames(CAPABILITIES.map((c) => c.id)),
+    ]);
+    const built = Object.keys(buildTools(ctx, "full"));
+    const orphans = built.filter((name) => !reachable.has(name));
+    expect(orphans).toEqual([]);
   });
 
   it("clears promotions between runs", () => {

@@ -479,12 +479,39 @@ export const useChatStore = create<StoreState>((set, get) => ({
 
   hydrateSessions: async () => {
     if (get().sessionsHydrated) return;
-    const { sessions } = await loadAll();
+    const { sessions, activeId } = await loadAll();
     const normalized = sessions.map((s) =>
       s.projectId === undefined || s.projectName === undefined
         ? bindSessionToWorkspace(s, s.workspaceRoot ?? null)
         : s,
     );
+
+    // Restore the previously-active session if it still exists and has history,
+    // so a restart returns the user to their conversation instead of a blank
+    // "New chat". Seed its messages so the chat view renders them immediately.
+    const restorable = activeId
+      ? normalized.find((s) => s.id === activeId)
+      : null;
+    if (restorable) {
+      const msgs = await loadMessages(restorable.id).catch(() => null);
+      if (msgs && msgs.length > 0) {
+        seedMessages.set(restorable.id, msgs);
+        if (restorable.workspaceRoot) {
+          await useWorkspaceStore
+            .getState()
+            .setWorkspaceRoot(restorable.workspaceRoot)
+            .catch(() => useWorkspaceStore.getState().clearWorkspace());
+        } else {
+          useWorkspaceStore.getState().clearWorkspace();
+        }
+        set({
+          sessions: normalized,
+          activeSessionId: restorable.id,
+          sessionsHydrated: true,
+        });
+        return;
+      }
+    }
 
     // Reuse the most recent untitled "New chat" session if one exists from
     // the previous run — no point stacking empty placeholder sessions every

@@ -84,6 +84,8 @@ enum LanguageKind {
     Tsx,
     Python,
     Rust,
+    Go,
+    Java,
 }
 
 impl LanguageKind {
@@ -94,6 +96,8 @@ impl LanguageKind {
             "tsx" => Some(Self::Tsx),
             "py" => Some(Self::Python),
             "rs" => Some(Self::Rust),
+            "go" => Some(Self::Go),
+            "java" => Some(Self::Java),
             _ => None,
         }
     }
@@ -105,6 +109,8 @@ impl LanguageKind {
             Self::Tsx => "tsx",
             Self::Python => "python",
             Self::Rust => "rust",
+            Self::Go => "go",
+            Self::Java => "java",
         }
     }
 }
@@ -116,6 +122,8 @@ struct Extractors {
     tsx: TagsConfiguration,
     python: TagsConfiguration,
     rust: TagsConfiguration,
+    go: TagsConfiguration,
+    java: TagsConfiguration,
 }
 
 impl Extractors {
@@ -157,6 +165,16 @@ impl Extractors {
                 tree_sitter_rust::TAGS_QUERY,
                 "",
             )?,
+            go: tags_configuration(
+                tree_sitter_go::LANGUAGE.into(),
+                tree_sitter_go::TAGS_QUERY,
+                "",
+            )?,
+            java: tags_configuration(
+                tree_sitter_java::LANGUAGE.into(),
+                tree_sitter_java::TAGS_QUERY,
+                "",
+            )?,
         })
     }
 
@@ -172,6 +190,8 @@ impl Extractors {
             LanguageKind::Tsx => &self.tsx,
             LanguageKind::Python => &self.python,
             LanguageKind::Rust => &self.rust,
+            LanguageKind::Go => &self.go,
+            LanguageKind::Java => &self.java,
         };
         let (tags, has_parse_error) = self
             .context
@@ -373,6 +393,18 @@ mod tests {
                 "app.rs",
                 "fn double(x: i32) -> i32 { x * 2 }\n",
                 "double",
+            ),
+            (
+                LanguageKind::Go,
+                "app.go",
+                "package main\nfunc Double(x int) int { return x * 2 }\n",
+                "Double",
+            ),
+            (
+                LanguageKind::Java,
+                "App.java",
+                "class App { int doubleIt(int x) { return x * 2; } }\n",
+                "doubleIt",
             ),
         ];
         for (language, path, source, expected) in cases {

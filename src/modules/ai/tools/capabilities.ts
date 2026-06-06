@@ -29,6 +29,7 @@ export const CORE_TOOL_NAMES: readonly string[] = [
   "bash_run",
   "get_terminal_output",
   "serve_preview",
+  "suggest_command",
   // cheap orientation + planning
   "repo_context",
   "todo_write",
@@ -145,7 +146,7 @@ export const CAPABILITIES: readonly CapabilityDescriptor[] = [
     keywords: [
       "background", "server", "watch", "daemon", "long running", "logs", "job", "kill", "process",
     ],
-    toolNames: ["bash_background", "bash_logs", "bash_list", "bash_kill"],
+    toolNames: ["bash_background", "bash_logs", "bash_list", "bash_kill", "open_preview"],
   },
   {
     id: "metrics",

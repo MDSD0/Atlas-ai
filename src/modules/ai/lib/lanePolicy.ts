@@ -11,6 +11,8 @@ export type AgentRunPolicy = {
   includeSimpleMem: boolean;
   includeWorkPacket: boolean;
   includeSkills: boolean;
+  /** Lane-level ceiling on agent steps. Combined (min) with the model budget. */
+  maxSteps?: number;
   reason: string;
 };
 
@@ -41,6 +43,7 @@ const STATIC_WEB_APP_POLICY: AgentRunPolicy = {
   includeSimpleMem: false,
   includeWorkPacket: false,
   includeSkills: false,
+  maxSteps: 12,
   reason: "static HTML/CSS/JS flow uses the small no-todo toolbelt",
 };
 

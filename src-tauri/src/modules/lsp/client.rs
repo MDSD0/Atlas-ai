@@ -92,9 +92,8 @@ pub struct LspClient {
 
 impl LspClient {
     pub fn spawn(executable: &Path, args: &[&str], root: &Path) -> Result<Self, String> {
-        let mut command = Command::new(executable);
+        let mut command = language_server_command(executable, args);
         command
-            .args(args)
             .current_dir(root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -391,6 +390,31 @@ impl Drop for LspClient {
     }
 }
 
+fn language_server_command(executable: &Path, args: &[&str]) -> Command {
+    #[cfg(windows)]
+    {
+        if is_windows_command_shim(executable) {
+            let mut command = Command::new("cmd.exe");
+            command.args(["/D", "/S", "/C"]).arg(executable).args(args);
+            return command;
+        }
+    }
+
+    let mut command = Command::new(executable);
+    command.args(args);
+    command
+}
+
+#[cfg(windows)]
+fn is_windows_command_shim(executable: &Path) -> bool {
+    executable
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            extension.eq_ignore_ascii_case("cmd") || extension.eq_ignore_ascii_case("bat")
+        })
+}
+
 fn semantic_method(operation: &LspSemanticOperation) -> &'static str {
     match operation {
         LspSemanticOperation::Definition => "textDocument/definition",
@@ -597,6 +621,33 @@ mod tests {
         assert_eq!(params["context"]["includeDeclaration"], true);
     }
 
+    #[cfg(windows)]
+    #[test]
+    fn command_shims_are_launched_through_cmd_on_windows() {
+        let command = language_server_command(
+            Path::new(r"C:\Users\name\AppData\Roaming\npm\typescript-language-server.cmd"),
+            &["--stdio"],
+        );
+        let args = command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+
+        assert_eq!(command.get_program().to_string_lossy(), "cmd.exe");
+        assert_eq!(args[0..3], ["/D", "/S", "/C"]);
+        assert!(args[3].ends_with("typescript-language-server.cmd"));
+        assert_eq!(args[4], "--stdio");
+    }
+
+    #[cfg(not(windows))]
+    #[test]
+    fn native_servers_are_launched_directly() {
+        let command = language_server_command(Path::new("/usr/bin/rust-analyzer"), &[]);
+
+        assert_eq!(command.get_program(), Path::new("/usr/bin/rust-analyzer"));
+        assert_eq!(command.get_args().count(), 0);
+    }
+
     #[test]
     fn semantic_result_arrays_are_bounded() {
         let result = Value::Array(
@@ -752,7 +803,10 @@ mod tests {
                 .expect("read definition")
                 .expect("definition message");
             assert_eq!(definition["method"], "textDocument/definition");
-            assert_eq!(definition["params"]["position"], json!({ "line": 1, "character": 12 }));
+            assert_eq!(
+                definition["params"]["position"],
+                json!({ "line": 1, "character": 12 })
+            );
             write_message(
                 &mut server_stream,
                 &json!({
@@ -813,14 +867,11 @@ mod tests {
     #[test]
     #[ignore = "run explicitly when clangd is installed for host semantic qualification"]
     fn installed_clangd_document_symbols_smoke() {
-        let Some(executable) = std::env::var_os("PATH")
-            .as_deref()
-            .and_then(|path| {
-                std::env::split_paths(path)
-                    .map(|directory| directory.join("clangd"))
-                    .find(|candidate| candidate.is_file())
-            })
-        else {
+        let Some(executable) = std::env::var_os("PATH").as_deref().and_then(|path| {
+            std::env::split_paths(path)
+                .map(|directory| directory.join("clangd"))
+                .find(|candidate| candidate.is_file())
+        }) else {
             return;
         };
         let root = tempfile::tempdir().expect("root");
@@ -841,6 +892,9 @@ mod tests {
             .expect("request document symbols");
 
         assert!(!snapshot.truncated);
-        assert!(snapshot.result.as_array().is_some_and(|items| !items.is_empty()));
+        assert!(snapshot
+            .result
+            .as_array()
+            .is_some_and(|items| !items.is_empty()));
     }
 }

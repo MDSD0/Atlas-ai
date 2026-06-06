@@ -13,7 +13,7 @@ import { RunRecorder } from "../proof/recorder";
 import { proofRunRegistry } from "../proof/runtime";
 import { useProofStore } from "../store/proofStore";
 import {
-  buildLocalMemoryContext,
+  buildPinnedMemoryContext,
   buildMemorySurfaceContext,
   mirrorProofRunToMemorySurface,
   SimpleMemRunObserver,
@@ -106,30 +106,33 @@ export function createContextAwareTransport(deps: Deps) {
       planMode,
       activeFile: live.activeFile,
     });
-    const simpleMem = runPolicy.includeSimpleMem
-      ? await SimpleMemRunObserver.start({
-          workspaceRoot: live.workspaceRoot,
-          contentSessionId: sessionId,
-          userPrompt: prompt,
-        }).catch(() => null)
-      : null;
-    const [atlasMd, fileMemory, localMemory, activeWorkPacket, localSkills] = await Promise.all([
-      runPolicy.includeAtlasMd
-        ? readAtlasMd(live.workspaceRoot)
-        : Promise.resolve(null),
-      runPolicy.includeMemoryIndex
-        ? buildMemorySurfaceContext(live.workspaceRoot)
-        : Promise.resolve(null),
-      runPolicy.includeLocalMemory
-        ? buildLocalMemoryContext(live.workspaceRoot, prompt)
-        : Promise.resolve(null),
-      runPolicy.includeWorkPacket
-        ? buildActiveWorkPacketContext(live.workspaceRoot)
-        : Promise.resolve(null),
-      runPolicy.includeSkills
-        ? buildLocalSkillsContext()
-        : Promise.resolve(null),
-    ]);
+    // Start the SimpleMem observer concurrently with the other context builders
+    // instead of blocking the model call on its session round-trip first.
+    const [atlasMd, fileMemory, localMemory, activeWorkPacket, localSkills, simpleMem] =
+      await Promise.all([
+        runPolicy.includeAtlasMd
+          ? readAtlasMd(live.workspaceRoot)
+          : Promise.resolve(null),
+        runPolicy.includeMemoryIndex
+          ? buildMemorySurfaceContext(live.workspaceRoot)
+          : Promise.resolve(null),
+        runPolicy.includeLocalMemory
+          ? buildPinnedMemoryContext(live.workspaceRoot)
+          : Promise.resolve(null),
+        runPolicy.includeWorkPacket
+          ? buildActiveWorkPacketContext(live.workspaceRoot)
+          : Promise.resolve(null),
+        runPolicy.includeSkills
+          ? buildLocalSkillsContext()
+          : Promise.resolve(null),
+        runPolicy.includeSimpleMem
+          ? SimpleMemRunObserver.start({
+              workspaceRoot: live.workspaceRoot,
+              contentSessionId: sessionId,
+              userPrompt: prompt,
+            }).catch(() => null)
+          : Promise.resolve(null),
+      ]);
     const projectSources: PackedContextSource[] = [
       {
         id: "atlas_md",
@@ -145,8 +148,8 @@ export function createContextAwareTransport(deps: Deps) {
       },
       {
         id: "local_memory",
-        label: "LocalRecords recall",
-        source: "app-local typed memory",
+        label: "Pinned memory",
+        source: "app-local typed memory (top-confidence snapshot)",
         content: localMemory,
       },
       {
@@ -247,6 +250,7 @@ export function createContextAwareTransport(deps: Deps) {
         agentPersona: deps.getAgentPersona(),
         toolContext: deps.toolContext,
         toolMode: runPolicy.toolMode,
+        laneMaxSteps: runPolicy.maxSteps,
         onStep: deps.onStep,
         onUsage: deps.onUsage,
         onCompact: deps.onCompact,

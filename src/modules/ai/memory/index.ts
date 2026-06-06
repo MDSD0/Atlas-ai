@@ -70,3 +70,45 @@ export async function buildLocalMemoryContext(
     return null;
   }
 }
+
+const PINNED_MEMORY_LIMIT = 5;
+
+/**
+ * Memory kernel: a tiny, always-on snapshot of the highest-confidence project
+ * facts. Unlike `buildLocalMemoryContext` (query-based recall that the harness
+ * used to inject every turn), this is bounded and query-free — the small
+ * "frozen" memory layer. Deeper or query-specific retrieval is on-demand and
+ * cited via the memory_recall / memory_simplemem_search tools, not injected.
+ */
+export async function buildPinnedMemoryContext(
+  projectId: string | null,
+  limit = PINNED_MEMORY_LIMIT,
+  provider: Pick<LocalRecordsProvider, "list"> = localRecords,
+): Promise<string | null> {
+  if (!projectId) return null;
+  try {
+    const records = await provider.list(projectId);
+    const pinned = records
+      .filter((record) => record.status === "active")
+      .sort(
+        (a, b) =>
+          b.confidence - a.confidence ||
+          b.updatedAt - a.updatedAt ||
+          a.id.localeCompare(b.id),
+      )
+      .slice(0, Math.max(1, limit));
+    if (pinned.length === 0) return null;
+    return [
+      '<atlas_memory provider="local_records" scope="pinned">',
+      MEMORY_REPO_TRUTH_RULE,
+      "Advisory only. For more, call memory_recall (keyword) or memory_simplemem_search (semantic).",
+      ...pinned.map(
+        (record) =>
+          `- [${record.kind}] ${record.content} (id=${record.id}, confidence=${record.confidence.toFixed(2)})`,
+      ),
+      "</atlas_memory>",
+    ].join("\n");
+  } catch {
+    return null;
+  }
+}

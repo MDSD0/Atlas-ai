@@ -1,7 +1,17 @@
 import type { ModelMessage } from "ai";
 
 const KEEP_TAIL = 24;
-const ELISION_TEXT = "[elided to save context — see prior tool call in history]";
+
+/**
+ * Elision keeps a breadcrumb of *which* tool ran instead of a flat placeholder,
+ * so the model retains the causal chain (what happened) even after the bulky
+ * output is dropped. Cheap synthesis without a model call.
+ */
+function elisionText(toolName: string | undefined): string {
+  return toolName
+    ? `[${toolName} output elided to save context — re-run or see history if needed]`
+    : "[tool output elided to save context — see history]";
+}
 
 type ToolPart = {
   type: string;
@@ -44,9 +54,15 @@ function elideToolResult(part: ToolPart): { changed: boolean; part: ToolPart } {
     changed: true,
     part: {
       ...part,
-      output: { type: "text", value: ELISION_TEXT, __elided: true },
+      output: { type: "text", value: elisionText(part.toolName), __elided: true },
     },
   };
+}
+
+// Bytes contributed by a single message — used to track the running total during
+// elision in O(message) instead of rescanning the whole history each step.
+function messageBytes(message: ModelMessage): number {
+  return approxBytes([message]);
 }
 
 function pathOfInput(input: unknown): string | null {
@@ -176,20 +192,39 @@ export function compactModelMessagesDetailed(
   }
 
   const out = working.slice();
-  const stopIdx = Math.max(0, out.length - KEEP_TAIL);
-  for (let i = 0; i < stopIdx; i++) {
-    if (out[i].role === "system") continue;
-    if (!Array.isArray(out[i].content)) continue;
+  // Track the running byte total so each elision costs O(message), not O(history).
+  let bytes = approxBytes(out);
+  const targetBytes = 0.6 * contextLimit * 4;
+
+  const elideMessageAt = (i: number): void => {
+    if (out[i].role === "system" || !Array.isArray(out[i].content)) return;
     let local = false;
     const next = (out[i].content as ToolPart[]).map((part) => {
       const r = elideToolResult(part);
       if (r.changed) local = true;
       return r.part;
     });
-    if (local) {
-      out[i] = { ...out[i], content: next } as ModelMessage;
-      dropped++;
-      if (approxBytes(out) / 4 < 0.6 * contextLimit) break;
+    if (!local) return;
+    const before = messageBytes(out[i]);
+    const replaced = { ...out[i], content: next } as ModelMessage;
+    out[i] = replaced;
+    bytes -= before - messageBytes(replaced);
+    dropped++;
+  };
+
+  const stopIdx = Math.max(0, out.length - KEEP_TAIL);
+  for (let i = 0; i < stopIdx; i++) {
+    elideMessageAt(i);
+    if (bytes < targetBytes) break;
+  }
+
+  // Tail-overflow guard: if even after eliding the head we're still near the
+  // ceiling (a single huge tool result lives in the kept tail), elide the tail
+  // too rather than ship an over-limit request the provider will reject.
+  if (bytes / 4 >= 0.9 * contextLimit) {
+    for (let i = stopIdx; i < out.length; i++) {
+      elideMessageAt(i);
+      if (bytes / 4 < 0.9 * contextLimit) break;
     }
   }
 

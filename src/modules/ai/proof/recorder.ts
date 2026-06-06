@@ -414,6 +414,12 @@ export class RunRecorder {
         this.verifiedCheckRan = true;
       }
     }
+    // Running the app counts as activity: a successful serve_preview (the fused
+    // run/open tool) means something ran, so the verdict is at least
+    // "smoke_checked" rather than the alarming "unverified".
+    if (record.toolName === "serve_preview" && !failed) {
+      this.anyCommandRan = true;
+    }
     this.diagnostics.push(
       ...summarizeDiagnosticEvidence(
         semanticEvidenceFromToolResult(record.toolName, record.output),
