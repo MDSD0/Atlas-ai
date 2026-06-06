@@ -30,7 +30,22 @@ type EditResult =
       post_edit_diagnostics?: PostEditDiagnostics;
       memory_invalidation?: MemoryInvalidation;
     }
-  | { error: string; path: string; code?: "stale_read" };
+  | {
+      error: string;
+      path: string;
+      code?: "stale_read" | "old_string_not_found";
+      recovery?: string;
+    };
+
+function oldStringNotFound(path: string, oldString: string): EditResult {
+  return {
+    error: `old_string not found: ${JSON.stringify(oldString.slice(0, 80))}`,
+    code: "old_string_not_found",
+    path,
+    recovery:
+      "Do not retry the same old_string. Call read_file again, copy the exact current text including whitespace and line endings, then issue one corrected edit or multi_edit.",
+  };
+}
 
 export async function applyEdits(
   abs: string,
@@ -98,20 +113,14 @@ async function applyEditsUnlocked(
         i += e.old_string.length;
       }
       if (n === 0) {
-        return {
-          error: `old_string not found: ${JSON.stringify(e.old_string.slice(0, 80))}`,
-          path: abs,
-        };
+        return oldStringNotFound(abs, e.old_string);
       }
       totalReplacements += n;
       void occurrences;
     } else {
       const first = content.indexOf(e.old_string);
       if (first === -1) {
-        return {
-          error: `old_string not found: ${JSON.stringify(e.old_string.slice(0, 80))}`,
-          path: abs,
-        };
+        return oldStringNotFound(abs, e.old_string);
       }
       const second = content.indexOf(e.old_string, first + 1);
       if (second !== -1) {

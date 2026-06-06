@@ -661,11 +661,13 @@ export const MLX_DEFAULT_BASE_URL = "http://127.0.0.1:8080/v1";
 export const OLLAMA_DEFAULT_BASE_URL = "http://localhost:11434/v1";
 export const OPENAI_COMPATIBLE_DEFAULT_BASE_URL = "";
 export const MAX_AGENT_STEPS = 24;
+export const MAX_AGENT_OUTPUT_TOKENS = 8192;
 export const TERMINAL_BUFFER_LINES = 300;
 
 /** Tighter ceiling for lite/local models — they tend to spiral, so cap the loop
  * sooner to bound wasted cost; frontier models keep the full budget. */
 const LITE_MODEL_MAX_STEPS = 16;
+const LITE_MODEL_MAX_OUTPUT_TOKENS = 4096;
 
 /**
  * Provider/model step budget. The single global MAX_AGENT_STEPS was applied to
@@ -677,6 +679,13 @@ export function modelStepBudget(modelId: string | undefined): number {
     return LITE_MODEL_MAX_STEPS;
   }
   return MAX_AGENT_STEPS;
+}
+
+export function modelOutputTokenBudget(modelId: string | undefined): number {
+  if (modelId && LITE_SYSTEM_PROMPT_MODEL_IDS.has(modelId)) {
+    return LITE_MODEL_MAX_OUTPUT_TOKENS;
+  }
+  return MAX_AGENT_OUTPUT_TOKENS;
 }
 
 export const SYSTEM_PROMPT = `You are Atlas, a local-first AI coding harness embedded in a developer desktop app (Tauri + Rust + React). You are a hands-on engineer, not a chat bot. Your job is to *do* the work, not narrate it.

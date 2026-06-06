@@ -518,3 +518,48 @@ Focused green receipts:
   `157 passed / 0 failed / 3 ignored`, harness `3 passed`.
 
 Next: continue the bug ledger with provider/API robustness and latency receipts.
+
+## Corrective slice: provider/API benchmark robustness
+
+Done.
+
+- LSP broken providers now use a short retry cooldown instead of permanent
+  poison state.
+- CodeReality graph/detail opens now resolve repo-relative paths against the
+  workspace root before opening editor tabs.
+- Exact edit misses return structured recovery guidance to prevent repeated
+  stale edit attempts.
+- Headless benchmark canonicalization now mirrors the native Windows path
+  contract.
+- Real-loop benchmark metrics now include `toolErrors`,
+  `repeatedToolFailures`, and sampled tool error text.
+- Progressive benchmark now supports provider filtering and explicit step/output
+  caps via `BENCH_PROVIDERS`, `BENCH_MAX_STEPS`, and
+  `BENCH_MAX_OUTPUT_TOKENS`.
+- Production agent stream now caps per-step output tokens to prevent providers
+  from treating tiny tasks as 65k-token completions.
+
+Receipts:
+
+- Focused frontend Vitest `RC=0`, `15 passed / 1 skipped`.
+- Rust LSP tests `RC=0`, `11 passed / 0 failed / 1 ignored`.
+- SWE-bench preflight `RC=0`; host blocked by missing Docker and unset
+  `SWE_BENCH_ROOT`.
+- Terminal-Bench preflight `RC=0`; host blocked by missing Docker and Harbor.
+- Codebase-memory preflight `RC=0`; external MCP binary not installed.
+- Launchability audit ran; advisory blocked by host/release publication items.
+- OpenRouter `openai/gpt-4.1-mini` progressive API smoke `RC=0`, `5/5 pass`,
+  no tool errors, no repeated failures.
+- Installed global `opensrc@0.7.2` and fetched Harbor, SWE-bench,
+  mini-swe-agent, opencode, MCP TS SDK, prompt repos, harness list, and skills
+  repos into the local opensrc cache.
+- Installed user-level Python `harbor`, `mini-swe-agent`, and `swebench`.
+  Harbor preflight now passes when the Python user scripts dir is on PATH.
+  Docker remains missing. mini-swe-agent interactive CLI is installed but cannot
+  run in this non-console capture. PyPI `swebench` imports a Unix-only
+  `resource` module on Windows Python 3.14; use the cached official checkout
+  plus Docker for real SWE-bench execution.
+- Full gate `bash scripts/verify-atlas.sh --all` `RC=0` from a VS 2022
+  vcvars64 shell with the MSVC linker pinned via
+  `CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER`; frontend `306 passed / 3
+  skipped`, Rust check/clippy/tests/doc-tests complete.

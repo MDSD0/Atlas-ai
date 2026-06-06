@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { formatRealityStats, freshnessLabel } from "./CodeRealityPanel";
+import {
+  formatRealityStats,
+  freshnessLabel,
+  resolveRepoDisplayPath,
+} from "./CodeRealityPanel";
 import type { RepoContextResponse } from "../lib/native";
 
 function snap(patch: Partial<RepoContextResponse> = {}): RepoContextResponse {
@@ -63,5 +67,19 @@ describe("freshnessLabel", () => {
     expect(
       freshnessLabel(snap({ indexed_at_ms: Date.now() - 120_000 })),
     ).toBe("2m ago");
+  });
+});
+
+describe("resolveRepoDisplayPath", () => {
+  it("opens repo-relative Reality paths as workspace files on Windows", () => {
+    expect(resolveRepoDisplayPath("C:\\repo", "src\\app.ts")).toBe(
+      "C:\\repo\\src\\app.ts",
+    );
+  });
+
+  it("does not rewrite already absolute paths", () => {
+    expect(resolveRepoDisplayPath("C:\\repo", "D:\\other\\file.ts")).toBe(
+      "D:\\other\\file.ts",
+    );
   });
 });

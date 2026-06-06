@@ -64,6 +64,8 @@ async function runWithRotation(
         keys,
         modelId: c.modelId,
         openrouterModelId: c.openrouterModelId,
+        maxSteps: Number(process.env.BENCH_MAX_STEPS ?? 10),
+        maxOutputTokens: Number(process.env.BENCH_MAX_OUTPUT_TOKENS ?? 2048),
       });
       last = { used: `${c.label}#${i + 1}`, metrics };
       const dead =
@@ -152,6 +154,12 @@ run("Atlas progressive harness benchmark (real loop)", () => {
   const env = loadEnv();
   const ONLY = process.env.BENCH_ONLY ?? "";
   const KEEP = process.env.BENCH_KEEP === "1";
+  const providerFilter = new Set(
+    (process.env.BENCH_PROVIDERS ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
   // Order is the fallback chain. OpenRouter free keys are out of credits and
   // groq keys are largely rate-limited from prior runs, so try the fresh,
   // capable Gemini keys first to get meaningful first-pass numbers.
@@ -167,7 +175,11 @@ run("Atlas progressive harness benchmark (real loop)", () => {
         keys: pick(env, "key", 7),
       },
     ] satisfies Candidate[]
-  ).filter((c) => c.keys.length > 0);
+  ).filter(
+    (c) =>
+      c.keys.length > 0 &&
+      (providerFilter.size === 0 || providerFilter.has(c.label)),
+  );
 
   const tasks: Array<{ build: (dir: string) => HarnessTask; difficulty: string }> = [
     {
@@ -270,6 +282,8 @@ run("Atlas progressive harness benchmark (real loop)", () => {
           console.log(
             `[bench:${t.difficulty}] via=${res.used} pass=${m.pass} wallMs=${m.wallMs} steps=${m.steps} ` +
               `toolCalls=${m.toolCalls} tools=${JSON.stringify(m.toolCounts)} ` +
+              `toolErrors=${m.toolErrors} repeatedFailures=${m.repeatedToolFailures} ` +
+              `errorSamples=${JSON.stringify(m.toolErrorSamples)} ` +
               `unlocked=${JSON.stringify(m.unlockedCapabilities)} ` +
               `in=${m.inputTokens} out=${m.outputTokens} hitCap=${m.hitStepCap} ` +
               `finish=${m.finishReason}${m.error ? ` error=${m.error.slice(0, 160)}` : ""}`,

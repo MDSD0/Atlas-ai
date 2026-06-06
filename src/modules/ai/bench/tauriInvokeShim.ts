@@ -27,10 +27,11 @@ const READ_LIMIT = 256 * 1024;
 
 function canonical(root: string, p: string): string {
   const abs = isAbsolute(p) ? p : resolve(root, p);
+  const nativeShape = (path: string) => path.replace(/\\/g, "/");
   try {
-    return realpathSync(abs);
+    return nativeShape(realpathSync(abs));
   } catch {
-    return abs; // non-existent path: caller (context.ts) walks parents itself
+    return nativeShape(abs); // non-existent path: caller (context.ts) walks parents itself
   }
 }
 

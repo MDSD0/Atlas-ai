@@ -1335,3 +1335,66 @@ Verification:
 - Vite production build returned `0`.
 - `git diff --check` returned `0`.
 - Clean-shell `bash scripts/verify-atlas.sh --all` returned `0`, printed `RC=0` and `verify-atlas --all: OK`; frontend Vitest `270/270`, Rust `157 passed / 0 failed / 3 ignored`, harness `3 passed`.
+
+## Corrective Slice C21: provider/API benchmark robustness
+
+Source-parity packet:
+
+- Slice: make Atlas benchmarkable under real API/provider constraints while
+  fixing the UI/LSP/tool-loop defects found by the benchmark trace.
+- Atlas files inspected: `src-tauri/src/modules/lsp.rs`,
+  `src/modules/ai/lib/agent.ts`, `src/modules/ai/config.ts`,
+  `src/modules/ai/tools/edit.ts`, `src/modules/ai/components/CodeRealityPanel.tsx`,
+  `src/modules/ai/bench/runHarnessTask.ts`,
+  `src/modules/ai/bench/progressiveBench.test.ts`, and
+  `src/modules/ai/bench/tauriInvokeShim.ts`.
+- opensrc hook: explicit Git Bash
+  `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh lsp tools permission benchmark eval mcp skills opencode mini-swe-agent`
+  returned `0`.
+- opensrc inspected: opencode LSP diagnostic/client/status handling,
+  opencode MCP/tool/session status handling, mini-swe-agent control-loop and
+  SWE-bench usage docs, Harbor/Terminal-Bench preflight surface, and official
+  SWE-bench adapter expectations.
+- Finding: opencode does not permanently poison a provider after one transient
+  LSP failure; mini-swe-agent records trajectories/errors plainly and keeps the
+  loop bounded; official SWE/Terminal benchmark wrappers require Docker/Harbor
+  host readiness. Atlas had the right adapters but weaker failure receipts and
+  provider budget controls.
+- Disposition: `ADAPT` transient LSP broken-state retry, bounded benchmark
+  output/step controls, and trajectory-like sampled tool failure receipts.
+  `PRESERVE` Atlas workspace safety invariants and native canonical path
+  contract. `REJECT` using official SWE-bench/Terminal-Bench claims without
+  Docker/Harbor/SWE_BENCH_ROOT on the host.
+
+Applied:
+
+- LSP broken state is a short retry cooldown rather than permanent poison.
+- Reality graph opens normalize repo-relative paths to workspace-absolute editor
+  paths.
+- Edit misses return `old_string_not_found` and recovery guidance.
+- Headless benchmark canonical paths now match the native Windows slash
+  contract.
+- Real-loop benchmark metrics include tool error counts, repeated failure
+  counts, and sampled error strings.
+- Progressive benchmark supports provider filtering and budget caps.
+- Production `streamText` calls now pass a conservative `maxOutputTokens`.
+
+Verification:
+
+- Focused frontend Vitest returned `0` with `15 passed / 1 skipped`.
+- Rust LSP tests returned `0` with `11 passed / 0 failed / 1 ignored`.
+- SWE-bench preflight returned `0`; official sample blocked by missing Docker
+  and unset `SWE_BENCH_ROOT`.
+- Terminal-Bench preflight returned `0`; official sample blocked by missing
+  Docker and Harbor CLI.
+- Codebase-memory preflight returned `0`; external MCP binary unavailable.
+- OpenRouter `openai/gpt-4.1-mini` progressive API smoke returned `0` with
+  `5/5 pass`, no tool errors, no repeated failures.
+- Global `opensrc@0.7.2` installed and fetched the referenced source-pack repos
+  into the local opensrc cache.
+- User-level Python `harbor`, `mini-swe-agent`, and `swebench` installed.
+  Terminal-Bench preflight detects Harbor when
+  `C:\Users\name\AppData\Roaming\Python\Python314\Scripts` is on PATH. Docker is
+  still unavailable. mini-swe-agent interactive CLI fails in this non-console
+  capture, and PyPI `swebench` imports Unix-only `resource` on Windows Python
+  3.14, so official benchmark execution still requires host provisioning.

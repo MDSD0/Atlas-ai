@@ -83,6 +83,86 @@ Verification receipts:
   `verify-atlas --all: OK`; Rust `157 passed / 0 failed / 3 ignored`, harness
   `3 passed`.
 
+## Corrective slice: provider/API benchmark robustness and Reality/LSP recovery
+
+Observed during real Atlas UI and headless API smokes:
+
+- TypeScript LSP could remain visibly `broken` after a transient spawn failure,
+  even after the language server or Windows command shim was fixed.
+- CodeReality map/detail clicks passed repo-relative paths to editor tabs, so
+  files could open as inaccessible breadcrumb paths on Windows.
+- Exact edit misses returned only `old_string not found`, which let weaker
+  models repeat the same stale replacement instead of rereading.
+- The headless benchmark shim returned Windows backslash canonical paths, while
+  the production native boundary returns forward-slash canonical paths; this
+  caused false `outside workspace root` tool failures in benchmark traces.
+- OpenRouter requests for tiny tasks were rejected because Atlas did not set an
+  agent output-token ceiling, so providers inferred context-sized maxima
+  (observed 65,536 requested output tokens).
+
+Applied:
+
+- LSP broken state is now a short retry cooldown, not a permanent provider
+  poison. Status/diagnostic calls can recover without an app restart.
+- Reality file opens now resolve repo-relative display paths against the
+  workspace root before opening editor tabs.
+- Edit misses return structured `old_string_not_found` plus recovery guidance:
+  reread, copy exact current text, then issue one corrected edit.
+- Progressive benchmark metrics now record tool errors, repeated identical tool
+  failures, and sampled error text.
+- Progressive benchmark supports `BENCH_PROVIDERS`, `BENCH_MAX_STEPS`, and
+  `BENCH_MAX_OUTPUT_TOKENS`.
+- Production agent stream now sets a conservative per-step output cap:
+  8,192 tokens for frontier/default models and 4,096 for lite/local models.
+
+Receipts:
+
+- Focused frontend Vitest: `15 passed / 1 skipped`, `RC=0`.
+- Rust LSP tests: `11 passed / 0 failed / 1 ignored`, `RC=0`.
+- External benchmark preflight: SWE-bench adapter `RC=0`, but host blocked by
+  missing Docker and unset `SWE_BENCH_ROOT`.
+- Terminal-Bench preflight: Harbor adapter `RC=0`, but host blocked by missing
+  Docker and missing Harbor CLI.
+- Codebase-memory preflight: `RC=0`, external MCP binary not installed.
+- Launchability audit: advisory blocked by missing Docker/SWE_BENCH_ROOT/Harbor
+  and updater endpoint publication, with static adapters present.
+- API smoke after output cap, OpenRouter `openai/gpt-4.1-mini`, 5 tasks:
+  `5/5 pass`, `RC=0`, no tool errors, no repeated failures. Summary:
+  T1 21.3s / 2 steps / 1 tool / in 5547 / out 38;
+  T2 5.2s / 3 steps / 3 tools / in 4488 / out 42;
+  T3 8.9s / 7 steps / 6 tools / in 4730 / out 33;
+  T4 8.7s / 6 steps / 5 tools / in 4655 / out 43;
+  T5 7.3s / 3 steps / 3 tools / in 4629 / out 49.
+
+Next: install or provision host-level Docker/Harbor/SWE-bench checkout before
+claiming official SWE-bench/Terminal-Bench execution; current repo adapters and
+preflights are wired, but the host is not ready.
+
+Follow-up during the same slice:
+
+- Installed global `opensrc@0.7.2`; `opensrc --help` works.
+- Fetched local opensrc checkouts for Harbor, SWE-bench, mini-swe-agent,
+  opencode, MCP TS SDK, Claude/system prompt repos, harness engineering list,
+  and Karpathy skills.
+- Installed user-level Python packages `harbor`, `mini-swe-agent`, and
+  `swebench` via `python -m pip install --user ...`.
+- Python user scripts are in
+  `C:\Users\name\AppData\Roaming\Python\Python314\Scripts`, which is not on
+  PATH by default.
+- Terminal-Bench preflight now detects installed Harbor when that scripts dir is
+  on PATH; `RC=0`, Docker still unavailable.
+- mini-swe-agent import/CLI is installed, but the interactive CLI cannot render
+  in this non-console PowerShell capture (`NoConsoleScreenBufferError`).
+- PyPI `swebench` installs, but importing the harness on Windows Python 3.14
+  hits Unix-only `resource`; official Atlas sample path remains the opensrc
+  checkout plus Docker host readiness.
+- Full gate after the slice: `bash scripts/verify-atlas.sh --all` `RC=0`
+  when run from a VS 2022 vcvars64 shell with
+  `CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_LINKER` pinned to the MSVC linker.
+  Frontend Vitest reported `306 passed / 3 skipped`; Rust check/clippy/tests
+  and doc-tests completed. Plain Git Bash can pick up Git's Unix `link.exe`,
+  which breaks Rust linking on Windows.
+
 ## Stop/cancellation resource correction
 
 Observed failure class: Stop could abort the visible model stream while leaving

@@ -14,6 +14,7 @@ import {
   LMSTUDIO_DEFAULT_BASE_URL,
   MLX_DEFAULT_BASE_URL,
   modelKeepsReasoning,
+  modelOutputTokenBudget,
   modelStepBudget,
   OLLAMA_DEFAULT_BASE_URL,
   providerNeedsKey,
@@ -527,6 +528,8 @@ export type RunAgentOptions = {
   toolMode?: AblationMode;
   /** Lane-level step ceiling; combined (min) with the per-model budget. */
   laneMaxSteps?: number;
+  /** Per-step output ceiling; defaults to a conservative per-model budget. */
+  maxOutputTokens?: number;
   /** Benchmark ablation: disable the capability gateway (expose every tool). */
   gatewayDisabled?: boolean;
   onStep?: (step: string | null) => void;
@@ -665,6 +668,8 @@ export async function runAgentStream(opts: RunAgentOptions) {
     model,
     messages: finalMessages,
     tools,
+    maxOutputTokens:
+      opts.maxOutputTokens ?? modelOutputTokenBudget(getModel(modelId).id),
     stopWhen: stepCountIs(effectiveMaxSteps),
     prepareStep: gatewayActive
       ? () => ({

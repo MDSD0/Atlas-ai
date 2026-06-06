@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MAX_AGENT_STEPS, modelStepBudget } from "../config";
+import {
+  MAX_AGENT_OUTPUT_TOKENS,
+  MAX_AGENT_STEPS,
+  modelOutputTokenBudget,
+  modelStepBudget,
+} from "../config";
 import { selectAgentRunPolicy } from "./lanePolicy";
 
 describe("per-model step budget", () => {
@@ -14,6 +19,18 @@ describe("per-model step budget", () => {
     expect(lite).toBeLessThan(MAX_AGENT_STEPS);
     expect(modelStepBudget("qwen-3-32b")).toBe(lite);
     expect(modelStepBudget("gemini-2.5-flash")).toBe(lite);
+  });
+});
+
+describe("per-model output token budget", () => {
+  it("keeps provider output ceilings below context-sized defaults", () => {
+    expect(modelOutputTokenBudget("gpt-5.5")).toBe(MAX_AGENT_OUTPUT_TOKENS);
+    expect(modelOutputTokenBudget("openrouter-custom")).toBe(
+      MAX_AGENT_OUTPUT_TOKENS,
+    );
+    expect(modelOutputTokenBudget("gemini-2.5-flash")).toBeLessThan(
+      MAX_AGENT_OUTPUT_TOKENS,
+    );
   });
 });
 

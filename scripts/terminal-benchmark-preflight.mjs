@@ -58,7 +58,10 @@ const report = {
   sampleCommand: [harbor ?? "harbor", ...args].join(" "),
 };
 
-assert.match(report.sampleCommand, /harbor run --dataset terminal-bench@2\.0/);
+assert.match(
+  report.sampleCommand,
+  /(?:^|[\\/])harbor(?:\.exe)? run --dataset terminal-bench@2\.0/,
+);
 assert.match(report.sampleCommand, /--agent oracle/);
 assert.match(report.sampleCommand, /--n-concurrent 1/);
 assert.match(report.sampleCommand, /--n-tasks 1/);

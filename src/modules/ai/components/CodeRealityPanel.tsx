@@ -70,6 +70,18 @@ const CHIP_TONE: Record<StatusChip["tone"], string> = {
   muted: "border-border/50 bg-card/50 text-muted-foreground",
 };
 
+export function resolveRepoDisplayPath(workspaceRoot: string, path: string): string {
+  if (
+    /^[A-Za-z]:[\\/]/.test(path) ||
+    path.startsWith("/") ||
+    path.startsWith("\\\\")
+  ) {
+    return path;
+  }
+  const separator = workspaceRoot.includes("\\") ? "\\" : "/";
+  return `${workspaceRoot.replace(/[\\/]+$/, "")}${separator}${path.replace(/^[\\/]+/, "")}`;
+}
+
 export function CodeRealityPanel({
   onOpenFile,
 }: {
@@ -84,6 +96,10 @@ export function CodeRealityPanel({
   const lsp = useStatusStore((s) => s.lsp);
   const memory = useStatusStore((s) => s.memory);
   const refreshStatus = useStatusStore((s) => s.refresh);
+  const openRepoFile = onOpenFile
+    ? (path: string) =>
+        onOpenFile(resolveRepoDisplayPath(workspaceRoot ?? "", path))
+    : undefined;
 
   useEffect(() => {
     void refresh(workspaceRoot);
@@ -143,7 +159,7 @@ export function CodeRealityPanel({
               workspaceRoot={workspaceRoot}
               task={task}
               onFocusTask={(focusedTask) => void refresh(workspaceRoot, focusedTask)}
-              onOpenFile={onOpenFile}
+              onOpenFile={openRepoFile}
             />
 
             {snapshot.degraded_files.length > 0 && (

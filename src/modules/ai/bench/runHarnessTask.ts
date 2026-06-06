@@ -19,6 +19,9 @@ export type HarnessMetrics = {
   steps: number;
   toolCalls: number;
   toolCounts: Record<string, number>;
+  toolErrors: number;
+  repeatedToolFailures: number;
+  toolErrorSamples: string[];
   unlockedCapabilities: string[];
   inputTokens: number;
   outputTokens: number;
@@ -78,6 +81,8 @@ export async function runHarnessTask(
     gatewayDisabled?: boolean;
     /** Hard ceiling on agent steps (budget guardrail for paid runs). */
     maxSteps?: number;
+    /** Hard ceiling on per-step output tokens (budget guardrail for paid runs). */
+    maxOutputTokens?: number;
   },
 ): Promise<HarnessMetrics> {
   const sessionId = `bench-${task.name}-${Date.now()}`;
@@ -87,6 +92,10 @@ export async function runHarnessTask(
   let toolCalls = 0;
   let hitStepCap = false;
   let finishReason = "";
+  let toolErrors = 0;
+  let repeatedToolFailures = 0;
+  const toolErrorSamples: string[] = [];
+  const failedToolFingerprints = new Map<string, number>();
   const usage = { inputTokens: 0, outputTokens: 0, cachedInputTokens: 0 };
 
   const messages: UIMessage[] = [
@@ -105,11 +114,28 @@ export async function runHarnessTask(
       toolMode: opts.toolMode ?? "full",
       gatewayDisabled: opts.gatewayDisabled,
       laneMaxSteps: opts.maxSteps,
+      maxOutputTokens: opts.maxOutputTokens,
       openrouterModelId: opts.openrouterModelId,
       uiMessages: messages,
       onToolResult: (r) => {
         toolCalls++;
         toolCounts[r.toolName] = (toolCounts[r.toolName] ?? 0) + 1;
+        const output = r.output as { error?: unknown; code?: unknown } | undefined;
+        if (output && typeof output.error === "string") {
+          toolErrors++;
+          if (toolErrorSamples.length < 5) {
+            toolErrorSamples.push(`${r.toolName}: ${output.error.slice(0, 180)}`);
+          }
+          const fingerprint = JSON.stringify({
+            tool: r.toolName,
+            input: r.input,
+            error: output.error,
+            code: output.code,
+          });
+          const seen = failedToolFingerprints.get(fingerprint) ?? 0;
+          if (seen > 0) repeatedToolFailures++;
+          failedToolFingerprints.set(fingerprint, seen + 1);
+        }
       },
       onUsage: (d) => {
         usage.inputTokens = d.inputTokens;
@@ -123,7 +149,14 @@ export async function runHarnessTask(
     });
     // Drive the stream to completion.
     await result.consumeStream();
-    await Promise.resolve(result.finishReason).catch(() => {});
+    await Promise.resolve(result.finishReason)
+      .then((reason) => {
+        finishReason = reason;
+      })
+      .catch((finishError) => {
+        finishReason = "error";
+        error = String(finishError);
+      });
     const stepList = await (result as unknown as { steps?: Promise<unknown[]> })
       .steps;
     if (Array.isArray(stepList)) steps = stepList.length;
@@ -148,6 +181,9 @@ export async function runHarnessTask(
     steps,
     toolCalls,
     toolCounts,
+    toolErrors,
+    repeatedToolFailures,
+    toolErrorSamples,
     unlockedCapabilities: getPromotedCapabilities(sessionId),
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,

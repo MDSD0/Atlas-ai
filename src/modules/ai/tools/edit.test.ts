@@ -119,4 +119,30 @@ describe("agent edit freshness", () => {
     ).resolves.toEqual({ error: "binary file refused", path });
     expect(mocks.writeFile).not.toHaveBeenCalled();
   });
+
+  it("returns recovery guidance when an exact replacement is stale", async () => {
+    const path = "/repo/value.ts";
+    const original = "export const VALUE = 1;\n";
+    const readCache = new Map([[path, fingerprintText(original)]]);
+    mocks.readFile.mockResolvedValue({
+      kind: "text",
+      content: original,
+      size: original.length,
+    });
+
+    await expect(
+      applyEdits(
+        path,
+        "/repo",
+        [{ old_string: "VALUE = 2", new_string: "VALUE = 3" }],
+        "edit",
+        readCache,
+      ),
+    ).resolves.toMatchObject({
+      code: "old_string_not_found",
+      path,
+      recovery: expect.stringContaining("Do not retry the same old_string"),
+    });
+    expect(mocks.writeFile).not.toHaveBeenCalled();
+  });
 });

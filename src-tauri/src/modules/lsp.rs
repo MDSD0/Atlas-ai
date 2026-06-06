@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
     sync::Mutex,
+    time::{Duration, Instant},
 };
 
 use serde::Serialize;
@@ -117,8 +118,15 @@ const PROVIDERS: &[Provider] = &[
 #[derive(Default)]
 pub struct LspState {
     clients: Mutex<HashMap<String, LspClient>>,
-    broken: Mutex<HashMap<String, String>>,
+    broken: Mutex<HashMap<String, BrokenProvider>>,
 }
+
+struct BrokenProvider {
+    detail: String,
+    failed_at: Instant,
+}
+
+const BROKEN_RETRY_AFTER: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -222,13 +230,7 @@ pub fn agent_lsp_diagnostics(
         ));
     }
     let key = client_key(&root, provider);
-    if let Some(detail) = state
-        .broken
-        .lock()
-        .map_err(|_| "LSP broken-state lock poisoned")?
-        .get(&key)
-        .cloned()
-    {
+    if let Some(detail) = recent_broken_detail(&state, &key)? {
         return Ok(response(
             provider,
             &file,
@@ -262,11 +264,7 @@ pub fn agent_lsp_diagnostics(
                 clients.insert(key.clone(), client);
             }
             Err(detail) => {
-                state
-                    .broken
-                    .lock()
-                    .map_err(|_| "LSP broken-state lock poisoned")?
-                    .insert(key, detail.clone());
+                record_broken(&state, key, detail.clone())?;
                 return Ok(response(
                     provider,
                     &file,
@@ -286,11 +284,7 @@ pub fn agent_lsp_diagnostics(
         Ok(snapshot) => Ok(snapshot_response(provider, &file, snapshot)),
         Err(detail) => {
             clients.remove(&key);
-            state
-                .broken
-                .lock()
-                .map_err(|_| "LSP broken-state lock poisoned")?
-                .insert(key, detail.clone());
+            record_broken(&state, key, detail.clone())?;
             Ok(response(
                 provider,
                 &file,
@@ -325,13 +319,7 @@ pub fn agent_lsp_semantic(
     let provider = provider_for_file(&file)
         .ok_or_else(|| "no semantic provider is registered for this file extension".to_string())?;
     let key = client_key(&root, provider);
-    if let Some(detail) = state
-        .broken
-        .lock()
-        .map_err(|_| "LSP broken-state lock poisoned")?
-        .get(&key)
-        .cloned()
-    {
+    if let Some(detail) = recent_broken_detail(&state, &key)? {
         return Ok(semantic_response(
             provider,
             &file,
@@ -373,11 +361,7 @@ pub fn agent_lsp_semantic(
                 clients.insert(key.clone(), client);
             }
             Err(detail) => {
-                state
-                    .broken
-                    .lock()
-                    .map_err(|_| "LSP broken-state lock poisoned")?
-                    .insert(key, detail.clone());
+                record_broken(&state, key, detail.clone())?;
                 return Ok(semantic_response(
                     provider,
                     &file,
@@ -408,11 +392,7 @@ pub fn agent_lsp_semantic(
         )),
         Err(detail) => {
             clients.remove(&key);
-            state
-                .broken
-                .lock()
-                .map_err(|_| "LSP broken-state lock poisoned")?
-                .insert(key, detail.clone());
+            record_broken(&state, key, detail.clone())?;
             Ok(semantic_response(
                 provider,
                 &file,
@@ -449,7 +429,15 @@ fn provider_statuses(
                         .broken
                         .lock()
                         .ok()
-                        .and_then(|broken| broken.get(key).cloned())
+                        .and_then(|mut broken| {
+                            let entry = broken.get(key)?;
+                            if entry.failed_at.elapsed() >= BROKEN_RETRY_AFTER {
+                                broken.remove(key);
+                                None
+                            } else {
+                                Some(entry.detail.clone())
+                            }
+                        })
                 })
             });
             let connected = key.as_ref().is_some_and(|key| {
@@ -487,6 +475,36 @@ fn provider_statuses(
             }
         })
         .collect()
+}
+
+fn recent_broken_detail(state: &LspState, key: &str) -> Result<Option<String>, String> {
+    let mut broken = state
+        .broken
+        .lock()
+        .map_err(|_| "LSP broken-state lock poisoned")?;
+    let Some(entry) = broken.get(key) else {
+        return Ok(None);
+    };
+    if entry.failed_at.elapsed() >= BROKEN_RETRY_AFTER {
+        broken.remove(key);
+        return Ok(None);
+    }
+    Ok(Some(entry.detail.clone()))
+}
+
+fn record_broken(state: &LspState, key: String, detail: String) -> Result<(), String> {
+    state
+        .broken
+        .lock()
+        .map_err(|_| "LSP broken-state lock poisoned")?
+        .insert(
+            key,
+            BrokenProvider {
+                detail,
+                failed_at: Instant::now(),
+            },
+        );
+    Ok(())
 }
 
 fn provider_for_file(file: &Path) -> Option<&'static Provider> {
@@ -732,10 +750,53 @@ mod tests {
             .broken
             .lock()
             .expect("broken state")
-            .insert(key, "initialize failed".into());
+            .insert(
+                key,
+                BrokenProvider {
+                    detail: "initialize failed".into(),
+                    failed_at: Instant::now(),
+                },
+            );
         let infos = provider_statuses(Some("ts"), None, Some(root.path()), Some(&state));
 
         assert_eq!(infos[0].status, LspProviderStatus::Broken);
         assert_eq!(infos[0].detail, "initialize failed");
+    }
+
+    #[test]
+    fn stale_broken_provider_state_becomes_retryable() {
+        let root = tempfile::tempdir().expect("root");
+        let bin = tempfile::tempdir().expect("bin");
+        let marker = bin.path().join("typescript-language-server");
+        std::fs::write(&marker, "").expect("write executable marker");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&marker, std::fs::Permissions::from_mode(0o755))
+                .expect("mark executable");
+        }
+        let state = LspState::default();
+        let key = client_key(root.path(), &PROVIDERS[0]);
+        state
+            .broken
+            .lock()
+            .expect("broken state")
+            .insert(
+                key,
+                BrokenProvider {
+                    detail: "initialize failed".into(),
+                    failed_at: Instant::now() - BROKEN_RETRY_AFTER - Duration::from_secs(1),
+                },
+            );
+
+        let infos = provider_statuses(
+            Some("ts"),
+            Some(bin.path().as_os_str()),
+            Some(root.path()),
+            Some(&state),
+        );
+
+        assert_eq!(infos[0].status, LspProviderStatus::Available);
+        assert!(state.broken.lock().expect("broken state").is_empty());
     }
 }
