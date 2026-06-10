@@ -1,5 +1,44 @@
 # Source Pack
 
+## C23 - Atlas qualification harness and real-UI boundary (2026-06-08)
+
+Source-parity hook:
+
+- Command: `& "C:\Program Files\Git\bin\bash.exe" scripts/consult-opensrc.sh tauri-driver mini-swe-agent opencode`
+- Result: RC=0 after normalizing `scripts/consult-opensrc.sh` to LF. Before this fix, the hook failed under Bash with `set: pipefail\r: invalid option name`.
+
+Upstream files / docs inspected:
+
+- `C:\Users\name\.opensrc\repos\github.com\SWE-agent\mini-swe-agent\main\README.md`
+- `C:\Users\name\.opensrc\repos\github.com\SWE-agent\mini-swe-agent\main\docs\faq.md`
+- `C:\Users\name\.opensrc\repos\github.com\SWE-agent\mini-swe-agent\main\docs\advanced\control_flow.md`
+- `C:\Users\name\.opensrc\repos\github.com\anomalyco\opencode\dev\AGENTS.md`
+- `C:\Users\name\.opensrc\repos\github.com\anomalyco\opencode\dev\CONTEXT.md`
+- `C:\Users\name\.opensrc\repos\github.com\anomalyco\opencode\dev\packages\app\e2e\regression\session-list-path-loading.spec.ts`
+- Official Tauri 2 WebDriver docs: `https://v2.tauri.app/develop/tests/webdriver/`
+
+Disposition:
+
+- Adapted mini-SWE-agent's benchmark discipline: every run is explicit, bounded, and logged; no hidden stateful shell assumptions in evidence reporting.
+- Adapted opencode's separation between durable/session context and runtime execution evidence: qualification phases now label whether they are real desktop UI, headless shim, or paid API work.
+- Adapted Tauri's documented WebDriver boundary: real Atlas UI automation must use `tauri-driver` plus a platform WebDriver on Windows/Linux. Browser/Vite and headless shims are explicitly not accepted as desktop UI proof.
+- Rejected spending paid model tokens while the real desktop automation stack is missing.
+
+Local changes:
+
+- Added `scripts/atlas-qualification.mjs`, which writes timestamped evidence under `runs/atlas-qualification/<run-id>/` with `summary.json`, `report.md`, and per-phase stdout/stderr logs.
+- Added `pnpm qualify:atlas`.
+- Added stable UI selectors: `atlas-ai-input`, `atlas-project-chip`, `atlas-sessions-panel`, and `atlas-receipt-strip`.
+- Ignored `runs/` evidence artifacts in git.
+
+Current proof:
+
+- Latest run: `C:\Users\name\Downloads\Atlas-ai\runs\atlas-qualification\2026-06-08T18-25-16-775Z\report.md`
+- Verdict: `RECORDED_WITH_BLOCKERS`
+- Passed: source-parity hook RC=0, desktop static contract RC=0, TypeScript RC=0, focused Vitest RC=0, Rust git worktree tests RC=0.
+- Blocked: real desktop UI WebDriver phase. Missing `tauri-driver` and `msedgedriver/chromedriver/geckodriver`.
+- Paid generation: skipped by default. OpenRouter key probe only, no generation.
+
 Scope: Atlas workspace, session, agent, terminal cwd, path resolution, and shell execution binding.
 
 ## Files inspected
@@ -1398,3 +1437,59 @@ Verification:
   still unavailable. mini-swe-agent interactive CLI fails in this non-console
   capture, and PyPI `swebench` imports Unix-only `resource` on Windows Python
   3.14, so official benchmark execution still requires host provisioning.
+## Corrective Slice C22: worktree isolation core and benchmark control arm
+
+Source-parity packet:
+
+- Slice: add the verifiable core of agent worktree isolation and add a minimal
+  SWE-bench control arm before spending more provider credits.
+- Atlas files inspected: `src-tauri/src/modules/git/{commands,operations,parser,process,types,utils}.rs`,
+  `src-tauri/src/lib.rs`, `src/modules/ai/lib/{agent,native}.ts`,
+  `src/modules/ai/bench/{runHarnessTask,sweBenchLite,tauriInvokeShim}.ts`, and
+  `src/modules/ai/tools/capabilities.ts`.
+- opensrc hook: explicit Git Bash `PNPM_CONFIG_OFFLINE=true bash scripts/consult-opensrc.sh git agent-loop mini-swe-agent opencode`
+  returned `0` and resolved the focused source set through the active `gh`
+  keyring.
+- opensrc inspected: `SWE-agent/mini-swe-agent/docs/usage/mini.md`,
+  `SWE-agent/mini-swe-agent/docs/usage/swebench.md`,
+  `anomalyco/opencode/packages/opencode/src/session/session.ts`, and
+  `anomalyco/opencode/packages/opencode/src/tool/tool.ts`.
+- Finding: mini-swe-agent is the right minimal baseline for the "does the
+  harness beat raw bash" question. opencode truncates tool output at the tool
+  boundary, which Atlas production shell already does but the headless benchmark
+  shim did not.
+- Disposition: `ADAPT` git worktree isolation as a narrow native primitive:
+  Atlas-created worktrees only, under `.atlas/worktrees/<name>`, with branches
+  under `atlas/<name>`. `ADAPT` the minimal benchmark arm with only
+  `bash_run`, `read_file`, `write_file`, and `edit`. `ADAPT` benchmark shell
+  output capping so test context cannot explode. `REJECT` building the merge UI
+  or agent-run worktree routing blind without native app interaction evidence.
+- Tests required: git worktree parser and safety guards, real temp-repo
+  create/list/remove round trip, TypeScript compile, focused benchmark shim and
+  capability tests, and a paid one-instance smoke before full localization.
+
+Applied:
+
+- Added native `git_worktree_list`, `git_worktree_create`,
+  `git_worktree_remove`, and `git_worktree_merge` commands.
+- Added typed frontend wrappers for those commands.
+- Added `WorktreeInfo`, `WorktreeCreateResult`, and `WorktreeMergeResult`.
+- Added `git worktree list --porcelain` parsing.
+- Added the `REPO_INTEL=minimal` SWE-bench arm and `BENCH_INSTANCE_LIMIT`.
+- Added capability usage metrics: unlocked, used, promoted-unused.
+- Fixed benchmark usage accumulation across steps.
+- Capped headless `shell_run_command` output to prevent benchmark-only context
+  explosions.
+
+Verification:
+
+- TypeScript returned `0`.
+- Focused bench/shim/capability Vitest returned `0` with `13 passed / 1 skipped`.
+- Focused git operations tests returned `0` with `5/5` including a real
+  temp-repo worktree create/list/remove round trip.
+- Paid OpenRouter key check returned `is_free_tier=false`.
+- One-instance OpenRouter Gemini 2.5 Flash smoke returned `0` for both
+  `minimal` and `map`.
+- Full 15-instance Gemini 2.5 Flash localization campaign returned `0` for
+  `map`, `off`, and `minimal`. OpenRouter key usage after the campaign was
+  `2.5897409`.

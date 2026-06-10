@@ -206,9 +206,16 @@ export function getPromotedCapabilities(sessionId: string): string[] {
   return [...(promotedBySession.get(sessionId) ?? [])];
 }
 
-/** Active tool names for a run = core + promoted capability tools. */
-export function activeToolNames(sessionId: string): string[] {
-  return [...CORE_TOOL_NAMES, ...capabilityToolNames(getPromotedCapabilities(sessionId))];
+/** Active tool names for a run = core + promoted capability tools, minus blocked families. */
+export function activeToolNames(
+  sessionId: string,
+  blockedCapabilityIds: Iterable<string> = [],
+): string[] {
+  const blocked = new Set(capabilityToolNames(blockedCapabilityIds));
+  return [
+    ...CORE_TOOL_NAMES,
+    ...capabilityToolNames(getPromotedCapabilities(sessionId)),
+  ].filter((name) => !blocked.has(name));
 }
 
 export function clearPromotedCapabilities(sessionId: string): void {

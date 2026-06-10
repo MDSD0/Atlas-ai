@@ -1,5 +1,5 @@
 import type { UIMessage } from "@ai-sdk/react";
-import { type ModelId } from "../config";
+import { getModel, type ModelId } from "../config";
 import { runAgentStream, type AgentUsageDelta } from "./agent";
 import type { ProviderKeys } from "./keyring";
 import { agentNative } from "./native";
@@ -27,6 +27,12 @@ import {
   killRunResourcesForSignal,
   releaseRunResources,
 } from "./runResources";
+import {
+  finishSessionTrace,
+  recordSessionTraceEvent,
+  recordSessionTraceUsage,
+  startSessionTrace,
+} from "../traces/sessionTrace";
 
 const ATLAS_MD_MAX_BYTES = 32 * 1024;
 type MemoryCacheEntry = { content: string | null; mtime: number };
@@ -106,6 +112,26 @@ export function createContextAwareTransport(deps: Deps) {
       planMode,
       activeFile: live.activeFile,
     });
+    const modelId = deps.getModelId();
+    const model = getModel(modelId);
+    const trace = await startSessionTrace({
+      sessionId,
+      workspaceRoot: live.workspaceRoot,
+      modelId,
+      providerId: model.provider,
+      prompt,
+      lane: runPolicy.lane,
+      toolMode: runPolicy.toolMode,
+      planMode,
+      reason: runPolicy.reason,
+      activeFile: live.activeFile,
+    });
+    for (const observedTool of observedToolResults(options.messages)) {
+      recordSessionTraceEvent(trace, "tool.finished", {
+        ...observedTool,
+        source: "ui-message-history",
+      });
+    }
     // Start the SimpleMem observer concurrently with the other context builders
     // instead of blocking the model call on its session round-trip first.
     const [atlasMd, fileMemory, localMemory, activeWorkPacket, localSkills, simpleMem] =
@@ -218,6 +244,14 @@ export function createContextAwareTransport(deps: Deps) {
       } else {
         releaseRunResources(sessionId, options.abortSignal);
       }
+      await finishSessionTrace(
+        trace,
+        outcome.cancelled ? "cancelled" : outcome.errored ? "errored" : "finished",
+        {
+          proofRunId: recorder?.runId ?? null,
+          sessionId,
+        },
+      );
       await Promise.all([
         (async () => {
           await recorder?.finish(outcome).catch(() => {});
@@ -251,12 +285,28 @@ export function createContextAwareTransport(deps: Deps) {
         toolContext: deps.toolContext,
         toolMode: runPolicy.toolMode,
         laneMaxSteps: runPolicy.maxSteps,
-        onStep: deps.onStep,
-        onUsage: deps.onUsage,
-        onCompact: deps.onCompact,
-        onFinishMeta: deps.onFinishMeta,
-        onToolResult: recorder || simpleMem
+        onStep: (step) => {
+          deps.onStep?.(step);
+          recordSessionTraceEvent(trace, "agent.step", { step });
+        },
+        onUsage: (delta) => {
+          deps.onUsage?.(delta);
+          recordSessionTraceUsage(trace, delta);
+        },
+        onCompact: (info) => {
+          deps.onCompact?.(info);
+          recordSessionTraceEvent(trace, "context.compacted", info);
+        },
+        onFinishMeta: (info) => {
+          deps.onFinishMeta?.(info);
+          recordSessionTraceEvent(trace, "agent.finish_meta", info);
+        },
+        onToolCall: (r) => {
+          recordSessionTraceEvent(trace, "tool.called", r);
+        },
+        onToolResult: recorder || simpleMem || trace
           ? (r) => {
+              recordSessionTraceEvent(trace, "tool.finished", r);
               void recorder?.recordTool(r).catch(() => {});
               void simpleMem?.recordTool(r).catch(() => {});
             }
@@ -283,7 +333,10 @@ export function createContextAwareTransport(deps: Deps) {
               projectSources,
             }
           : undefined,
-        onContextPacked: (snapshot) => contextLedger.capture(snapshot),
+        onContextPacked: (snapshot) => {
+          contextLedger.capture(snapshot);
+          recordSessionTraceEvent(trace, "context.packed", snapshot);
+        },
         uiMessages: messagesForRun,
         abortSignal: options.abortSignal,
       });
@@ -337,6 +390,66 @@ function recentUserText(messages: UIMessage[], maxMessages = 4): string {
     if (text) chunks.unshift(text);
   }
   return chunks.join("\n\n").slice(-8192);
+}
+
+function observedToolResults(
+  messages: UIMessage[],
+): Array<{
+  toolName: string;
+  input: Record<string, unknown>;
+  output: unknown;
+  state: string;
+  toolCallId?: string;
+}> {
+  const out: Array<{
+    toolName: string;
+    input: Record<string, unknown>;
+    output: unknown;
+    state: string;
+    toolCallId?: string;
+  }> = [];
+  const terminalStates = new Set([
+    "output-available",
+    "output-denied",
+    "output-error",
+  ]);
+  for (const message of messages) {
+    const parts = message.parts as
+      | Array<{
+          type?: string;
+          state?: string;
+          toolName?: string;
+          dynamicToolName?: string;
+          input?: unknown;
+          output?: unknown;
+          result?: unknown;
+          toolCallId?: string;
+        }>
+      | undefined;
+    if (!Array.isArray(parts)) continue;
+    for (const part of parts) {
+      const state = part.state ?? "";
+      if (!terminalStates.has(state)) continue;
+      const type = part.type ?? "";
+      const toolName =
+        part.toolName ??
+        part.dynamicToolName ??
+        (type.startsWith("tool-") ? type.slice("tool-".length) : "");
+      if (!toolName) continue;
+      const input =
+        typeof part.input === "object" && part.input !== null
+          ? (part.input as Record<string, unknown>)
+          : {};
+      out.push({
+        toolName,
+        input,
+        output: part.output ?? part.result ?? null,
+        state,
+        toolCallId: part.toolCallId,
+      });
+    }
+  }
+  return out;
 }
 
 function injectEnvIntoLastUser(

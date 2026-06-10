@@ -5,6 +5,7 @@ import { checkShellCommand } from "../lib/security";
 import { shellNeedsApproval } from "../lib/permissions";
 import { redactSensitive } from "../lib/redact";
 import { registerRunBackgroundHandle } from "../lib/runResources";
+import { interactiveEofHint, verificationRecovery } from "../lib/verificationLoop";
 import { resolvePath, type ToolContext } from "./context";
 import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace/env";
 
@@ -175,6 +176,8 @@ export function buildShellTools(ctx: ToolContext) {
             cwd,
             timeout_secs,
           );
+          const recovery = verificationRecovery(command, r.exit_code);
+          const eofHint = interactiveEofHint(r.exit_code, r.stderr);
           return {
             command,
             stdout: redactShellOutput(r.stdout),
@@ -185,6 +188,8 @@ export function buildShellTools(ctx: ToolContext) {
             cwd,
             cwd_after: r.cwd_after,
             duration_ms: Date.now() - startedAt,
+            ...(recovery ? { verification_failed: true, recovery } : {}),
+            ...(eofHint ? { interactive_stdin_note: eofHint } : {}),
           };
         } catch (e) {
           return { error: String(e) };

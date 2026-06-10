@@ -49,6 +49,20 @@ describe("tauriInvokeShim (headless harness seam)", () => {
     expect(out.exit_code).toBe(0);
   });
 
+  it("caps shell output so benchmark context cannot explode", async () => {
+    const command =
+      process.platform === "win32"
+        ? "node -e \"console.log('x'.repeat(70000))\""
+        : "node -e \"console.log('x'.repeat(70000))\"";
+    const out = (await invoke("shell_run_command", { command })) as {
+      stdout: string;
+      truncated: boolean;
+    };
+    expect(out.truncated).toBe(true);
+    expect(out.stdout.length).toBeLessThan(66_000);
+    expect(out.stdout).toContain("truncated by benchmark shim");
+  });
+
   it("throws on unhandled commands so gaps are visible", async () => {
     await expect(invoke("some_unknown_command", {})).rejects.toThrow(/unhandled/);
   });

@@ -1383,10 +1383,23 @@ export default function App() {
         return t?.kind === "terminal" && t.private === true;
       },
       injectIntoActivePty: (text) => {
-        const t = tabs.find((x) => x.id === activeId);
-        if (t?.kind !== "terminal") return false;
-        const term = terminalRefs.current.get(t.activeLeafId);
+        // Prefer the active terminal; otherwise fall back to the most recent
+        // live terminal tab and bring it forward. From the agent home or an
+        // editor tab, "Run" should still land somewhere visible instead of
+        // silently doing nothing.
+        const active = tabs.find((x) => x.id === activeId);
+        const target =
+          active?.kind === "terminal"
+            ? active
+            : [...tabs].reverse().find(
+                (x) =>
+                  x.kind === "terminal" &&
+                  terminalRefs.current.has(x.activeLeafId),
+              );
+        if (target?.kind !== "terminal") return false;
+        const term = terminalRefs.current.get(target.activeLeafId);
         if (!term) return false;
+        if (target.id !== activeId) setActiveId(target.id);
         term.write(text);
         term.focus();
         return true;
@@ -1694,6 +1707,7 @@ export default function App() {
               <AgentRunBridge
                 openAiDiffTab={openAiDiffTab}
                 closeAiDiffTab={closeAiDiffTab}
+                suppressAutoSurfaces={isWelcomeTab}
               />
               <LocalAgentNotificationsBridge />
             </>

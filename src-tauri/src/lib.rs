@@ -55,10 +55,15 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         .min_inner_size(820.0, 620.0)
         .resizable(true)
         .visible(false)
-        .center()
-        // Keep settings above the main app window so it doesn't get hidden
-        // when the user clicks back into the editor or terminal (#33).
-        .always_on_top(true);
+        .center();
+
+    // Keep settings above the main app window so it doesn't get hidden when
+    // the user clicks back into the editor or terminal (#33). On Windows and
+    // Linux the parent/owner relationship below already guarantees that, and
+    // always_on_top is system-global — it would float settings over OTHER
+    // applications too. Only macOS (no parent, see below) needs the flag.
+    #[cfg(target_os = "macos")]
+    let builder = builder.always_on_top(true);
 
     // Tie lifecycle to the main window so settings minimizes/closes with it.
     // On macOS, setting a parent while the main window is fullscreen forces the child to also be fullscreen.
@@ -180,6 +185,10 @@ pub fn run() {
             git::commands::git_commit,
             git::commands::git_fetch,
             git::commands::git_pull_ff_only,
+            git::commands::git_worktree_list,
+            git::commands::git_worktree_create,
+            git::commands::git_worktree_remove,
+            git::commands::git_worktree_merge,
             git::commands::git_push,
             git::commands::git_log,
             git::commands::git_show_commit,

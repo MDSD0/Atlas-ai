@@ -75,4 +75,22 @@ describe("capability gateway", () => {
     clearPromotedCapabilities(SESSION);
     expect(activeToolNames(SESSION).sort()).toEqual([...CORE_TOOL_NAMES].sort());
   });
+
+  it("can pre-promote a capability family without capability_search", () => {
+    promoteCapabilities(SESSION, ["repo_intel"]);
+    const active = activeToolNames(SESSION);
+    expect(active).toContain("find_symbol");
+    expect(active).toContain("repo_map");
+    expect(active).toContain("read_file");
+  });
+
+  it("blocked capability families stay removed even after promotion", () => {
+    promoteCapabilities(SESSION, ["repo_intel"]);
+    const active = activeToolNames(SESSION, ["repo_intel"]);
+    expect(getPromotedCapabilities(SESSION)).toEqual(["repo_intel"]);
+    expect(active).not.toContain("find_symbol");
+    expect(active).not.toContain("repo_map");
+    expect(active).toContain("read_file");
+    expect(active).toContain("grep");
+  });
 });

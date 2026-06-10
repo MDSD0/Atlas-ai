@@ -35,7 +35,6 @@ import type {
 } from "ai";
 import type { StickToBottomContext } from "use-stick-to-bottom";
 import { memo, useCallback, useLayoutEffect, useMemo, useRef } from "react";
-import { AiToolApproval } from "./AiToolApproval";
 import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 
 function CommandSnippet({ name }: { name: string }) {
@@ -684,7 +683,6 @@ const RenderedPart = memo(function RenderedPart({
 
 const RenderedTool = memo(function RenderedTool({
   part,
-  onApproval,
 }: {
   part: AnyToolPart;
   onApproval: (id: string, approved: boolean) => void;
@@ -695,12 +693,15 @@ const RenderedTool = memo(function RenderedTool({
       : part.type.replace(/^tool-/, "");
 
   if (part.state === "approval-requested") {
+    // The actionable card lives in the PendingApprovals dock above the
+    // composer so it can't scroll out of reach; inline we only mark the spot.
     return (
-      <AiToolApproval
-        part={part as Extract<ToolUIPart, { state: "approval-requested" }>}
-        toolName={toolName}
-        onRespond={(approved) => onApproval(part.approval.id, approved)}
-      />
+      <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground">
+        <span className="size-1.5 shrink-0 rounded-full bg-[#A5E605] animate-pulse" />
+        <span className="truncate">
+          {toolName} is waiting for approval below
+        </span>
+      </div>
     );
   }
 

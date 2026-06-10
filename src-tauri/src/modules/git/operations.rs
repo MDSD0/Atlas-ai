@@ -2,7 +2,7 @@ use std::ffi::{OsStr, OsString};
 use std::path::Path;
 
 use crate::modules::git::errors::{GitError, Result};
-use crate::modules::git::parser::parse_porcelain_v2;
+use crate::modules::git::parser::{parse_porcelain_v2, parse_worktree_porcelain};
 use crate::modules::git::process::{
     ensure_git_available, ensure_success, git_show_text, git_stdout_line_opt, git_stdout_lines,
     read_text_file, run_git,
@@ -10,10 +10,12 @@ use crate::modules::git::process::{
 use crate::modules::git::types::{
     DiscardEntry, GitCommitFileChange, GitCommitResult, GitDiffContentResult, GitDiffResult,
     GitLogEntry, GitOutput, GitPanelSnapshot, GitPushResult, GitRepoInfo, GitStatusSnapshot,
-    TextSource, DEFAULT_TIMEOUT_SECS, NETWORK_TIMEOUT_SECS,
+    TextSource, WorktreeCreateResult, WorktreeInfo, WorktreeMergeResult, DEFAULT_TIMEOUT_SECS,
+    NETWORK_TIMEOUT_SECS,
 };
 use crate::modules::git::utils::{
-    authorized_repo_root, canonical_dir, resolve_within_repo, split_upstream, ResolvedGitDirectory,
+    authorized_repo_root, canonical_dir, display_path, resolve_within_repo, split_upstream,
+    ResolvedGitDirectory,
 };
 use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
 
@@ -935,6 +937,114 @@ pub fn pull_ff_only(
     ensure_success(&output, "git pull --ff-only failed")
 }
 
+pub fn worktree_list(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<Vec<WorktreeInfo>> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let lines = git_stdout_lines(
+        &repo_root.workspace,
+        &repo_root.git_path,
+        ["worktree", "list", "--porcelain"],
+    )?;
+    Ok(parse_worktree_porcelain(&lines))
+}
+
+pub fn worktree_create(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    name: &str,
+    base_ref: Option<&str>,
+    workspace: &WorkspaceEnv,
+) -> Result<WorktreeCreateResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let name = safe_worktree_name(name)?;
+    let branch = format!("atlas/{name}");
+    let local_path = repo_root.local_path.join(".atlas").join("worktrees").join(name);
+    if local_path.exists() {
+        return Err(GitError::InvalidPath(display_path(&local_path)));
+    }
+    std::fs::create_dir_all(
+        local_path
+            .parent()
+            .ok_or_else(|| GitError::InvalidPath(name.to_string()))?,
+    )
+    .map_err(GitError::Io)?;
+    let worktree_path = display_path(&local_path);
+    let mut args: Vec<OsString> = vec![
+        "worktree".into(),
+        "add".into(),
+        "-b".into(),
+        branch.clone().into(),
+        worktree_path.clone().into(),
+    ];
+    if let Some(base) = base_ref.filter(|s| !s.trim().is_empty()) {
+        args.push(safe_ref(base)?.into());
+    }
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        args,
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git worktree add failed")?;
+    let worktree = worktree_list(registry, repo_root.git_path.as_str(), workspace)?
+        .into_iter()
+        .find(|wt| same_display_path(&wt.path, &worktree_path))
+        .unwrap_or(WorktreeInfo {
+            path: worktree_path,
+            branch: Some(branch),
+            head: None,
+            is_main: false,
+        });
+    Ok(WorktreeCreateResult { worktree })
+}
+
+pub fn worktree_remove(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    path: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let worktree_path = atlas_worktree_path(&repo_root.local_path, path)?;
+    let worktree_path = display_path(&worktree_path);
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["worktree", "remove", &worktree_path],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git worktree remove failed")
+}
+
+pub fn worktree_merge(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    branch: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<WorktreeMergeResult> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    let branch = safe_atlas_branch(branch)?;
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["merge", "--no-ff", branch],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "git merge worktree branch failed")?;
+    let summary = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(WorktreeMergeResult {
+        merged: true,
+        summary,
+    })
+}
+
 fn nothing_to_commit(output: &GitOutput) -> bool {
     let stderr = String::from_utf8_lossy(&output.stderr).to_ascii_lowercase();
     let stdout = String::from_utf8_lossy(&output.stdout).to_ascii_lowercase();
@@ -959,4 +1069,162 @@ fn pathspec(repo_root: &Path, absolute: &Path) -> String {
         .strip_prefix(repo_root)
         .map(|rel| rel.to_string_lossy().replace('\\', "/"))
         .unwrap_or_else(|_| absolute.to_string_lossy().replace('\\', "/"))
+}
+
+fn safe_worktree_name(name: &str) -> Result<&str> {
+    let trimmed = name.trim();
+    if trimmed.is_empty()
+        || trimmed.len() > 64
+        || trimmed == "."
+        || trimmed == ".."
+        || trimmed.starts_with('.')
+        || trimmed.starts_with('-')
+        || !trimmed
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(GitError::InvalidPath(name.into()));
+    }
+    Ok(trimmed)
+}
+
+fn safe_ref(reference: &str) -> Result<&str> {
+    let trimmed = reference.trim();
+    if trimmed.is_empty()
+        || trimmed.len() > 128
+        || trimmed.starts_with('-')
+        || trimmed.contains("..")
+        || trimmed.contains('@')
+        || trimmed.contains('\\')
+        || trimmed.contains('\0')
+        || trimmed.chars().any(|c| (c as u32) < 0x20)
+    {
+        return Err(GitError::InvalidPath(reference.into()));
+    }
+    Ok(trimmed)
+}
+
+fn safe_atlas_branch(branch: &str) -> Result<&str> {
+    let branch = safe_ref(branch)?;
+    if !branch.starts_with("atlas/") {
+        return Err(GitError::InvalidPath(branch.into()));
+    }
+    Ok(branch)
+}
+
+fn atlas_worktree_path(repo_root: &Path, path: &str) -> Result<std::path::PathBuf> {
+    let canonical = std::fs::canonicalize(path).map_err(GitError::Io)?;
+    let base = repo_root.join(".atlas").join("worktrees");
+    let canonical_base = std::fs::canonicalize(&base).map_err(GitError::Io)?;
+    if !canonical.starts_with(&canonical_base) || canonical == canonical_base {
+        return Err(GitError::PathOutsideWorkspace(canonical));
+    }
+    Ok(canonical)
+}
+
+fn same_display_path(a: &str, b: &str) -> bool {
+    #[cfg(windows)]
+    {
+        a.replace('\\', "/").eq_ignore_ascii_case(&b.replace('\\', "/"))
+    }
+    #[cfg(not(windows))]
+    {
+        a.replace('\\', "/") == b.replace('\\', "/")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::process::Command;
+
+    use tempfile::TempDir;
+
+    use super::{
+        safe_atlas_branch, safe_ref, safe_worktree_name, worktree_create, worktree_list,
+        worktree_remove,
+    };
+    use crate::modules::workspace::{WorkspaceEnv, WorkspaceRegistry};
+
+    #[test]
+    fn worktree_name_accepts_small_slug() {
+        assert_eq!(safe_worktree_name("fix-123_ok").unwrap(), "fix-123_ok");
+    }
+
+    #[test]
+    fn worktree_name_rejects_paths_flags_and_hidden() {
+        for name in ["", "../x", "a/b", "--force", ".hidden", "with space"] {
+            assert!(safe_worktree_name(name).is_err(), "{name}");
+        }
+    }
+
+    #[test]
+    fn base_ref_rejects_ambiguous_or_flag_like_refs() {
+        for reference in ["", "--orphan", "main..other", "main@{1}", "a\\b"] {
+            assert!(safe_ref(reference).is_err(), "{reference}");
+        }
+        assert_eq!(safe_ref("main").unwrap(), "main");
+        assert_eq!(safe_ref("origin/main").unwrap(), "origin/main");
+    }
+
+    #[test]
+    fn merge_branch_is_atlas_scoped() {
+        assert_eq!(safe_atlas_branch("atlas/task-1").unwrap(), "atlas/task-1");
+        assert!(safe_atlas_branch("main").is_err());
+        assert!(safe_atlas_branch("--main").is_err());
+    }
+
+    #[test]
+    fn worktree_create_list_remove_round_trip() {
+        let Some((tmp, registry, repo_root)) = initialized_repo() else {
+            return;
+        };
+        let workspace = WorkspaceEnv::Local;
+        let created = worktree_create(&registry, &repo_root, "task-one", None, &workspace)
+            .expect("create worktree");
+        assert_eq!(created.worktree.branch.as_deref(), Some("atlas/task-one"));
+        assert!(created.worktree.path.replace('\\', "/").ends_with(
+            "/.atlas/worktrees/task-one"
+        ));
+
+        let list = worktree_list(&registry, &repo_root, &workspace).expect("list worktrees");
+        assert!(list.iter().any(|wt| wt.is_main));
+        assert!(list
+            .iter()
+            .any(|wt| wt.branch.as_deref() == Some("atlas/task-one")));
+
+        worktree_remove(&registry, &repo_root, &created.worktree.path, &workspace)
+            .expect("remove worktree");
+        assert!(!tmp
+            .path()
+            .join(".atlas")
+            .join("worktrees")
+            .join("task-one")
+            .exists());
+    }
+
+    fn initialized_repo() -> Option<(TempDir, WorkspaceRegistry, String)> {
+        if Command::new("git").arg("--version").output().is_err() {
+            return None;
+        }
+        let tmp = tempfile::tempdir().ok()?;
+        git(tmp.path(), &["init"]).ok()?;
+        git(tmp.path(), &["config", "user.email", "atlas@example.test"]).ok()?;
+        git(tmp.path(), &["config", "user.name", "Atlas Test"]).ok()?;
+        std::fs::write(tmp.path().join("README.md"), "hello\n").ok()?;
+        git(tmp.path(), &["add", "README.md"]).ok()?;
+        git(tmp.path(), &["commit", "-m", "initial"]).ok()?;
+        let registry = WorkspaceRegistry::default();
+        registry.authorize(tmp.path()).ok()?;
+        let repo_root = tmp.path().to_string_lossy().to_string();
+        Some((tmp, registry, repo_root))
+    }
+
+    fn git(cwd: &std::path::Path, args: &[&str]) -> std::io::Result<()> {
+        let status = Command::new("git").args(args).current_dir(cwd).status()?;
+        if status.success() {
+            Ok(())
+        } else {
+            Err(std::io::Error::other("git command failed"))
+        }
+    }
 }

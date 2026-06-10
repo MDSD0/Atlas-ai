@@ -209,15 +209,28 @@ function CommandCard({ code, lang }: { code: string; lang: string }) {
 }
 
 function RunInTerminalButton({ command }: { command: string }) {
-  const [sent, setSent] = useState(false);
+  const [state, setState] = useState<"idle" | "sent" | "no-terminal">("idle");
   const tRef = useRef<number>(0);
   useEffect(() => () => window.clearTimeout(tRef.current), []);
   const onRun = () => {
     const ok = useChatStore.getState().live.injectIntoActivePty(command);
-    if (!ok) return;
-    setSent(true);
-    tRef.current = window.setTimeout(() => setSent(false), 1500);
+    if (ok) {
+      setState("sent");
+    } else {
+      // No terminal anywhere — never a silent no-op. Put the command on the
+      // clipboard and say why.
+      void navigator?.clipboard?.writeText?.(command);
+      setState("no-terminal");
+    }
+    tRef.current = window.setTimeout(() => setState("idle"), 1800);
   };
+  const Icon = state === "idle" ? ArrowRight01Icon : TerminalIcon;
+  const label =
+    state === "sent"
+      ? "Sent"
+      : state === "no-terminal"
+        ? "Copied — no terminal"
+        : "Run";
   return (
     <Button
       type="button"
@@ -228,8 +241,8 @@ function RunInTerminalButton({ command }: { command: string }) {
       aria-label="Run in active terminal"
       title="Run in active terminal"
     >
-      {(() => { const I = sent ? TerminalIcon : ArrowRight01Icon; return I ? <I size={11} strokeWidth={1.5}  /> : null; })()}
-      <span>{sent ? "Sent" : "Run"}</span>
+      <Icon size={11} strokeWidth={1.5} />
+      <span>{label}</span>
     </Button>
   );
 }

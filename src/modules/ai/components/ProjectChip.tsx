@@ -52,6 +52,7 @@ export function ProjectChip() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          data-testid="atlas-project-chip"
           title={workspaceRoot ?? "Unbound — no project"}
           className={cn(
             "flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium transition-colors",

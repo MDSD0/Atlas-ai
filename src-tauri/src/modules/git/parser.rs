@@ -1,4 +1,41 @@
-use crate::modules::git::types::GitChangedFile;
+use crate::modules::git::types::{GitChangedFile, WorktreeInfo};
+
+/// Parse `git worktree list --porcelain`. Entries are delimited by a new
+/// `worktree <path>` line (robust to whether blank separators survive line
+/// splitting). The first entry is the main working tree.
+pub fn parse_worktree_porcelain(lines: &[String]) -> Vec<WorktreeInfo> {
+    let mut out: Vec<WorktreeInfo> = Vec::new();
+    let mut cur: Option<WorktreeInfo> = None;
+    let flush = |out: &mut Vec<WorktreeInfo>, mut wt: WorktreeInfo| {
+        wt.is_main = out.is_empty();
+        out.push(wt);
+    };
+    for line in lines {
+        if let Some(path) = line.strip_prefix("worktree ") {
+            if let Some(prev) = cur.take() {
+                flush(&mut out, prev);
+            }
+            cur = Some(WorktreeInfo {
+                path: path.trim().to_string(),
+                branch: None,
+                head: None,
+                is_main: false,
+            });
+        } else if let Some(head) = line.strip_prefix("HEAD ") {
+            if let Some(c) = cur.as_mut() {
+                c.head = Some(head.trim().to_string());
+            }
+        } else if let Some(branch) = line.strip_prefix("branch ") {
+            if let Some(c) = cur.as_mut() {
+                c.branch = Some(branch.trim().trim_start_matches("refs/heads/").to_string());
+            }
+        }
+    }
+    if let Some(prev) = cur.take() {
+        flush(&mut out, prev);
+    }
+    out
+}
 
 #[derive(Default)]
 pub struct PorcelainV2 {
@@ -148,6 +185,44 @@ fn status_label(index_status: char, worktree_status: char) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn worktree_porcelain_parses_main_and_linked() {
+        let lines: Vec<String> = [
+            "worktree /repo",
+            "HEAD abc123",
+            "branch refs/heads/main",
+            "",
+            "worktree /repo/.atlas/wt/feature",
+            "HEAD def456",
+            "branch refs/heads/atlas/feature",
+            "",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+        let wts = parse_worktree_porcelain(&lines);
+        assert_eq!(wts.len(), 2);
+        assert!(wts[0].is_main);
+        assert_eq!(wts[0].path, "/repo");
+        assert_eq!(wts[0].branch.as_deref(), Some("main"));
+        assert!(!wts[1].is_main);
+        assert_eq!(wts[1].path, "/repo/.atlas/wt/feature");
+        assert_eq!(wts[1].branch.as_deref(), Some("atlas/feature"));
+        assert_eq!(wts[1].head.as_deref(), Some("def456"));
+    }
+
+    #[test]
+    fn worktree_porcelain_handles_missing_blank_separators() {
+        let lines: Vec<String> = ["worktree /a", "worktree /b", "branch refs/heads/x"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let wts = parse_worktree_porcelain(&lines);
+        assert_eq!(wts.len(), 2);
+        assert_eq!(wts[0].path, "/a");
+        assert_eq!(wts[1].branch.as_deref(), Some("x"));
+    }
 
     // Build one ordinary-change record (`1 ` entry) with the exact field layout
     // git emits: `XY sub mH mI mW hH hI path`.

@@ -115,6 +115,31 @@ pub struct GitPushResult {
     pub pushed: bool,
 }
 
+/// An isolated working tree sharing the repo's object database. Atlas runs an
+/// agent task in one of these so its edits never touch the user's checkout until
+/// merged (and many agents can work on separate branches in parallel).
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeInfo {
+    pub path: String,
+    pub branch: Option<String>,
+    pub head: Option<String>,
+    pub is_main: bool,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeCreateResult {
+    pub worktree: WorktreeInfo,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeMergeResult {
+    pub merged: bool,
+    pub summary: String,
+}
+
 pub(crate) struct GitOutput {
     pub(crate) stdout: Vec<u8>,
     pub(crate) stderr: Vec<u8>,

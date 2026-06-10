@@ -165,6 +165,7 @@ run("Atlas progressive harness benchmark (real loop)", () => {
   // capable Gemini keys first to get meaningful first-pass numbers.
   const candidates: Candidate[] = (
     [
+      { label: "deepseek", provider: "deepseek" as ProviderId, modelId: (process.env.BENCH_MODEL ?? "deepseek-v4-flash") as ModelId, keys: env.deepseek ? [env.deepseek] : [] },
       { label: "gemini", provider: "google" as ProviderId, modelId: "gemini-2.5-flash" as ModelId, keys: pick(env, "g", 5) },
       { label: "groq", provider: "groq" as ProviderId, modelId: "llama-3.3-70b-versatile" as ModelId, keys: pick(env, "gq", 8) },
       {

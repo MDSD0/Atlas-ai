@@ -31,6 +31,27 @@ describe("sanitizeToolParts", () => {
     expect(partsOf(out[0])).toHaveLength(0);
   });
 
+  it("keeps approval responses so approved local tools can execute on the next turn", () => {
+    const out = sanitizeToolParts([
+      msg([
+        {
+          type: "tool-write_file",
+          state: "approval-responded",
+          toolCallId: "call-1",
+          input: { path: "a.txt", content: "ok\n" },
+          approval: { id: "approval-1", approved: true },
+        },
+      ]),
+    ]);
+    const parts = partsOf(out[0]);
+    expect(parts).toHaveLength(1);
+    expect(parts[0]).toMatchObject({
+      type: "tool-write_file",
+      state: "approval-responded",
+      input: { path: "a.txt", content: "ok\n" },
+    });
+  });
+
   it("coerces a non-object input on a finished tool part to {}", () => {
     const out = sanitizeToolParts([
       msg([

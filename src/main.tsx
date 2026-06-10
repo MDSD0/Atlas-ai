@@ -18,6 +18,25 @@ import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 
 if (USE_CUSTOM_WINDOW_CONTROLS) {
   document.documentElement.dataset.chrome = "borderless";
+
+  // A maximized/fullscreen window must be square — the OS doesn't round
+  // edges there, so our painted radius leaves dark notches in the corners.
+  const win = getCurrentWindow();
+  const syncMaximized = async () => {
+    try {
+      const [maximized, fullscreen] = await Promise.all([
+        win.isMaximized(),
+        win.isFullscreen(),
+      ]);
+      document.documentElement.dataset.maximized = String(
+        maximized || fullscreen,
+      );
+    } catch {
+      // leave previous state
+    }
+  };
+  void syncMaximized();
+  void win.onResized(() => void syncMaximized());
 }
 
 // Render the application immediately

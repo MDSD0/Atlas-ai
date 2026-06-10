@@ -198,6 +198,20 @@ html[data-chrome="borderless"] #settings-root {
   border: 1px solid var(--border);
   background: var(--background);
 }
+/* Activity indicator: dash chasing around the infinity path (pathLength=100). */
+@keyframes atlas-infinity-dash {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+/* Maximized/fullscreen windows are square on every OS; a painted radius
+ * there leaves dark notches in the corners. */
+html[data-chrome="borderless"][data-maximized="true"] #root,
+html[data-chrome="borderless"][data-maximized="true"] #settings-root {
+  border-radius: 0;
+  border: none;
+}
 
 /*
  * xterm.js overrides — kept outside @layer so they win against the addon's

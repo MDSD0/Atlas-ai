@@ -19,6 +19,38 @@ function compact(text: string): string {
   return `${collapsed.slice(0, MAX_AGENT_ERROR_LENGTH - 3).trimEnd()}...`;
 }
 
+/**
+ * Whether a run error is a transient mid-stream failure (provider dropped or
+ * corrupted the SSE stream, network blip) that is safe to auto-resume once.
+ * Deliberately conservative: anything that smells like auth, billing, quota,
+ * rate limiting, a missing model, context overflow, or a user abort is NOT
+ * transient — auto-retrying those wastes money or fights the user.
+ */
+export function isTransientStreamError(error: unknown): boolean {
+  const lower = compact(errorText(error)).toLowerCase();
+  if (!lower) return false;
+
+  const nonRetryable = [
+    "401", "402", "403", "404", "429",
+    "credit", "quota", "rate limit", "billing",
+    "invalid api key", "unauthorized", "forbidden",
+    "model not found", "does not exist",
+    "context length", "maximum context", "output limit",
+    "abort", // user-initiated stop must never auto-resume
+    "tool_use_failed",
+  ];
+  if (nonRetryable.some((s) => lower.includes(s))) return false;
+
+  const transient = [
+    "sse stream", "injected into sse",
+    "json pars", "invalid json", "unexpected token",
+    "type validation failed",
+    "econnreset", "socket hang up", "premature close",
+    "terminated", "network error", "stream error",
+  ];
+  return transient.some((s) => lower.includes(s));
+}
+
 export function formatAgentError(error: unknown): string {
   const raw = compact(errorText(error));
   const lower = raw.toLowerCase();

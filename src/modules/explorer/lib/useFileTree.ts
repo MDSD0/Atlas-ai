@@ -29,6 +29,13 @@ export function joinPath(parent: string, name: string): string {
   return `${parent}/${name}`;
 }
 
+// Tree state is string-keyed and fs:changed events arrive forward-slashed
+// (Rust to_canon), so every path entering this hook must be normalized or
+// watcher refreshes silently miss their nodes.
+function norm(path: string): string {
+  return path.replace(/\\/g, "/");
+}
+
 export function dirname(path: string): string {
   const i = path.lastIndexOf("/");
   if (i <= 0) return "/";
@@ -65,7 +72,8 @@ type Options = {
   onPathDeleted?: (path: string) => void;
 };
 
-export function useFileTree(rootPath: string | null, options?: Options) {
+export function useFileTree(rawRootPath: string | null, options?: Options) {
+  const rootPath = rawRootPath === null ? null : norm(rawRootPath);
   const showHidden = usePreferencesStore((s) => s.showHidden);
   const showHiddenRef = useRef(showHidden);
   const [nodes, setNodes] = useState<TreeState>({});
@@ -102,7 +110,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     watchRemove([path]);
   }, []);
 
-  const fetchChildren = useCallback(async (path: string) => {
+  const fetchChildren = useCallback(async (rawPath: string) => {
+    const path = norm(rawPath);
     setNodes((s) => ({ ...s, [path]: { status: "loading" } }));
     try {
       const entries = await invoke<DirEntry[]>("fs_read_dir", {
@@ -194,7 +203,8 @@ export function useFileTree(rootPath: string | null, options?: Options) {
     void listenFsChanged((paths) => {
       const current = nodesRef.current;
       const dirs = new Set<string>();
-      for (const p of paths) {
+      for (const raw of paths) {
+        const p = norm(raw);
         const parent = dirname(p);
         if (current[parent]?.status === "loaded") dirs.add(parent);
         if (current[p]?.status === "loaded") dirs.add(p);

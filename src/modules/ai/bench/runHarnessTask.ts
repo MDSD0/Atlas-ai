@@ -8,7 +8,7 @@
 import type { UIMessage } from "@ai-sdk/react";
 import { runAgentStream } from "../lib/agent";
 import { EMPTY_PROVIDER_KEYS, type ProviderKeys } from "../lib/keyring";
-import { getPromotedCapabilities } from "../tools/capabilities";
+import { CAPABILITIES, getPromotedCapabilities } from "../tools/capabilities";
 import type { AblationMode, ToolContext } from "../tools/tools";
 import type { AtlasToolProjectContext } from "../tools/context";
 import type { ModelId } from "../config";
@@ -23,6 +23,10 @@ export type HarnessMetrics = {
   repeatedToolFailures: number;
   toolErrorSamples: string[];
   unlockedCapabilities: string[];
+  /** Promoted capability families whose tools were actually CALLED this run.
+   * `promotedUnused` is the waste signal: unlocked but never used. */
+  capabilitiesUsed: string[];
+  promotedUnused: string[];
   inputTokens: number;
   outputTokens: number;
   cachedInputTokens: number;
@@ -83,6 +87,12 @@ export async function runHarnessTask(
     maxSteps?: number;
     /** Hard ceiling on per-step output tokens (budget guardrail for paid runs). */
     maxOutputTokens?: number;
+    /** Capability families to unlock up front (e.g. ["repo_intel"]). */
+    prePromote?: string[];
+    /** Ablation: capability families to remove entirely (grep-only arm). */
+    blockCapabilities?: string[];
+    /** Ablation: force exactly this toolbelt (the MINIMAL control arm). */
+    forceActiveTools?: string[];
   },
 ): Promise<HarnessMetrics> {
   const sessionId = `bench-${task.name}-${Date.now()}`;
@@ -113,8 +123,11 @@ export async function runHarnessTask(
       toolContext,
       toolMode: opts.toolMode ?? "full",
       gatewayDisabled: opts.gatewayDisabled,
-      laneMaxSteps: opts.maxSteps,
+      stepBudgetOverride: opts.maxSteps,
       maxOutputTokens: opts.maxOutputTokens,
+      prePromoteCapabilities: opts.prePromote,
+      blockCapabilities: opts.blockCapabilities,
+      forceActiveTools: opts.forceActiveTools,
       openrouterModelId: opts.openrouterModelId,
       uiMessages: messages,
       onToolResult: (r) => {
@@ -138,9 +151,9 @@ export async function runHarnessTask(
         }
       },
       onUsage: (d) => {
-        usage.inputTokens = d.inputTokens;
-        usage.outputTokens = d.outputTokens;
-        usage.cachedInputTokens = d.cachedInputTokens;
+        usage.inputTokens += d.inputTokens;
+        usage.outputTokens += d.outputTokens;
+        usage.cachedInputTokens += d.cachedInputTokens;
       },
       onFinishMeta: (m) => {
         hitStepCap = m.hitStepCap;
@@ -175,6 +188,17 @@ export async function runHarnessTask(
     pass = false;
   }
 
+  const unlocked = getPromotedCapabilities(sessionId).filter(
+    (id) => !(opts.blockCapabilities ?? []).includes(id),
+  );
+  // A promoted capability "was used" iff at least one of its tools got called.
+  const usedTool = (id: string) =>
+    (CAPABILITIES.find((c) => c.id === id)?.toolNames ?? []).some(
+      (t) => (toolCounts[t] ?? 0) > 0,
+    );
+  const capabilitiesUsed = unlocked.filter(usedTool);
+  const promotedUnused = unlocked.filter((id) => !usedTool(id));
+
   return {
     pass,
     wallMs,
@@ -184,7 +208,9 @@ export async function runHarnessTask(
     toolErrors,
     repeatedToolFailures,
     toolErrorSamples,
-    unlockedCapabilities: getPromotedCapabilities(sessionId),
+    unlockedCapabilities: unlocked,
+    capabilitiesUsed,
+    promotedUnused,
     inputTokens: usage.inputTokens,
     outputTokens: usage.outputTokens,
     cachedInputTokens: usage.cachedInputTokens,

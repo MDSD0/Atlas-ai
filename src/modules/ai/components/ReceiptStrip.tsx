@@ -91,7 +91,10 @@ export function ReceiptStrip({ sessionId, onOpenFile }: Props) {
     summary.changedFiles.length + summary.checks.length;
 
   return (
-    <div className="flex flex-col shrink-0 border-t-2 border-border/40 bg-muted/80 px-3 py-1.5 max-h-[35%] overflow-y-auto shadow-[0_-4px_12px_-8px_rgba(0,0,0,0.2)]">
+    <div
+      data-testid="atlas-receipt-strip"
+      className="flex flex-col shrink-0 border-t-2 border-border/40 bg-muted/80 px-3 py-1.5 max-h-[35%] overflow-y-auto shadow-[0_-4px_12px_-8px_rgba(0,0,0,0.2)]"
+    >
       <button
         type="button"
         onClick={() => setUserExpanded((v) => !v)}

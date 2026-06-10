@@ -24,6 +24,15 @@ import { resolve, join, isAbsolute, relative, sep } from "node:path";
 export type InvokeFn = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 
 const READ_LIMIT = 256 * 1024;
+const SHELL_OUTPUT_LIMIT = 64 * 1024;
+
+function capOutput(text: string): { text: string; truncated: boolean } {
+  if (text.length <= SHELL_OUTPUT_LIMIT) return { text, truncated: false };
+  return {
+    text: `${text.slice(0, SHELL_OUTPUT_LIMIT)}\n[truncated by benchmark shim]`,
+    truncated: true,
+  };
+}
 
 function canonical(root: string, p: string): string {
   const abs = isAbsolute(p) ? p : resolve(root, p);
@@ -176,22 +185,25 @@ export function createInvokeShim(root: string): InvokeFn {
             encoding: "utf8",
             stdio: ["ignore", "pipe", "pipe"],
           });
+          const capped = capOutput(stdout);
           return {
-            stdout,
+            stdout: capped.text,
             stderr: "",
             exit_code: 0,
             timed_out: false,
-            truncated: false,
+            truncated: capped.truncated,
             cwd_after: cwd,
           };
         } catch (e) {
           const err = e as { stdout?: string; stderr?: string; status?: number };
+          const stdout = capOutput(err.stdout ?? "");
+          const stderr = capOutput(err.stderr ?? String(e));
           return {
-            stdout: err.stdout ?? "",
-            stderr: err.stderr ?? String(e),
+            stdout: stdout.text,
+            stderr: stderr.text,
             exit_code: err.status ?? 1,
             timed_out: false,
-            truncated: false,
+            truncated: stdout.truncated || stderr.truncated,
             cwd_after: cwd,
           };
         }
@@ -202,27 +214,90 @@ export function createInvokeShim(root: string): InvokeFn {
         return null;
 
       case "agent_reality_context": {
-        // Headless: list real files (no Rust PageRank ranking — that's native).
+        // Headless repo intelligence: a grep-powered symbol index. Not the Rust
+        // PageRank, but it returns real definition/reference matches so the
+        // find_symbol / find_references / repo_map tools actually navigate.
+        const task = String(args.task ?? "");
+        const tokens = [
+          ...new Set((task.toLowerCase().match(/[a-z_][a-z0-9_]{2,}/g) ?? [])),
+        ]
+          .sort((a, b) => b.length - a.length)
+          .slice(0, 8);
+        const tokenSet = new Set(tokens);
+        const refRes = tokens.map((t) => new RegExp(`\\b${t}\\b`));
         const files: string[] = [];
-        walkFiles(root, root, files, 500);
-        const rels = files.map((f) => relative(root, f).split(sep).join("/"));
+        walkFiles(root, root, files, 1200);
+        const matches: Array<{
+          path: string;
+          name: string;
+          kind: string;
+          line: number;
+          is_definition: boolean;
+        }> = [];
+        const fileScore = new Map<string, number>();
+        const DEF_RE =
+          /^\s*(?:export\s+)?(?:public\s+|private\s+|async\s+)*(?:def|class|function|interface|struct|fn|type|enum)\s+([A-Za-z_]\w+)/;
+        const ASSIGN_RE =
+          /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_]\w+)\s*=/;
+        for (const file of files) {
+          if (matches.length > 250) break;
+          const rel = relative(file, root) ? relative(root, file).split(sep).join("/") : file;
+          let lines: string[];
+          try {
+            lines = readFileSync(file, "utf8").split("\n");
+          } catch {
+            continue;
+          }
+          for (let i = 0; i < lines.length && matches.length <= 250; i++) {
+            const line = lines[i];
+            const lower = line.toLowerCase();
+            const def = DEF_RE.exec(line) ?? ASSIGN_RE.exec(line);
+            if (def && tokenSet.has(def[1].toLowerCase())) {
+              matches.push({ path: file, name: def[1], kind: "definition", line: i + 1, is_definition: true });
+              fileScore.set(rel, (fileScore.get(rel) ?? 0) + 6);
+              continue;
+            }
+            for (let t = 0; t < tokens.length; t++) {
+              if (refRes[t].test(lower)) {
+                matches.push({ path: file, name: tokens[t], kind: "reference", line: i + 1, is_definition: false });
+                fileScore.set(rel, (fileScore.get(rel) ?? 0) + 1);
+                break;
+              }
+            }
+          }
+        }
+        const ranked = [...fileScore.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 40)
+          .map((e) => e[0]);
+        const defs = matches.filter((m) => m.is_definition).length;
         return {
           root,
           indexed_at_ms: Date.now(),
           cache_hit: false,
           watch_status: "headless",
-          file_count: rels.length,
-          symbol_count: 0,
-          included_files: rels,
-          matches: [],
+          rescan_bound_ms: 0,
+          file_count: files.length,
+          symbol_count: matches.length,
+          definition_count: defs,
+          reference_count: matches.length - defs,
+          parse_failures: 0,
+          skipped_dirs: 0,
+          excluded_files: 0,
+          degraded_files: [],
+          rank_iterations: 0,
+          graph_edge_count: 0,
+          included_files: ranked,
+          matches: matches.slice(0, 200),
           graph_relations: [],
           context:
-            `Headless project at ${root}. Files:\n` + rels.map((r) => `- ${r}`).join("\n"),
-          truncated: false,
-          max_tokens: 0,
+            `Headless symbol index for "${task.slice(0, 60)}". Top files:\n` +
+            ranked.slice(0, 15).map((r) => `- ${r}`).join("\n"),
+          truncated: matches.length > 200,
+          max_tokens: Number(args.maxTokens ?? 1200),
           projected_tokens: 0,
           naive_tokens: 0,
-          ranking_strategy: "headless_file_list",
+          ranking_strategy: "headless_grep_index",
         };
       }
 

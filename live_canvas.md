@@ -1,4 +1,28 @@
 
+## Qualification harness correction - real Atlas vs shim boundary (2026-06-08)
+
+Problem: previous benchmark evidence mixed production agent-loop code with a Node Tauri-invoke shim, then risked being read as proof that the real Atlas desktop UI/session/native boundary worked. That was not honest enough for paid model testing.
+
+Applied:
+
+- Added `scripts/atlas-qualification.mjs` and `pnpm qualify:atlas`.
+- The runner creates `runs/atlas-qualification/<run-id>/summary.json`, `report.md`, and per-phase stdout/stderr logs.
+- Every phase records whether it is `realAtlasUi`, `headlessShim`, and/or `paid`.
+- Paid model generation is skipped unless `--allow-paid` is passed.
+- Added stable UI selectors for future WebDriver tests: `atlas-ai-input`, `atlas-project-chip`, `atlas-sessions-panel`, `atlas-receipt-strip`.
+- Fixed the source-parity hook line-ending failure by normalizing `scripts/consult-opensrc.sh` to LF.
+- The runner now prefers Git Bash on Windows for source-parity checks.
+
+Latest evidence:
+
+- `node scripts/atlas-qualification.mjs` RC=0.
+- Report: `C:\Users\name\Downloads\Atlas-ai\runs\atlas-qualification\2026-06-08T18-25-16-775Z\report.md`
+- Passed phases: source-parity hook RC=0, desktop static contract RC=0, TypeScript RC=0, focused Vitest RC=0, native git worktree tests RC=0.
+- Real Atlas desktop UI phase: blocked, not faked. Missing `tauri-driver` and a platform WebDriver (`msedgedriver`/`chromedriver`/`geckodriver`).
+- Paid SWE-bench smoke: skipped by design until real UI automation is installed.
+
+Blunt conclusion: we currently have good headless agent-loop instrumentation, but we do not yet have product-level proof that the UI creates a project-bound session and drives the same native boundary a user sees. Next highest ROI is installing/adding Tauri WebDriver E2E and making that phase submit one cheap deterministic mock-model task before any paid LLM benchmark.
+
 ## Design note: smart plan replan (deferred, agent-loop)
 
 User decision on comment-on-plan: do NOT blind-incorporate per-line comments
@@ -193,3 +217,63 @@ Focused verification:
 - Clean-shell `bash scripts/verify-atlas.sh --all` `RC=0`, printed
   `verify-atlas --all: OK`; Rust `157 passed / 0 failed / 3 ignored`, harness
   `3 passed`.
+## Corrective slice: worktree core plus real localization campaign
+
+Done for the verifiable core, not the full UI feature.
+
+- Added native git worktree primitives:
+  `git_worktree_list`, `git_worktree_create`, `git_worktree_remove`, and
+  `git_worktree_merge`.
+- Worktrees are intentionally narrow: Atlas-created only, stored under
+  `.atlas/worktrees/<name>`, with branches under `atlas/<name>`.
+- Added frontend native wrappers for later UI integration.
+- Added parser, safety guard, and real temp-repo create/list/remove tests.
+- Added `REPO_INTEL=minimal`, a mini-swe-agent-like four-tool control arm:
+  `bash_run`, `read_file`, `write_file`, and `edit`.
+- Added `BENCH_INSTANCE_LIMIT` so paid smokes cannot accidentally run all
+  instances.
+- Added capability usage metrics: unlocked, used, promoted-unused.
+- Fixed benchmark token accounting to accumulate per-step usage.
+- Capped benchmark shim shell output after a real run showed a 7.8M-token
+  baseline outlier from uncapped bash output.
+
+Paid OpenRouter Gemini 2.5 Flash receipts:
+
+- Key status before campaign: `is_free_tier=false`.
+- One-instance smoke, `minimal`, max steps `8`, max output `200`: `RC=0`,
+  `steps=6`, `tools=5`, no patch.
+- One-instance smoke, `map`, max steps `8`, max output `400`: `RC=0`,
+  `steps=5`, tools `repo_map/find_symbol/read_file`, `used=repo_intel`, no
+  patch.
+- Full 15-instance localization, max steps `28`, max output `1024`, all arms
+  `RC=0`.
+
+Localization table:
+
+| arm | hitRate | recall | precision | non-empty | avg input | avg output | avg steps | step caps | stream JSON errors |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| map | 0.067 | 0.067 | 0.067 | 1/15 | 266,323 | 1,805 | 10.9 | 0 | 12 |
+| off | 0.267 | 0.267 | 0.267 | 8/15 | 331,599 | 2,448 | 12.2 | 1 | 3 |
+| minimal | 0.333 | 0.333 | 0.333 | 9/15 | 632,892 | 1,488 | 10.1 | 0 | 2 |
+
+Verdict:
+
+- Gate 1 result is `STRIP/RETHINK`, not GO. On this run, repo-intel underperformed
+  grep-only and the minimal control on hard-localization large-repo tasks.
+- The result is not "minimal is perfect": minimal had the best hit rate but the
+  worst token behavior because bash output was uncapped in the headless shim.
+- Do not run official Docker eval from this result. Fix benchmark output capping,
+  inspect why map produced many empty patches, and rerun a smaller confirmation
+  before spending more.
+- OpenRouter key usage after campaign: `2.5897409`.
+
+Verification receipts:
+
+- TypeScript `RC=0`.
+- Focused bench/shim/capability Vitest `RC=0`, `13 passed / 1 skipped`.
+- Focused git operations tests `RC=0`, `5/5`.
+
+Left intentionally:
+
+- Native-app worktree UX: run agent in isolated worktree, review diff, merge on
+  accept. This needs real desktop interaction evidence, not headless pretending.

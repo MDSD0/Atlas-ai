@@ -33,6 +33,7 @@ import { SessionsList } from "./SessionsPanel";
 import { TodoStrip } from "./TodoStrip";
 import { ReceiptStrip } from "./ReceiptStrip";
 import { AiInput } from "./AiInputBar";
+import { PendingApprovals } from "./PendingApprovals";
 
 const SUGGESTIONS = [
   {
@@ -259,6 +260,12 @@ function Body({
 
       <TodoStrip sessionId={sessionId} />
       <ReceiptStrip sessionId={sessionId} />
+      <PendingApprovals
+        messages={helpers.messages}
+        onRespond={(id, approved) =>
+          helpers.addToolApprovalResponse({ id, approved })
+        }
+      />
       <div className="shrink-0">
         <AiInput />
       </div>

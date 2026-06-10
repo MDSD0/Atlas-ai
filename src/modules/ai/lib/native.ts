@@ -217,6 +217,22 @@ export type GitPanelSnapshot = {
   status: GitStatusSnapshot | null;
 };
 
+export type WorktreeInfo = {
+  path: string;
+  branch: string | null;
+  head: string | null;
+  isMain: boolean;
+};
+
+export type WorktreeCreateResult = {
+  worktree: WorktreeInfo;
+};
+
+export type WorktreeMergeResult = {
+  merged: boolean;
+  summary: string;
+};
+
 export type GitDiscardEntry = {
   path: string;
   untracked: boolean;
@@ -416,6 +432,34 @@ export const native = {
   gitPullFfOnly: (repoRoot: string) =>
     invoke<void>("git_pull_ff_only", {
       repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitWorktreeList: (repoRoot: string) =>
+    invoke<WorktreeInfo[]>("git_worktree_list", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitWorktreeCreate: (
+    repoRoot: string,
+    name: string,
+    baseRef?: string | null,
+  ) =>
+    invoke<WorktreeCreateResult>("git_worktree_create", {
+      repoRoot,
+      name,
+      baseRef: baseRef ?? null,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitWorktreeRemove: (repoRoot: string, path: string) =>
+    invoke<void>("git_worktree_remove", {
+      repoRoot,
+      path,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitWorktreeMerge: (repoRoot: string, branch: string) =>
+    invoke<WorktreeMergeResult>("git_worktree_merge", {
+      repoRoot,
+      branch,
       workspace: currentWorkspaceEnv(),
     }),
   gitPush: (repoRoot: string) =>

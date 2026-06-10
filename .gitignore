@@ -28,3 +28,6 @@ dist-ssr
 *.tsbuildinfo
 __pycache__/
 *.pyc
+
+# Atlas qualification evidence
+runs/

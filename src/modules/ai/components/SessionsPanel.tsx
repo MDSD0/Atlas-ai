@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { currentWorkspaceEnv } from "@/modules/workspace/env";
 import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 import { workspaceBindingErrorMessage } from "@/modules/workspace/workspaceStore";
+import { switchToProject } from "@/modules/workspace/projectFlow";
 
 import { useChatStore } from "@/modules/ai";
 import type { SessionMeta } from "@/modules/ai/lib/sessions";
@@ -311,7 +312,7 @@ export function SessionsList({
   const renameSession = useChatStore((s) => s.renameSession);
   const openPanel = useChatStore((s) => s.openPanel);
   const focusInput = useChatStore((s) => s.focusInput);
-  const { setWorkspaceRoot, removeRecent } = useWorkspaceStore();
+  const { removeRecent } = useWorkspaceStore();
 
   const [staleMap, setStaleMap] = useState<Map<string, boolean>>(new Map());
 
@@ -376,12 +377,15 @@ export function SessionsList({
   const handleOpenWorkspace = useCallback(
     async (path: string) => {
       try {
-        await setWorkspaceRoot(path);
+        // Switch to that project's session (or a fresh bound one) — never
+        // rebind the folder under the currently open chat, which leaves the
+        // old conversation pointing at a different workspace.
+        await switchToProject(path);
       } catch (error) {
         window.alert(workspaceBindingErrorMessage(error));
       }
     },
-    [setWorkspaceRoot],
+    [],
   );
 
   const handleRemoveStale = useCallback(
@@ -409,6 +413,7 @@ export function SessionsList({
 
   return (
     <div
+      data-testid="atlas-sessions-panel"
       className={cn(
         "flex h-full min-h-0 flex-col overflow-y-auto px-2 py-1",
         compact && "max-h-[min(70vh,620px)] w-[min(92vw,400px)] py-2",

@@ -5,8 +5,6 @@ import {
   modelOutputTokenBudget,
   modelStepBudget,
 } from "../config";
-import { selectAgentRunPolicy } from "./lanePolicy";
-
 describe("per-model step budget", () => {
   it("gives frontier models the full budget", () => {
     expect(modelStepBudget("gpt-5.5")).toBe(MAX_AGENT_STEPS);
@@ -31,26 +29,5 @@ describe("per-model output token budget", () => {
     expect(modelOutputTokenBudget("gemini-2.5-flash")).toBeLessThan(
       MAX_AGENT_OUTPUT_TOKENS,
     );
-  });
-});
-
-describe("lane step ceiling", () => {
-  it("static web lane caps steps lower than full", () => {
-    const staticLane = selectAgentRunPolicy({
-      prompt: "build a calculator web app with html css js and open it",
-      planMode: false,
-      activeFile: null,
-    });
-    expect(staticLane.lane).toBe("static_web_app");
-    expect(staticLane.maxSteps).toBeDefined();
-    expect(staticLane.maxSteps!).toBeLessThan(MAX_AGENT_STEPS);
-
-    const full = selectAgentRunPolicy({
-      prompt: "refactor the auth module and run the tests",
-      planMode: false,
-      activeFile: null,
-    });
-    expect(full.lane).toBe("full");
-    expect(full.maxSteps).toBeUndefined();
   });
 });

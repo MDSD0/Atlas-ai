@@ -286,6 +286,7 @@ export function AiInputBar() {
           <PopoverAnchor asChild>
             <div className="px-3 pt-2.5 pb-1">
               <textarea
+                data-testid="atlas-ai-input"
                 ref={(node) => {
                   localRef.current = node;
                   if (node) {

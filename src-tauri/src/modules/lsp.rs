@@ -620,14 +620,19 @@ fn executable_candidates(directory: &Path, executable: &str) -> Vec<PathBuf> {
     let base = directory.join(executable);
     #[cfg(windows)]
     {
-        let mut candidates = vec![base.clone()];
+        // PATHEXT variants first. npm-installed language servers ship an
+        // extensionless POSIX shell shim alongside `<name>.cmd`/`.exe`; the
+        // extensionless file IS a file but is not a PE image, so spawning it
+        // directly fails with "%1 is not a valid Win32 application" (os error
+        // 193). Prefer a launchable `.cmd`/`.exe` and keep the bare name only as
+        // a last-resort fallback (e.g. a genuine extensionless native binary).
         let extensions = std::env::var("PATHEXT").unwrap_or_else(|_| ".COM;.EXE;.BAT;.CMD".into());
-        candidates.extend(
-            extensions
-                .split(';')
-                .filter(|extension| !extension.is_empty())
-                .map(|extension| directory.join(format!("{executable}{extension}"))),
-        );
+        let mut candidates: Vec<PathBuf> = extensions
+            .split(';')
+            .filter(|extension| !extension.is_empty())
+            .map(|extension| directory.join(format!("{executable}{extension}")))
+            .collect();
+        candidates.push(base);
         candidates
     }
     #[cfg(not(windows))]
@@ -715,6 +720,32 @@ mod tests {
 
         assert_eq!(infos.len(), 1);
         assert_eq!(infos[0].status, LspProviderStatus::Unavailable);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_prefers_cmd_shim_over_extensionless_posix_shim() {
+        // Reproduces the pyright "os error 193" bug: npm installs both an
+        // extensionless POSIX shell shim and a launchable `.cmd`. Resolution
+        // must pick the `.cmd`, not the extensionless file (CreateProcess can't
+        // exec it).
+        let bin = tempfile::tempdir().expect("tempdir");
+        std::fs::write(bin.path().join("pyright-langserver"), "#!/bin/sh\n")
+            .expect("write posix shim");
+        std::fs::write(bin.path().join("pyright-langserver.cmd"), "@echo off\n")
+            .expect("write cmd shim");
+
+        let resolved = find_executable("pyright-langserver", Some(bin.path().as_os_str()))
+            .expect("resolves an executable");
+        let extension = resolved
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.to_ascii_lowercase());
+        assert_eq!(
+            extension.as_deref(),
+            Some("cmd"),
+            "must prefer the launchable .cmd over the extensionless shim",
+        );
     }
 
     #[test]

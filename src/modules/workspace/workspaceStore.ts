@@ -46,7 +46,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   workspaceRoot: null,
   recentWorkspaces: [],
 
-  setWorkspaceRoot: async (path: string) => {
+  setWorkspaceRoot: async (rawPath: string) => {
+    // Forward slashes everywhere: Rust emits canonical forward-slashed paths
+    // (to_canon), so storing the dialog's backslash form here breaks every
+    // string-keyed lookup downstream (fs watcher refresh, session grouping).
+    const path = rawPath.replace(/\\/g, "/");
     try {
       await native.workspaceAuthorizeAgentProject(path);
     } catch (error) {

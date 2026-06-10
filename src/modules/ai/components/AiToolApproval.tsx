@@ -55,6 +55,7 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
           size="sm"
           variant="ghost"
           onClick={() => onRespond(false)}
+          data-testid="atlas-approval-deny"
           className="h-7 gap-1.5 text-[11px]"
         >
           <Cancel01Icon size={12} strokeWidth={1.5} />
@@ -64,6 +65,7 @@ function AiToolApprovalImpl({ part, toolName, onRespond }: Props) {
           size="sm"
           variant="default"
           onClick={() => onRespond(true)}
+          data-testid="atlas-approval-approve"
           className="h-7 gap-1.5 text-[11px]"
         >
           <Tick02Icon size={12} strokeWidth={1.5} />

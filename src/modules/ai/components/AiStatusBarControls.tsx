@@ -153,6 +153,7 @@ export function AiStatusBarControls() {
           size="icon"
           variant="ghost"
           onClick={c.stop}
+          data-testid="atlas-stop-button"
           className="size-6"
           aria-label="Stop"
           title="Stop"
@@ -165,6 +166,7 @@ export function AiStatusBarControls() {
           size="icon"
           onClick={c.submit}
           disabled={!c.canSend}
+          data-testid="atlas-send-button"
           className="h-5.5 w-7.5 ml-1"
           aria-label="Send"
           title="Send (Enter)"

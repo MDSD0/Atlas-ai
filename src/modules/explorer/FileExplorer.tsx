@@ -1,4 +1,4 @@
-import { FilePlus as FileAddIcon, Folder as Folder01Icon, FolderOpen as FolderOpenIcon, FolderPlus as FolderAddIcon, RefreshCw as Refresh01Icon, Search as Search01Icon } from "lucide-react";
+import { FilePlus as FileAddIcon, Folder as Folder01Icon, FolderOpen as FolderOpenIcon, FolderPlus as FolderAddIcon, Search as Search01Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ContextMenu,
@@ -543,15 +543,6 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             title="New folder"
           >
             <FolderAddIcon size={13} strokeWidth={1.5} />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-6 text-muted-foreground hover:text-foreground"
-            onClick={() => tree.refresh(rootPath)}
-            title="Refresh"
-          >
-            <Refresh01Icon size={12} strokeWidth={1.5} />
           </Button>
         </div>
 

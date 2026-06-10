@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { openProjectFromDialog, openProjectFromPath } from "./projectFlow";
+import { PendingApprovals } from "@/modules/ai/components/PendingApprovals";
 import {
   useWorkspaceStore,
   workspaceBindingErrorMessage,
@@ -57,6 +58,8 @@ function RecentItem({
 
   return (
     <div
+      data-testid="atlas-recent-workspace"
+      data-path={recent.path}
       className={cn(
         "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors",
         stale
@@ -240,6 +243,15 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
         )}
       </div>
       
+      <div className="mx-auto w-full max-w-4xl shrink-0 px-4">
+        <PendingApprovals
+          messages={helpers.messages}
+          onRespond={(id, approved) =>
+            helpers.addToolApprovalResponse({ id, approved })
+          }
+        />
+      </div>
+
       {/* Integrated Composer */}
       <div className="shrink-0 mx-auto w-full max-w-4xl px-4 pb-6 pt-2">
         <AiInput />

@@ -36,6 +36,13 @@ export type DiffOpenInput = {
 export type AgentRunBridgeProps = {
   openAiDiffTab: (input: DiffOpenInput) => number | null;
   closeAiDiffTab: (approvalId: string) => void;
+  /**
+   * True while the agent home (welcome tab) is the active surface. There the
+   * conversation and the pinned approval dock are already in front of the
+   * user, so auto-opening the mini window or editor diff tabs would only
+   * shove the layout around.
+   */
+  suppressAutoSurfaces?: boolean;
 };
 
 export function AgentRunBridge(props: AgentRunBridgeProps) {
@@ -65,6 +72,7 @@ function Bridge({
   sessionId,
   openAiDiffTab,
   closeAiDiffTab,
+  suppressAutoSurfaces = false,
 }: BridgeProps) {
   const chat = useMemo(() => getOrCreateChat(sessionId), [sessionId]);
   const { status, messages, addToolApprovalResponse } = useChat<UIMessage>({
@@ -128,8 +136,8 @@ function Bridge({
   }, [status, approvalsPending, patch]);
 
   useEffect(() => {
-    if (approvalsPending > 0) openMini();
-  }, [approvalsPending, openMini]);
+    if (approvalsPending > 0 && !suppressAutoSurfaces) openMini();
+  }, [approvalsPending, openMini, suppressAutoSurfaces]);
 
   // Approval state is emitted by the AI SDK as UI-message parts. Mirror each
   // request and resolution once into the latest proof run for this session.
@@ -203,6 +211,7 @@ function Bridge({
         | { kind: "literal"; content: string }
         | { kind: "edits"; edits: EditOp[] };
     };
+    if (suppressAutoSurfaces) return;
     if (fileMutationFingerprint === fileMutationFingerprintRef.current) {
       return;
     }
@@ -279,7 +288,7 @@ function Bridge({
     return () => {
       cancelled = true;
     };
-  }, [messages, fileMutationFingerprint, openAiDiffTab, closeAiDiffTab]);
+  }, [messages, fileMutationFingerprint, openAiDiffTab, closeAiDiffTab, suppressAutoSurfaces]);
 
   return null;
 }

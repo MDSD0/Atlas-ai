@@ -31,10 +31,12 @@ import { buildTools, type AblationMode, type ToolContext } from "../tools/tools"
 import {
   activeToolNames,
   clearPromotedCapabilities,
+  promoteCapabilities,
 } from "../tools/capabilities";
 import { wrapToolsWithLifecycle } from "../tools/lifecycle";
 import type { AtlasLifecycleEvent } from "../skills";
 import { compactModelMessagesDetailed } from "./compact";
+import { unwrapDoubleEncodedInput } from "./repairToolInput";
 import type { ProviderKeys } from "./keyring";
 import { createProxyFetch } from "./proxyFetch";
 
@@ -376,6 +378,12 @@ export function buildConfiguredLanguageModel(
  * Drop incomplete tool parts; coerce non-object inputs to `{}`.
  */
 export function sanitizeToolParts(messages: UIMessage[]): UIMessage[] {
+  const replayableToolStates = new Set([
+    "approval-responded",
+    "output-available",
+    "output-denied",
+    "output-error",
+  ]);
   let changed = false;
   const out = messages.map((message) => {
     const parts = message.parts as
@@ -391,7 +399,7 @@ export function sanitizeToolParts(messages: UIMessage[]): UIMessage[] {
         next.push(part);
         continue;
       }
-      if (part.state !== "output-available" && part.state !== "output-error") {
+      if (!replayableToolStates.has(part.state ?? "")) {
         local = true; // incomplete/aborted tool call — would orphan a tool_use
         continue;
       }
@@ -528,15 +536,36 @@ export type RunAgentOptions = {
   toolMode?: AblationMode;
   /** Lane-level step ceiling; combined (min) with the per-model budget. */
   laneMaxSteps?: number;
+  /** Absolute step cap that overrides the model/lane budget (raises or lowers).
+   * For benchmarks and repo-editing lanes that need more runway than a lite
+   * model's default. */
+  stepBudgetOverride?: number;
   /** Per-step output ceiling; defaults to a conservative per-model budget. */
   maxOutputTokens?: number;
   /** Benchmark ablation: disable the capability gateway (expose every tool). */
   gatewayDisabled?: boolean;
+  /** Capability families to unlock up front (e.g. ["repo_intel"]) so the model
+   * has them from step 1 without a capability_search turn. */
+  prePromoteCapabilities?: string[];
+  /** Ablation: force the active toolbelt to exactly this set, bypassing the
+   * gateway (e.g. ["bash_run","read_file","write_file","edit"] to test whether
+   * the harness machinery beats a bare 4-tool loop). */
+  forceActiveTools?: string[];
+  /** Ablation: capability families to remove entirely (their tools never become
+   * active even if the model searches for them). Used to A/B a capability's
+   * value, e.g. blockCapabilities=["repo_intel"] for a grep-only arm. */
+  blockCapabilities?: string[];
   onStep?: (step: string | null) => void;
   onUsage?: (delta: AgentUsageDelta) => void;
   onCompact?: (info: { droppedCount: number }) => void;
   onFinishMeta?: (info: { hitStepCap: boolean; finishReason: string }) => void;
   /** Per-tool observation for the proof journal. Does not add a tool runtime. */
+  onToolCall?: (record: {
+    toolName: string;
+    input: Record<string, unknown>;
+    toolCallId: string;
+  }) => void;
+  /** Per-tool result observation for the proof journal. Does not add a tool runtime. */
   onToolResult?: (record: {
     toolName: string;
     input: Record<string, unknown>;
@@ -653,15 +682,26 @@ export async function runAgentStream(opts: RunAgentOptions) {
   const gatewayActive =
     (opts.toolMode ?? "full") === "full" && !opts.gatewayDisabled;
   const sessionId = opts.toolContext.getSessionId() ?? "unknown";
-  if (gatewayActive) clearPromotedCapabilities(sessionId);
+  if (gatewayActive) {
+    clearPromotedCapabilities(sessionId);
+    // Lanes/tasks can pre-unlock capability families (e.g. repo_intel for a
+    // repo-editing task) so the model has them from step 1 without spending a
+    // capability_search turn discovering it needs to navigate.
+    if (opts.prePromoteCapabilities?.length) {
+      promoteCapabilities(sessionId, opts.prePromoteCapabilities);
+    }
+  }
   const allToolNames = new Set(Object.keys(tools));
-
-  // Effective step cap = min(model budget, lane ceiling). Replaces the single
-  // global MAX_AGENT_STEPS so a local/lite model or a short lane stops sooner.
-  const effectiveMaxSteps = Math.min(
-    modelStepBudget(getModel(modelId).id),
-    opts.laneMaxSteps ?? Number.POSITIVE_INFINITY,
-  );
+  // Effective step cap. `stepBudgetOverride` wins absolutely (used by benchmarks
+  // and lanes that genuinely need more runway than the model default — a
+  // lite-model cap of 16 starves real repo-editing). Otherwise it's
+  // min(model budget, lane ceiling): a lane can only tighten, never loosen.
+  const effectiveMaxSteps =
+    opts.stepBudgetOverride ??
+    Math.min(
+      modelStepBudget(getModel(modelId).id),
+      opts.laneMaxSteps ?? Number.POSITIVE_INFINITY,
+    );
 
   let stepsSeen = 0;
   return streamText({
@@ -671,16 +711,39 @@ export async function runAgentStream(opts: RunAgentOptions) {
     maxOutputTokens:
       opts.maxOutputTokens ?? modelOutputTokenBudget(getModel(modelId).id),
     stopWhen: stepCountIs(effectiveMaxSteps),
-    prepareStep: gatewayActive
-      ? () => ({
-          activeTools: activeToolNames(sessionId).filter((name) =>
-            allToolNames.has(name),
-          ) as (keyof typeof tools)[],
-        })
-      : undefined,
+    // Weak models double-encode tool arguments (JSON string wrapping the JSON
+    // object); unwrap instead of failing the call. Anything else stays an error.
+    experimental_repairToolCall: async ({ toolCall, error }) => {
+      if (error.name === "AI_NoSuchToolError") return null;
+      const repaired = unwrapDoubleEncodedInput(toolCall.input);
+      return repaired === null ? null : { ...toolCall, input: repaired };
+    },
+    prepareStep:
+      opts.forceActiveTools?.length
+        ? () => ({
+            activeTools: opts.forceActiveTools!.filter((name) =>
+              allToolNames.has(name),
+            ) as (keyof typeof tools)[],
+          })
+        : gatewayActive
+          ? () => ({
+              activeTools: activeToolNames(sessionId, opts.blockCapabilities).filter(
+                (name) => allToolNames.has(name),
+              ) as (keyof typeof tools)[],
+            })
+          : undefined,
     abortSignal: opts.abortSignal,
     onStepFinish: (step) => {
       stepsSeen++;
+      if (opts.onToolCall && step.toolCalls) {
+        for (const call of step.toolCalls) {
+          opts.onToolCall({
+            toolName: call.toolName,
+            input: (call.input ?? {}) as Record<string, unknown>,
+            toolCallId: call.toolCallId,
+          });
+        }
+      }
       if (opts.onToolResult && step.toolResults) {
         const calls = step.toolCalls ?? [];
         for (const result of step.toolResults) {

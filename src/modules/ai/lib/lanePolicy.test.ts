@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { selectAgentRunPolicy } from "./lanePolicy";
 
 describe("selectAgentRunPolicy", () => {
-  it("narrows static HTML/CSS/JS app work to the simple lane", () => {
+  it("always uses the full harness lane (no static-web narrowing)", () => {
+    // A textbook static-web prompt no longer gets narrowed: the misrouting
+    // lane was removed, so everything runs on the full toolbelt.
     const policy = selectAgentRunPolicy({
       prompt:
         "build a simple beautiful scientific calculator in html css and js, then run it",
@@ -10,24 +12,23 @@ describe("selectAgentRunPolicy", () => {
       activeFile: null,
     });
 
-    expect(policy.lane).toBe("static_web_app");
-    expect(policy.toolMode).toBe("simple");
-    expect(policy.includeMemoryIndex).toBe(false);
-    expect(policy.includeLocalMemory).toBe(false);
-    expect(policy.includeSimpleMem).toBe(false);
-    expect(policy.includeWorkPacket).toBe(false);
-    expect(policy.includeSkills).toBe(false);
+    expect(policy.lane).toBe("full");
+    expect(policy.toolMode).toBe("full");
+    expect(policy.includeSimpleMem).toBe(true);
+    expect(policy.maxSteps).toBeUndefined();
   });
 
-  it("keeps static run follow-ups narrow when a static file is active", () => {
+  it("does not downgrade when a stale static file is open in the editor", () => {
+    // The exact regression that bit us: an unrelated index.html open in the
+    // editor used to flip a non-web run into the narrowed lane.
     const policy = selectAgentRunPolicy({
-      prompt: "run it",
+      prompt: "run it yourself",
       planMode: false,
       activeFile: "C:\\Users\\name\\Downloads\\project\\index.html",
     });
 
-    expect(policy.lane).toBe("static_web_app");
-    expect(policy.toolMode).toBe("simple");
+    expect(policy.lane).toBe("full");
+    expect(policy.toolMode).toBe("full");
   });
 
   it("keeps repo edits on the full lane", () => {
@@ -41,16 +42,4 @@ describe("selectAgentRunPolicy", () => {
     expect(policy.toolMode).toBe("full");
     expect(policy.includeSimpleMem).toBe(true);
   });
-
-  it("does not narrow plan mode", () => {
-    const policy = selectAgentRunPolicy({
-      prompt: "build a calculator in html css and js",
-      planMode: true,
-      activeFile: null,
-    });
-
-    expect(policy.lane).toBe("full");
-    expect(policy.toolMode).toBe("full");
-  });
 });
-

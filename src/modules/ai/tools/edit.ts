@@ -35,16 +35,64 @@ type EditResult =
       path: string;
       code?: "stale_read" | "old_string_not_found";
       recovery?: string;
+      closest_match?: string;
     };
 
-function oldStringNotFound(path: string, oldString: string): EditResult {
+function oldStringNotFound(
+  path: string,
+  oldString: string,
+  content: string,
+): EditResult {
+  const closest = closestSnippet(content, oldString);
   return {
     error: `old_string not found: ${JSON.stringify(oldString.slice(0, 80))}`,
     code: "old_string_not_found",
     path,
-    recovery:
-      "Do not retry the same old_string. Call read_file again, copy the exact current text including whitespace and line endings, then issue one corrected edit or multi_edit.",
+    ...(closest ? { closest_match: closest } : {}),
+    recovery: closest
+      ? "old_string does not exist in this file. closest_match holds the nearest actual text — re-issue the edit copying that text exactly. Do not retry the same old_string."
+      : "Do not retry the same old_string. Call read_file again, copy the exact current text including whitespace and line endings, then issue one corrected edit or multi_edit.",
   };
+}
+
+/**
+ * Best-effort pointer to the file text the model probably meant. Weak models
+ * tend to retry an identical wrong old_string instead of re-reading the file;
+ * surfacing the closest real lines in the error lets them correct in one step.
+ */
+export function closestSnippet(
+  content: string,
+  oldString: string,
+): string | null {
+  const targetLine = oldString
+    .split("\n")
+    .map((l) => l.trim())
+    .find((l) => l.length > 0);
+  if (!targetLine) return null;
+  const targetTokens = tokenize(targetLine);
+  if (targetTokens.size === 0) return null;
+
+  const lines = content.split("\n");
+  let bestIdx = -1;
+  let bestScore = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const tokens = tokenize(lines[i]);
+    if (tokens.size === 0) continue;
+    let shared = 0;
+    for (const t of targetTokens) if (tokens.has(t)) shared++;
+    const score = shared / Math.max(targetTokens.size, tokens.size);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+  }
+  if (bestIdx === -1 || bestScore < 0.4) return null;
+  const span = Math.min(oldString.split("\n").length + 1, 6);
+  return lines.slice(bestIdx, bestIdx + span).join("\n").slice(0, 400);
+}
+
+function tokenize(line: string): Set<string> {
+  return new Set(line.toLowerCase().split(/\W+/).filter(Boolean));
 }
 
 export async function applyEdits(
@@ -113,14 +161,14 @@ async function applyEditsUnlocked(
         i += e.old_string.length;
       }
       if (n === 0) {
-        return oldStringNotFound(abs, e.old_string);
+        return oldStringNotFound(abs, e.old_string, before);
       }
       totalReplacements += n;
       void occurrences;
     } else {
       const first = content.indexOf(e.old_string);
       if (first === -1) {
-        return oldStringNotFound(abs, e.old_string);
+        return oldStringNotFound(abs, e.old_string, content);
       }
       const second = content.indexOf(e.old_string, first + 1);
       if (second !== -1) {

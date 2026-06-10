@@ -34,7 +34,7 @@ import {
 import { pushRecentModel } from "../lib/modelPrefs";
 import type { ApprovalMode } from "../lib/permissions";
 import { createContextAwareTransport } from "../lib/transport";
-import { formatAgentError } from "../lib/errors";
+import { formatAgentError, isTransientStreamError } from "../lib/errors";
 import { killRunResourcesForSession } from "../lib/runResources";
 import type {
   AtlasToolProjectContext,
@@ -379,18 +379,59 @@ function makeChat(sessionId: string): Chat<UIMessage> {
   const initialMessages = seedMessages.get(sessionId);
   seedMessages.delete(sessionId);
 
-  return new Chat<UIMessage>({
+  const chat: Chat<UIMessage> = new Chat<UIMessage>({
     id: sessionId,
     transport,
     messages: initialMessages,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onError: (e) => {
+      if (tryAutoResume(sessionId, chat, e)) return;
       useChatStore.getState().patchAgentMeta({
         status: "error",
         error: formatAgentError(e),
       });
     },
   });
+  return chat;
+}
+
+const AUTO_RESUME_TEXT =
+  "Continue: the provider stream dropped mid-run. Resume from where you stopped without repeating completed tool work.";
+
+// One auto-resume per manual user turn. Replenished in sendMessage(); a
+// resume that errors again surfaces the error instead of looping.
+const autoResumeBudget = new Map<string, number>();
+
+export function replenishAutoResume(sessionId: string): void {
+  autoResumeBudget.set(sessionId, 1);
+}
+
+/**
+ * Auto-resume a run killed by a transient mid-stream provider error (e.g.
+ * OpenRouter injecting an error event into the SSE stream). Only fires when
+ * the dead turn already produced assistant work — a request that failed
+ * before the first token was already retried by the SDK and re-sending it
+ * verbatim would loop on a deterministic failure.
+ */
+function tryAutoResume(
+  sessionId: string,
+  chat: Chat<UIMessage>,
+  error: unknown,
+): boolean {
+  if (!isTransientStreamError(error)) return false;
+  if ((autoResumeBudget.get(sessionId) ?? 0) < 1) return false;
+  const last = chat.messages[chat.messages.length - 1];
+  if (!last || last.role !== "assistant" || last.parts.length === 0) {
+    return false;
+  }
+  autoResumeBudget.set(sessionId, 0);
+  useChatStore.getState().patchAgentMeta({
+    status: "thinking",
+    error: null,
+    step: "Stream dropped, resuming",
+  });
+  void chat.sendMessage({ text: AUTO_RESUME_TEXT }).catch(() => {});
+  return true;
 }
 
 export const useChatStore = create<StoreState>((set, get) => ({
@@ -480,11 +521,17 @@ export const useChatStore = create<StoreState>((set, get) => ({
   hydrateSessions: async () => {
     if (get().sessionsHydrated) return;
     const { sessions, activeId } = await loadAll();
-    const normalized = sessions.map((s) =>
-      s.projectId === undefined || s.projectName === undefined
-        ? bindSessionToWorkspace(s, s.workspaceRoot ?? null)
-        : s,
-    );
+    // Migrate legacy metas: missing project fields, or backslash workspace
+    // roots from before path normalization (those split one project into
+    // duplicate groups and break watcher-keyed lookups).
+    const normalized = sessions.map((s) => {
+      const root = s.workspaceRoot ? s.workspaceRoot.replace(/\\/g, "/") : null;
+      return s.projectId === undefined ||
+        s.projectName === undefined ||
+        root !== (s.workspaceRoot ?? null)
+        ? bindSessionToWorkspace(s, root)
+        : s;
+    });
 
     // Restore the previously-active session if it still exists and has history,
     // so a restart returns the user to their conversation instead of a blank
@@ -711,6 +758,7 @@ export async function sendMessage(text: string): Promise<boolean> {
   if (!sessionId) return false;
   if (providerNeedsKey(getModel(state.selectedModelId).provider) && !getActiveProviderKey()) return false;
   const c = getOrCreateChat(sessionId);
+  replenishAutoResume(sessionId);
   await c.sendMessage({ text });
   return true;
 }

@@ -1,6 +1,6 @@
 import type { AblationMode } from "../tools/tools";
 
-export type AgentRunLane = "full" | "static_web_app";
+export type AgentRunLane = "full";
 
 export type AgentRunPolicy = {
   lane: AgentRunLane;
@@ -34,68 +34,17 @@ const FULL_POLICY: AgentRunPolicy = {
   reason: "default full harness lane",
 };
 
-const STATIC_WEB_APP_POLICY: AgentRunPolicy = {
-  lane: "static_web_app",
-  toolMode: "simple",
-  includeAtlasMd: true,
-  includeMemoryIndex: false,
-  includeLocalMemory: false,
-  includeSimpleMem: false,
-  includeWorkPacket: false,
-  includeSkills: false,
-  maxSteps: 12,
-  reason: "static HTML/CSS/JS flow uses the small no-todo toolbelt",
-};
-
+/**
+ * Every run uses the full harness lane. There was once a narrowed
+ * `static_web_app` lane that keyed off prompt text and the open editor tab to
+ * thin context for calculator-grade web tasks. It mis-fired in practice — a
+ * stale `index.html` left open in the editor silently downgraded unrelated
+ * projects (e.g. a Python CLI), stripping tools and capping steps. Repo truth
+ * beats a brittle binary heuristic, so the lane was removed. The input shape is
+ * retained so callers don't churn.
+ */
 export function selectAgentRunPolicy(
-  input: AgentRunPolicyInput,
+  _input: AgentRunPolicyInput,
 ): AgentRunPolicy {
-  if (input.planMode) {
-    return FULL_POLICY;
-  }
-
-  const prompt = normalizePolicyText(input.prompt);
-  if (looksLikeStaticWebFlow(prompt, input.activeFile)) {
-    return STATIC_WEB_APP_POLICY;
-  }
-
   return FULL_POLICY;
 }
-
-function normalizePolicyText(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-function looksLikeStaticWebFlow(
-  prompt: string,
-  activeFile: string | null,
-): boolean {
-  const activePath = activeFile?.toLowerCase().replace(/\\/g, "/") ?? "";
-  const activeStaticFile =
-    activePath.endsWith(".html") ||
-    activePath.endsWith(".css") ||
-    activePath.endsWith(".js");
-
-  const asksToAct =
-    /\b(build|create|make|write|implement|generate|continue|run|open|preview|serve|launch)\b/.test(
-      prompt,
-    ) || prompt.includes("open command");
-  if (!asksToAct) return false;
-
-  const mentionsStaticStack =
-    /\b(html|css|javascript|js)\b/.test(prompt) ||
-    /\b(index\.html|style\.css|script\.js)\b/.test(prompt);
-  const mentionsWebArtifact =
-    /\b(calculator|web app|website|site|page|landing page|static app|static site)\b/.test(
-      prompt,
-    );
-  const asksToRunStatic =
-    /\b(run|open|preview|serve|launch)\b/.test(prompt) ||
-    prompt.includes("open command");
-
-  return (
-    (mentionsStaticStack && mentionsWebArtifact) ||
-    (activeStaticFile && (mentionsStaticStack || asksToRunStatic))
-  );
-}
-

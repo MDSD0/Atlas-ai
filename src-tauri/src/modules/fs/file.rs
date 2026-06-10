@@ -143,6 +143,18 @@ fn fs_write_file_inner_no_emit(
 }
 
 fn write_file_at(target: &Path, content: &str) -> Result<(), String> {
+    // The target is already authorized within the workspace, so creating its
+    // missing parents is in-bounds. Without this, writing pages/index.js into
+    // a fresh project fails at the tempfile ("os error 3") before the file
+    // ever exists.
+    if let Some(parent) = target.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(|e| {
+                log::warn!("fs_write_file create parents({}) failed: {e}", parent.display());
+                e.to_string()
+            })?;
+        }
+    }
     let original_permissions = fs::metadata(target).ok().map(|m| m.permissions());
     write_atomic(target, content.as_bytes()).map_err(|e| {
         log::warn!("fs_write_file({}) failed: {e}", target.display());
@@ -276,6 +288,26 @@ mod tests {
         let reg = WorkspaceRegistry::default();
         reg.authorize(dir).expect("authorize temp root");
         reg
+    }
+
+    #[test]
+    fn write_file_creates_missing_parent_directories() {
+        // Regression: writing pages/index.js into a fresh project failed with
+        // "os error 3" because the tempfile needs an existing parent.
+        let dir = tempfile::tempdir().unwrap();
+        let reg = authed_registry(dir.path());
+        let target = dir.path().join("pages").join("nested").join("index.js");
+        fs_write_file_inner_no_emit(
+            target.to_string_lossy().into_owned(),
+            "export default 1;".into(),
+            None,
+            &reg,
+        )
+        .expect("write with missing parents succeeds");
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "export default 1;"
+        );
     }
 
     #[test]
