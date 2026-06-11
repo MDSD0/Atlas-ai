@@ -253,6 +253,7 @@ function Body({
               clearError={helpers.clearError}
               addToolApprovalResponse={helpers.addToolApprovalResponse}
               stop={helpers.stop}
+              sessionId={sessionId}
               scrollKey={`mini:${sessionId}`}
             />
           </div>

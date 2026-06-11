@@ -42,6 +42,8 @@ export function PlanReviewDock({
 
   const proceed = () => {
     const body = [
+      '<atlas-control hidden="true" action="plan-proceed" />',
+      "",
       "Proceed with this approved plan. Execute it now.",
       "",
       "<approved_plan>",
@@ -59,6 +61,8 @@ export function PlanReviewDock({
 
   const revise = () => {
     const body = [
+      '<atlas-control hidden="true" action="plan-revise" />',
+      "",
       "Revise the plan using this feedback. Do not edit files yet.",
       "",
       "<current_plan>",

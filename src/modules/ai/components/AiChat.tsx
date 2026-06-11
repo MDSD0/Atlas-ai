@@ -26,6 +26,7 @@ import { ChevronRight as ArrowRight01Icon, Code as CodeIcon, FileText as File01I
 import { SLASH_COMMANDS, ATLAS_CMD_RE } from "../lib/slashCommands";
 import { Spinner } from "@/components/ui/spinner";
 import { useChatStore, sendMessage } from "../store/chatStore";
+import { usePlanStore } from "../store/planStore";
 import type {
   ChatStatus,
   DynamicToolUIPart,
@@ -167,6 +168,7 @@ type Props = {
   clearError: () => void;
   addToolApprovalResponse: (arg: ApprovalArg) => void | PromiseLike<void>;
   stop: () => void | PromiseLike<void>;
+  sessionId?: string;
   scrollKey?: string;
 };
 
@@ -178,6 +180,7 @@ export function AiChatView({
   error,
   clearError,
   addToolApprovalResponse,
+  sessionId,
   scrollKey,
 }: Props) {
   const conversationRef = useRef<StickToBottomContext | null>(null);
@@ -204,6 +207,20 @@ export function AiChatView({
   );
 
   const workspaceRoot = useWorkspaceStore((s) => s.workspaceRoot);
+  const planActive = usePlanStore((s) => s.isActive(sessionId));
+  const planQueueLen = usePlanStore((s) => s.queueFor(sessionId).length);
+  const hiddenPlanMessageId = useMemo(() => {
+    if (!planActive || planQueueLen > 0) return null;
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (message?.role !== "assistant") continue;
+      const hasText = message.parts.some(
+        (part) => part.type === "text" && part.text.trim().length > 0,
+      );
+      return hasText ? message.id : null;
+    }
+    return null;
+  }, [messages, planActive, planQueueLen]);
 
   useLayoutEffect(() => {
     if (!scrollKey) return;
@@ -277,6 +294,7 @@ export function AiChatView({
             message={m}
             onApproval={onApproval}
             streaming={m.id === streamingMessageId}
+            hiddenPlanMessage={m.id === hiddenPlanMessageId}
           />
         ))}
         {compactionNotice && (
@@ -372,10 +390,12 @@ const RenderedMessage = memo(function RenderedMessage({
   message,
   onApproval,
   streaming,
+  hiddenPlanMessage,
 }: {
   message: UIMessage;
   onApproval: (id: string, approved: boolean) => void;
   streaming: boolean;
+  hiddenPlanMessage: boolean;
 }) {
   // Index of the trailing text part — only that one is "live" mid-stream.
   // Earlier text parts (separated by tool calls) are already finalized.
@@ -391,6 +411,8 @@ const RenderedMessage = memo(function RenderedMessage({
       .filter((p): p is { type: "text"; text: string } => p.type === "text")
       .map((p) => p.text)
       .join("\n");
+    const hiddenControl = parseHiddenAtlasControl(rawText);
+    if (hiddenControl) return null;
 
     const cmdMatch = rawText.match(ATLAS_CMD_RE);
     const commandName = cmdMatch?.[1] ?? null;
@@ -413,6 +435,8 @@ const RenderedMessage = memo(function RenderedMessage({
       </Message>
     );
   }
+
+  if (hiddenPlanMessage) return null;
 
   const groups = useMemo(() => buildPartGroups(message.parts as AnyPart[]), [
     message.parts,
@@ -456,6 +480,13 @@ const RenderedMessage = memo(function RenderedMessage({
     </Message>
   );
 });
+
+function parseHiddenAtlasControl(text: string): string | null {
+  const match = text.match(
+    /<atlas-control\s+hidden="true"\s+action="([^"]+)"\s*\/>/,
+  );
+  return match?.[1] ?? null;
+}
 
 type Group =
   | { kind: "single"; part: AnyPart; idx: number; key: string }

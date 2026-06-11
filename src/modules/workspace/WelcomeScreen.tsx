@@ -179,6 +179,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
               clearError={helpers.clearError}
               addToolApprovalResponse={helpers.addToolApprovalResponse}
               stop={helpers.stop}
+              sessionId={sessionId}
               scrollKey={`home:${sessionId}`}
             />
           </div>
