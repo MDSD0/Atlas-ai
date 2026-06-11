@@ -113,7 +113,7 @@ export function WelcomeScreen() {
 }
 
 function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
-  const { recentWorkspaces, removeRecent } = useWorkspaceStore();
+  const { recentWorkspaces, removeRecent, workspaceRoot } = useWorkspaceStore();
   const chat = useMemo(() => getOrCreateChat(sessionId), [sessionId]);
   const helpers = useChat<UIMessage>({ chat });
   const sessions = useChatStore((s) => s.sessions);
@@ -186,9 +186,9 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
             <div className="flex w-full max-w-2xl flex-col gap-6">
               {/* Wordmark */}
               <div className="flex flex-col gap-1 items-center text-center mb-4">
-                <img src="/logo-transparent.png" alt="Atlas Logo" className="w-12 h-12 mb-1 object-contain opacity-90" />
+                <img src="/logo-transparent.png" alt="Atlas Logo" className="w-12 h-12 mb-1 object-contain opacity-90" style={{ filter: "hue-rotate(70deg) saturate(1.2)" }} />
                 <h1 
-                  className="text-5xl tracking-tighter text-[#A5E605] drop-shadow-[0_2px_15px_rgba(165,230,5,0.2)] pb-1 pr-2"
+                  className="text-5xl tracking-tighter text-brand drop-shadow-[0_2px_15px_color-mix(in_srgb,var(--brand)_20%,transparent)] pb-1 pr-2"
                   style={{ fontFamily: "'Good Times', sans-serif" }}
                 >
                   ATLAS
@@ -199,28 +199,30 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
               </div>
 
               {/* Secondary action: Open Folder */}
-              <div className="flex gap-4 justify-center">
-                <button
-                  id="welcome-open-folder"
-                  type="button"
-                  onClick={handleOpenFolder}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-lg border border-[#A5E605]/30 bg-[#A5E605]/5 px-4 py-2 text-sm font-medium",
-                    "text-[#A5E605] shadow-sm transition-colors hover:bg-[#A5E605]/15",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A5E605]/50",
-                  )}
-                >
-                  <FolderOpenIcon
-                    size={16}
-                    strokeWidth={1.5}
-                    className="shrink-0 text-[#A5E605]/80"
-                  />
-                  Open Folder
-                </button>
-              </div>
+              {!workspaceRoot && (
+                <div className="flex gap-4 justify-center">
+                  <button
+                    id="welcome-open-folder"
+                    type="button"
+                    onClick={handleOpenFolder}
+                    className={cn(
+                      "flex items-center gap-2.5 rounded-lg border border-brand/30 bg-brand/5 px-4 py-2 text-sm font-medium",
+                      "text-brand shadow-sm transition-colors hover:bg-brand/15",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50",
+                    )}
+                  >
+                    <FolderOpenIcon
+                      size={16}
+                      strokeWidth={1.5}
+                      className="shrink-0 text-brand/80"
+                    />
+                    Open Folder
+                  </button>
+                </div>
+              )}
 
               {/* Recent workspaces */}
-              {recentWorkspaces.length > 0 && (
+              {!workspaceRoot && recentWorkspaces.length > 0 && (
                 <div className="flex flex-col gap-2 mt-4 max-w-md mx-auto w-full">
                   <span className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 text-center">
                     Recent Workspaces

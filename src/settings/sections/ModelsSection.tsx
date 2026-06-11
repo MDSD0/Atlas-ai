@@ -46,6 +46,11 @@ import {
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useEffect, useMemo, useState } from "react";
+import {
+  fetchOpenRouterCatalog,
+  filterCatalog,
+  type CatalogModel,
+} from "@/modules/ai/lib/openrouterCatalog";
 import { ProviderIcon } from "../components/ProviderIcon";
 import { ProviderKeyCard } from "../components/ProviderKeyCard";
 import { SectionHeader } from "../components/SectionHeader";
@@ -732,17 +737,27 @@ function LocalProviderCard({
         )}
 
         <FieldRow label="Model ID">
-          <Input
-            value={modelDraft}
-            onChange={(e) => setModelDraft(e.target.value)}
-            onBlur={() => {
-              const v = modelDraft.trim();
-              if (v !== modelId) void setModelId(v);
-            }}
-            placeholder={meta.modelPlaceholder}
-            spellCheck={false}
-            className="h-8 font-mono text-[11.5px]"
-          />
+          <div className="flex flex-1 items-center gap-1.5">
+            <Input
+              value={modelDraft}
+              onChange={(e) => setModelDraft(e.target.value)}
+              onBlur={() => {
+                const v = modelDraft.trim();
+                if (v !== modelId) void setModelId(v);
+              }}
+              placeholder={meta.modelPlaceholder}
+              spellCheck={false}
+              className="h-8 flex-1 font-mono text-[11.5px]"
+            />
+            {provider.id === "openrouter" ? (
+              <CatalogBrowseButton
+                onPick={(id) => {
+                  setModelDraft(id);
+                  void setModelId(id);
+                }}
+              />
+            ) : null}
+          </div>
         </FieldRow>
 
         {setContextLimit ? (
@@ -819,6 +834,115 @@ function LocalProviderCard({
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * Live model browser: fetches the OpenRouter catalog (auto-refreshes after a
+ * short TTL, so new releases appear without an app update) and fuzzy-searches
+ * it. Picking a row fills the Model ID — nobody should hand-type
+ * "anthropic/claude-opus-4.8" from a web page.
+ */
+function CatalogBrowseButton({ onPick }: { onPick: (id: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [models, setModels] = useState<CatalogModel[] | null>(null);
+  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+
+  const load = (force = false) => {
+    setState("loading");
+    fetchOpenRouterCatalog(force)
+      .then((m) => {
+        setModels(m);
+        setState("idle");
+      })
+      .catch(() => setState("error"));
+  };
+
+  const hits = useMemo(
+    () => (models ? filterCatalog(models, query) : []),
+    [models, query],
+  );
+
+  return (
+    <DropdownMenu
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (v && models === null) load();
+      }}
+    >
+      <DropdownMenuTrigger asChild>
+        <Button size="sm" variant="outline" className="h-8 gap-1 px-2.5 text-[11px]">
+          Browse
+          <ArrowDown01Icon size={11} strokeWidth={1.5} className="opacity-70" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[26rem] p-0">
+        <div className="border-b border-border/60 px-2.5 py-2">
+          <Input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.stopPropagation()}
+            placeholder="Fuzzy search: opus 4.8, gpt55, gemini flash…"
+            spellCheck={false}
+            className="h-7 font-mono text-[11px]"
+          />
+        </div>
+        <div className="max-h-72 overflow-y-auto py-1">
+          {state === "loading" && (
+            <div className="px-3 py-6 text-center text-[11px] text-muted-foreground">
+              Loading live catalog…
+            </div>
+          )}
+          {state === "error" && (
+            <div className="flex flex-col items-center gap-2 px-3 py-6 text-[11px] text-muted-foreground">
+              Couldn't reach OpenRouter.
+              <Button size="sm" variant="outline" className="h-6 px-2 text-[10.5px]" onClick={() => load(true)}>
+                Retry
+              </Button>
+            </div>
+          )}
+          {state === "idle" && models && hits.length === 0 && (
+            <div className="px-3 py-6 text-center text-[11px] text-muted-foreground">
+              No models match.
+            </div>
+          )}
+          {state === "idle" &&
+            hits.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  onPick(m.id);
+                  setOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-accent"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-mono text-[11px] text-foreground">
+                    {m.id}
+                  </span>
+                  <span className="block truncate text-[10px] text-muted-foreground">
+                    {m.name}
+                  </span>
+                </span>
+                {m.contextLength != null && (
+                  <span className="shrink-0 text-[9.5px] tabular-nums text-muted-foreground/70">
+                    {Math.round(m.contextLength / 1000)}k
+                  </span>
+                )}
+                {m.promptPrice && (
+                  <span className="shrink-0 rounded bg-muted/60 px-1 py-0.5 text-[9.5px] tabular-nums text-muted-foreground">
+                    {m.promptPrice}
+                  </span>
+                )}
+              </button>
+            ))}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -7,11 +7,14 @@ import "../styles/globals.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactDOM from "react-dom/client";
 import { ThemeProvider } from "@/modules/theme";
-import { USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
+import { IS_LINUX, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { SettingsApp } from "./SettingsApp";
 
 if (USE_CUSTOM_WINDOW_CONTROLS) {
   document.documentElement.dataset.chrome = "borderless";
+  // Mirrors src/main.tsx: only Linux windows are transparent; an opaque
+  // window needs the page painted or white shows behind the corner radius.
+  if (IS_LINUX) document.documentElement.dataset.transparent = "true";
 }
 
 ReactDOM.createRoot(

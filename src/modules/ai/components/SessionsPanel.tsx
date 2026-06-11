@@ -1,4 +1,4 @@
-import { Trash2 as Delete02Icon, Folder as FolderIcon, FolderOpen as FolderOpenIcon, MoreVertical as MoreVerticalIcon, Pencil as PencilEdit01Icon } from "lucide-react";
+import { ChevronRight as ChevronRightIcon, Trash2 as Delete02Icon, Folder as FolderIcon, FolderOpen as FolderOpenIcon, MoreVertical as MoreVerticalIcon, Pencil as PencilEdit01Icon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 
 
@@ -109,10 +109,10 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "group relative flex items-center gap-2 rounded-md px-2 py-1.5 text-[12px] transition-colors",
+        "group relative flex items-center gap-2 rounded-md px-2 py-1 text-[12px] transition-colors",
         isActive
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+          ? "bg-accent font-medium text-foreground"
+          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
     >
       {renaming ? (
@@ -220,31 +220,31 @@ function WorkspaceGroupSection({
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-1 px-2 py-1">
+      <div className="flex items-center gap-0.5 px-1.5 py-0.5">
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-1 py-1 text-left transition-colors hover:bg-accent/50"
           onClick={() => setCollapsed((v) => !v)}
         >
-          <span
+          <ChevronRightIcon
+            size={12}
+            strokeWidth={2}
             className={cn(
-              "shrink-0 text-[9px] text-muted-foreground/60 transition-transform",
-              collapsed ? "-rotate-90" : "rotate-0",
+              "shrink-0 text-muted-foreground/50 transition-transform",
+              !collapsed && "rotate-90",
             )}
-          >
-            ▾
-          </span>
+          />
           <FolderIcon
-            size={14}
+            size={13}
             strokeWidth={1.5}
-            className="shrink-0 text-muted-foreground/80"
+            className="shrink-0 text-muted-foreground/70"
           />
           <span
             className={cn(
-              "truncate text-[13px] font-medium",
+              "truncate text-[12px] font-medium",
               group.stale
                 ? "text-destructive/70"
-                : "text-muted-foreground/80",
+                : "text-muted-foreground/90",
             )}
             title={group.workspaceRoot ?? undefined}
           >
@@ -281,7 +281,7 @@ function WorkspaceGroupSection({
       </div>
 
       {!collapsed && (
-        <div className="flex flex-col px-1 pb-1">
+        <div className="mb-1 ml-[18px] mr-1.5 flex flex-col gap-px border-l border-border/50 pl-1.5">
           {group.sessions.map((s) => (
             <SessionRow
               key={s.id}
@@ -419,7 +419,7 @@ export function SessionsList({
         compact && "max-h-[min(70vh,620px)] w-[min(92vw,400px)] py-2",
       )}
     >
-      <div className="px-3 pb-2 pt-1 text-[13px] font-medium text-muted-foreground">
+      <div className="px-3 pb-1.5 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
         Projects
       </div>
       {groups.map((group) => (

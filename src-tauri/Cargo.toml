@@ -2,7 +2,7 @@
 name = "atlas"
 version = "0.7.3"
 description = "Atlas — an open-source AI-native terminal emulator"
-authors = ["terax"]
+authors = ["Atlas"]
 license = "Apache-2.0"
 edition = "2021"
 

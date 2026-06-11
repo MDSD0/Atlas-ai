@@ -280,7 +280,7 @@ function PlanModeStrip() {
   if (!active) return null;
   return (
     <div className="flex shrink-0 items-center gap-2 border-b border-border/40 bg-muted/40 px-3 py-1.5">
-      <span className="size-1.5 shrink-0 rounded-full bg-[#A5E605]" />
+      <span className="size-1.5 shrink-0 rounded-full bg-brand" />
       <span className="text-[11px] font-medium text-foreground">Plan mode</span>
       <span className="text-[11px] text-muted-foreground">
         {queueLen > 0 ? `· ${queueLen} queued` : "· no edits queued"}
@@ -563,11 +563,11 @@ function SessionNameLabel() {
 function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 py-10 text-center">
-      <img src="/logo-transparent.png" alt="Atlas" className="size-11 object-contain opacity-90" />
+      <img src="/logo-transparent.png" alt="Atlas" className="size-11 object-contain opacity-90" style={{ filter: "hue-rotate(70deg) saturate(1.2)" }} />
       <div className="space-y-1.5">
         <p className="text-[16px] font-semibold tracking-tight">
           Ask <span 
-            className="tracking-tighter text-[#A5E605] pr-1"
+            className="tracking-tighter text-brand pr-1"
             style={{ fontFamily: "'Good Times', sans-serif" }}
           >ATLAS</span> anything
         </p>
@@ -583,17 +583,17 @@ function EmptyState({ onPick }: { onPick: (text: string) => void }) {
             onClick={() => onPick(s.text)}
             className={cn(
               "group flex items-center gap-2.5 bg-card/70 rounded-lg px-2.5 py-2 border border-border text-left",
-              "transition-colors hover:border-[#A5E605]/40 hover:bg-[#A5E605]/10",
+              "transition-colors hover:border-brand/40 hover:bg-brand/10",
             )}
           >
-            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/70 text-muted-foreground transition-colors group-hover:bg-[#A5E605]/20 group-hover:text-[#A5E605]">
+            <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted/70 text-muted-foreground transition-colors group-hover:bg-brand/20 group-hover:text-brand">
               {s.icon && <s.icon size={13} strokeWidth={1.5} />
             }</div>
             <div className="min-w-0 flex-1">
-              <div className="text-[12px] font-medium text-foreground transition-colors group-hover:text-[#A5E605]">
+              <div className="text-[12px] font-medium text-foreground transition-colors group-hover:text-brand">
                 {s.label}
               </div>
-              <div className="text-[10.5px] text-muted-foreground transition-colors group-hover:text-[#A5E605]/70">
+              <div className="text-[10.5px] text-muted-foreground transition-colors group-hover:text-brand/70">
                 {s.hint}
               </div>
             </div>

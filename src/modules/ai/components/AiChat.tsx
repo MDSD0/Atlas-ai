@@ -239,7 +239,7 @@ export function AiChatView({
       : (
           <span>
             Ask <span 
-              className="tracking-tighter text-[#A5E605] pr-1"
+              className="tracking-tighter text-brand pr-1"
               style={{ fontFamily: "'Good Times', sans-serif" }}
             >ATLAS</span> anything
           </span>
@@ -257,7 +257,7 @@ export function AiChatView({
           <ConversationEmptyState
             title={title as any}
             description={description}
-            icon={<img src="/logo-transparent.png" alt="Atlas Logo" className="w-16 h-16 opacity-80" />}
+            icon={<img src="/logo-transparent.png" alt="Atlas Logo" className="w-16 h-16 opacity-80" style={{ filter: "hue-rotate(70deg) saturate(1.2)" }} />}
           />
         </ConversationContent>
       </Conversation>
@@ -331,7 +331,7 @@ const CompactionNotice = memo(function CompactionNotice({
 }) {
   return (
     <div className="flex items-center gap-2 rounded-md border border-border/40 bg-muted/30 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-      <span className="size-1.5 shrink-0 rounded-full bg-[#A5E605]/80" />
+      <span className="size-1.5 shrink-0 rounded-full bg-brand/80" />
       <span className="flex-1 truncate">
         Context compacted — {droppedCount} older tool result
         {droppedCount === 1 ? "" : "s"} elided to save tokens.
@@ -697,7 +697,7 @@ const RenderedTool = memo(function RenderedTool({
     // composer so it can't scroll out of reach; inline we only mark the spot.
     return (
       <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-        <span className="size-1.5 shrink-0 rounded-full bg-[#A5E605] animate-pulse" />
+        <span className="size-1.5 shrink-0 rounded-full bg-brand animate-pulse" />
         <span className="truncate">
           {toolName} is waiting for approval below
         </span>

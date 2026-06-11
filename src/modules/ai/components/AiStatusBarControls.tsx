@@ -1,4 +1,4 @@
-import { Plus as Add01Icon, Book as AiBookIcon, Apple as AppleIcon, ChevronDown as ArrowDown01Icon, ArrowUp as ArrowUpIcon, Brain as BrainIcon, Bot as ChatGptIcon, Bot as ClaudeIcon, Clock as Clock01Icon, Coins as CoinsDollarIcon, Computer as ComputerIcon, Cpu as CpuIcon, Bot as DeepseekIcon, Star as FavouriteIcon, Zap as FlashIcon, Globe as GlobeIcon, Bot as GoogleGeminiIcon, Bot as Grok02Icon, Bot as MistralIcon, MessageSquare as Message01Icon, Mic as Mic01Icon, Plug as PlugIcon, Server as ServerStack01Icon, Search as Search01Icon, Settings as Settings01Icon, Star as StarIcon, StopCircle as StopCircleIcon, Check as Tick01Icon } from "lucide-react";
+import { Plus as Add01Icon, Book as AiBookIcon, ChevronDown as ArrowDown01Icon, ArrowUp as ArrowUpIcon, Brain as BrainIcon, Clock as Clock01Icon, Coins as CoinsDollarIcon, Star as FavouriteIcon, Zap as FlashIcon, MessageSquare as Message01Icon, Mic as Mic01Icon, Search as Search01Icon, Settings as Settings01Icon, Star as StarIcon, StopCircle as StopCircleIcon, Check as Tick01Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -28,23 +28,15 @@ import {
 import { ACCEPTED_FILES, useComposer } from "../lib/composer";
 import { toggleFavoriteModel } from "../lib/modelPrefs";
 import { useChatStore } from "../store/chatStore";
+import { ProviderMark } from "@/components/ProviderMark";
+import {
+  fetchOpenRouterCatalog,
+  filterCatalog,
+  type CatalogModel,
+} from "../lib/openrouterCatalog";
+import { setOpenrouterModelId } from "@/modules/settings/store";
+import { useEffect } from "react";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-
-const PROVIDER_ICON = {
-  openai: ChatGptIcon,
-  anthropic: ClaudeIcon,
-  google: GoogleGeminiIcon,
-  xai: Grok02Icon,
-  cerebras: CpuIcon,
-  groq: FlashIcon,
-  deepseek: DeepseekIcon,
-  mistral: MistralIcon,
-  openrouter: GlobeIcon,
-  "openai-compatible": PlugIcon,
-  lmstudio: ComputerIcon,
-  mlx: AppleIcon,
-  ollama: ServerStack01Icon,
-} as const satisfies Record<ProviderId, typeof ChatGptIcon>;
 
 export function AiOpenButton({ onOpen }: { onOpen: () => void }) {
   return (
@@ -189,7 +181,42 @@ export function ModelDropdown() {
   const current = getModel(selected);
   const [search, setSearch] = useState("");
   const [activeProvider, setActiveProvider] = useState<ProviderId | null>(null);
-  const [tab, setTab] = useState<Tab>("all");
+  // "All" exists but never opens by default — start where the user's own
+  // choices live: favorites, else recents, else fall back to the catalog.
+  const [tab, setTab] = useState<Tab>(() =>
+    usePreferencesStore.getState().favoriteModelIds.length > 0
+      ? "favorites"
+      : usePreferencesStore.getState().recentModelIds.length > 0
+        ? "recent"
+        : "all",
+  );
+
+  // Live OpenRouter catalog: loaded when the OpenRouter rail pill is selected,
+  // searched by the same box. Picking a row binds the id and switches the
+  // session to it — new releases appear without an app update.
+  const [catalog, setCatalog] = useState<CatalogModel[] | null>(null);
+  const [catalogState, setCatalogState] = useState<"idle" | "loading" | "error">("idle");
+  useEffect(() => {
+    if (activeProvider !== "openrouter" || catalog !== null) return;
+    setCatalogState("loading");
+    fetchOpenRouterCatalog()
+      .then((m) => {
+        setCatalog(m);
+        setCatalogState("idle");
+      })
+      .catch(() => setCatalogState("error"));
+  }, [activeProvider, catalog]);
+  const catalogHits = useMemo(
+    () =>
+      activeProvider === "openrouter" && catalog
+        ? filterCatalog(catalog, search, 40)
+        : [],
+    [activeProvider, catalog, search],
+  );
+  const pickCatalogModel = (id: string) => {
+    void setOpenrouterModelId(id);
+    setSelected("openrouter-custom" as ModelId);
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const currentProviderHasKey = providerNeedsKey(current.provider)
     ? !!apiKeys[current.provider]
@@ -244,10 +271,10 @@ export function ModelDropdown() {
           variant="ghost"
           size="sm"
           className={cn(
-            "h-5.5 gap-1 rounded-md px-1.5 my-1 text-[11.5px] font-medium transition-colors hover:bg-[#A5E605]/15 hover:text-[#A5E605]",
+            "h-5.5 gap-1 rounded-md px-1.5 my-1 text-[11.5px] font-medium transition-colors hover:bg-brand/15 hover:text-brand",
             currentProviderHasKey
-              ? "text-[#A5E605]"
-              : "text-[#A5E605] opacity-70",
+              ? "text-brand"
+              : "text-brand opacity-70",
           )}
           title={
             currentProviderHasKey
@@ -316,16 +343,16 @@ export function ModelDropdown() {
           {/* Provider sidebar — configured first, unconfigured muted, no dividers. */}
           <div className="flex w-11 shrink-0 flex-col gap-0.5 overflow-y-auto border-r border-border/70 bg-muted/20 py-1.5">
             <ProviderPill
-              icon={AiBookIcon}
               title="All providers"
               active={activeProvider === null}
               onClick={() => setActiveProvider(null)}
-            />
+            >
+              <AiBookIcon size={16} strokeWidth={1.5} />
+            </ProviderPill>
             {[...sortedProviders.configured, ...sortedProviders.unconfigured].map(
               (p) => (
                 <ProviderPill
                   key={p.id}
-                  icon={PROVIDER_ICON[p.id]}
                   title={
                     hasKeyFor(p.id)
                       ? p.label
@@ -334,7 +361,9 @@ export function ModelDropdown() {
                   active={activeProvider === p.id}
                   muted={!hasKeyFor(p.id)}
                   onClick={() => setActiveProvider(p.id)}
-                />
+                >
+                  <ProviderMark providerId={p.id} />
+                </ProviderPill>
               ),
             )}
           </div>
@@ -374,6 +403,61 @@ export function ModelDropdown() {
                   onToggleFavorite={() => void toggleFavoriteModel(m.id)}
                 />
               ))
+            )}
+
+            {activeProvider === "openrouter" && (
+              <div className="mt-1 border-t border-border/60 pt-1">
+                <div className="px-3 pb-1 pt-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">
+                  Live catalog
+                </div>
+                {catalogState === "loading" && (
+                  <div className="px-3 py-3 text-[11px] text-muted-foreground">
+                    Loading…
+                  </div>
+                )}
+                {catalogState === "error" && (
+                  <button
+                    type="button"
+                    onClick={() => setCatalog(null)}
+                    className="px-3 py-3 text-left text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    Couldn't reach OpenRouter — tap to retry.
+                  </button>
+                )}
+                {catalogState === "idle" &&
+                  catalogHits.map((m) => (
+                    <DropdownMenuItem
+                      key={m.id}
+                      onSelect={() => {
+                        if (!hasKeyFor("openrouter")) {
+                          void openSettingsWindow("models");
+                          return;
+                        }
+                        pickCatalogModel(m.id);
+                      }}
+                      className="mx-1 my-0.5 flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-mono text-[11px] text-foreground">
+                          {m.id}
+                        </span>
+                        <span className="block truncate text-[10px] text-muted-foreground">
+                          {m.name}
+                        </span>
+                      </span>
+                      {m.contextLength != null && (
+                        <span className="shrink-0 text-[9.5px] tabular-nums text-muted-foreground/70">
+                          {Math.round(m.contextLength / 1000)}k
+                        </span>
+                      )}
+                      {m.promptPrice && (
+                        <span className="shrink-0 rounded bg-muted/60 px-1 py-0.5 text-[9.5px] tabular-nums text-muted-foreground">
+                          {m.promptPrice}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  ))}
+              </div>
             )}
           </div>
         </div>
@@ -418,17 +502,17 @@ function TabButton({
 }
 
 function ProviderPill({
-  icon,
   title,
   active,
   muted,
   onClick,
+  children,
 }: {
-  icon: typeof AiBookIcon;
   title: string;
   active: boolean;
   muted?: boolean;
   onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
@@ -440,11 +524,11 @@ function ProviderPill({
         active
           ? "bg-accent text-foreground after:absolute after:right-0 after:top-1.5 after:bottom-1.5 after:w-[2px] after:rounded-full after:bg-primary after:content-['']"
           : muted
-            ? "text-muted-foreground/50 hover:bg-accent/40 hover:text-foreground"
+            ? "text-muted-foreground/50 opacity-60 hover:bg-accent/40 hover:opacity-100 hover:text-foreground"
             : "text-muted-foreground hover:bg-accent/40 hover:text-foreground",
       )}
     >
-      {(() => { const I = icon; return I ? <I size={16} strokeWidth={1.5} /> : null; })()}
+      {children}
     </button>
   );
 }
@@ -454,7 +538,7 @@ function ProviderHeader({ providerId }: { providerId: ProviderId }) {
   if (!p) return null;
   return (
     <div className="flex items-center gap-1.5 px-3 pt-1 pb-1.5 text-[11px] font-medium tracking-tight text-muted-foreground/90">
-      <></>
+      <ProviderMark providerId={p.id} size={14} />
       <span>{p.label}</span>
     </div>
   );
@@ -520,19 +604,19 @@ function ModelRow({
         className={cn(
           "shrink-0 rounded p-0.5 transition-colors",
           favorite
-            ? "text-[#A5E605]"
-            : "text-muted-foreground/40 hover:text-[#A5E605]",
+            ? "text-brand"
+            : "text-muted-foreground/40 hover:text-brand",
         )}
       >
         <StarIcon
           size={12}
           strokeWidth={favorite ? 2 : 1.75}
-          className={favorite ? "fill-[#A5E605]" : ""}
+          className={favorite ? "fill-brand" : ""}
         />
       </button>
 
       {showProviderIcon ? (
-        <></>
+        <ProviderMark providerId={model.provider} size={14} />
       ) : null}
 
       <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
@@ -544,7 +628,12 @@ function ModelRow({
         </span>
       </div>
 
-      <CapabilityBars caps={model.capabilities} />
+      {/* Meters carry detail, not identity — show them on demand, not as
+          permanent per-row noise. */}
+      <CapabilityBars
+        caps={model.capabilities}
+        className={cn("hidden group-hover:flex", selected && "flex")}
+      />
 
       {selected ? (
         <Tick01Icon
@@ -557,9 +646,15 @@ function ModelRow({
   );
 }
 
-function CapabilityBars({ caps }: { caps: ModelCapabilities }) {
+function CapabilityBars({
+  caps,
+  className,
+}: {
+  caps: ModelCapabilities;
+  className?: string;
+}) {
   return (
-    <div className="ml-auto flex items-center gap-1.5">
+    <div className={cn("ml-auto flex items-center gap-1.5", className)}>
       <CapBar icon={BrainIcon} value={caps.intelligence} label="Intelligence" />
       <CapBar icon={FlashIcon} value={caps.speed} label="Speed" />
       <CapBar

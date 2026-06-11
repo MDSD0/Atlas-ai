@@ -115,14 +115,24 @@ export function CodeRealityPanel({
     );
   }
 
+  const statusChips = [...lspChips(lsp), ...memoryChips(memory)];
+
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border/60 px-3">
-        <span className="flex-1 truncate text-xs font-medium text-foreground/80">
+      {/* Header */}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border/60 px-3">
+        <span className="flex-1 text-[11px] font-semibold text-foreground/90 tracking-wide">
           Code Reality
         </span>
         {snapshot && (
-          <span className="text-[10px] tabular-nums text-muted-foreground">
+          <span
+            className={cn(
+              "rounded border px-1.5 py-0.5 text-[10px] tabular-nums",
+              status === "loading"
+                ? "border-border/40 bg-muted/40 text-muted-foreground/60"
+                : "border-border/40 bg-muted/30 text-muted-foreground",
+            )}
+          >
             {freshnessLabel(snapshot)}
           </span>
         )}
@@ -140,9 +150,10 @@ export function CodeRealityPanel({
         </button>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+      {/* Body */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
         {status === "unavailable" && (
-          <div className="rounded-md bg-destructive/10 px-2 py-1.5 text-[11px] text-destructive">
+          <div className="rounded-md bg-destructive/10 px-2.5 py-2 text-[11px] text-destructive">
             {error ?? "Repository projection unavailable."}
           </div>
         )}
@@ -164,16 +175,18 @@ export function CodeRealityPanel({
 
             {snapshot.degraded_files.length > 0 && (
               <div className="mt-3">
-                <div className="mb-1 flex items-center gap-1.5 text-[10px] font-medium text-amber-500">
-                  <DegradedIcon size={11} strokeWidth={1.5} />
-                  Degraded parses ({snapshot.degraded_files.length})
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <DegradedIcon size={11} strokeWidth={1.5} className="text-amber-500" />
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-amber-500">
+                    Degraded ({snapshot.degraded_files.length})
+                  </span>
                 </div>
-                <ul className="flex flex-col gap-0.5">
+                <ul className="flex flex-col gap-0.5 rounded-md border border-amber-500/20 bg-amber-500/5 px-2 py-1.5">
                   {snapshot.degraded_files.slice(0, 20).map((f) => (
                     <li
                       key={f.path}
                       title={`${f.path} — ${f.status}`}
-                      className="truncate px-1 text-[10px] text-muted-foreground"
+                      className="truncate text-[10px] text-muted-foreground"
                     >
                       {f.path}
                     </li>
@@ -182,26 +195,31 @@ export function CodeRealityPanel({
               </div>
             )}
 
-            <div className="mt-3 text-[10px] text-muted-foreground/70">
-              watch: {snapshot.watch_status}
-              {snapshot.truncated && " · projection truncated to budget"}
-              {snapshot.parse_failures > 0 &&
-                ` · ${snapshot.parse_failures} parse failures`}
-            </div>
+            {(snapshot.watch_status !== "watching" ||
+              snapshot.truncated ||
+              snapshot.parse_failures > 0) && (
+              <div className="mt-3 flex flex-wrap gap-x-2 text-[10px] text-muted-foreground/60">
+                {snapshot.watch_status !== "watching" && (
+                  <span>watch: {snapshot.watch_status}</span>
+                )}
+                {snapshot.truncated && <span>projection truncated</span>}
+                {snapshot.parse_failures > 0 && (
+                  <span>{snapshot.parse_failures} parse failures</span>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>
 
-      <div className="shrink-0 border-t border-border/60 px-3 py-2">
-        <div className="mb-1.5 text-[10px] text-muted-foreground/70">
-          indexes ts · tsx · js · py · rust · diagnostics are separate (below)
-        </div>
-        <div className="flex flex-wrap gap-1">
-          {[...lspChips(lsp), ...memoryChips(memory)].map((chip) => (
+      {/* Footer: one quiet status row (chips appear only for problems) */}
+      {statusChips.length > 0 && (
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-t border-border/60 px-3 py-1.5">
+          {statusChips.map((chip) => (
             <span
               key={chip.label}
               className={cn(
-                "rounded border px-1.5 py-0.5 text-[10px] font-medium",
+                "rounded-md border px-1.5 py-0.5 text-[10px] font-medium",
                 CHIP_TONE[chip.tone],
               )}
             >
@@ -209,7 +227,7 @@ export function CodeRealityPanel({
             </span>
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -11,6 +11,10 @@
 @theme inline {
     --font-heading: var(--font-sans);
     --font-sans: 'Roboto', sans-serif;
+    /* Brand accent — THE single place to change Atlas's identity color.
+     * Use `brand` utilities (text-brand, bg-brand/10, border-brand/30);
+     * never hardcode the hex in components. */
+    --color-brand: var(--brand);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -52,72 +56,74 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.148 0.004 228.8);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.148 0.004 228.8);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.148 0.004 228.8);
-    --primary: oklch(0.218 0.008 223.9);
-    --primary-foreground: oklch(0.987 0.002 197.1);
-    --secondary: oklch(0.963 0.002 197.1);
-    --secondary-foreground: oklch(0.218 0.008 223.9);
-    --muted: oklch(0.963 0.002 197.1);
-    --muted-foreground: oklch(0.56 0.021 213.5);
-    --accent: oklch(0.963 0.002 197.1);
-    --accent-foreground: oklch(0.218 0.008 223.9);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.925 0.005 214.3);
-    --input: oklch(0.925 0.005 214.3);
-    --ring: oklch(0.723 0.014 214.4);
-    --chart-1: oklch(0.872 0.007 219.6);
-    --chart-2: oklch(0.56 0.021 213.5);
-    --chart-3: oklch(0.45 0.017 213.2);
-    --chart-4: oklch(0.378 0.015 216);
-    --chart-5: oklch(0.275 0.011 216.9);
+    --brand: #06B6D4; /* Electric Cyan / Scientific Teal */
+    --background: #ffffff;
+    --foreground: #18181b;
+    --card: #ffffff;
+    --card-foreground: #18181b;
+    --popover: #f4f4f5;
+    --popover-foreground: #18181b;
+    --primary: var(--brand);
+    --primary-foreground: #ffffff;
+    --secondary: #f4f4f5;
+    --secondary-foreground: #18181b;
+    --muted: #e4e4e7;
+    --muted-foreground: #71717a;
+    --accent: #f4f4f5;
+    --accent-foreground: #18181b;
+    --destructive: #ef4444;
+    --border: #e4e4e7;
+    --input: #e4e4e7;
+    --ring: var(--brand);
+    --chart-1: #06b6d4;
+    --chart-2: #0ea5e9;
+    --chart-3: #14b8a6;
+    --chart-4: #3b82f6;
+    --chart-5: #10b981;
     --radius: 0.625rem;
-    --sidebar: oklch(0.987 0.002 197.1);
-    --sidebar-foreground: oklch(0.148 0.004 228.8);
-    --sidebar-primary: oklch(0.218 0.008 223.9);
-    --sidebar-primary-foreground: oklch(0.987 0.002 197.1);
-    --sidebar-accent: oklch(0.963 0.002 197.1);
-    --sidebar-accent-foreground: oklch(0.218 0.008 223.9);
-    --sidebar-border: oklch(0.925 0.005 214.3);
-    --sidebar-ring: oklch(0.723 0.014 214.4);
+    --sidebar: #f4f4f5;
+    --sidebar-foreground: #18181b;
+    --sidebar-primary: var(--brand);
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #e4e4e7;
+    --sidebar-accent-foreground: #18181b;
+    --sidebar-border: #e4e4e7;
+    --sidebar-ring: var(--brand);
 }
 
 .dark {
-    --background: #000000;
-    --foreground: #FFFFFF;
-    --card: #121212;
-    --card-foreground: #FFFFFF;
-    --popover: #121212;
-    --popover-foreground: #FFFFFF;
-    --primary: #A5E605;
-    --primary-foreground: #000000;
-    --secondary: #232E16;
-    --secondary-foreground: #FFFFFF;
-    --muted: #121212;
-    --muted-foreground: #A3A3A3;
-    --accent: #232E16;
-    --accent-foreground: #FFFFFF;
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: #232E16;
-    --input: #232E16;
-    --ring: #A5E605;
-    --chart-1: oklch(0.872 0.007 219.6);
-    --chart-2: oklch(0.56 0.021 213.5);
-    --chart-3: oklch(0.45 0.017 213.2);
-    --chart-4: oklch(0.378 0.015 216);
-    --chart-5: oklch(0.275 0.011 216.9);
-    --sidebar: #121212;
-    --sidebar-foreground: #FFFFFF;
-    --sidebar-primary: #A5E605;
-    --sidebar-primary-foreground: #000000;
-    --sidebar-accent: #232E16;
-    --sidebar-accent-foreground: #FFFFFF;
-    --sidebar-border: #232E16;
-    --sidebar-ring: #A5E605;
+    /* Layered cool-graphite surfaces for an elegant, professional coding harness. */
+    --background: #0d0d0d;
+    --foreground: #ffffff;
+    --card: #151515;
+    --card-foreground: #ffffff;
+    --popover: #1a1a1a;
+    --popover-foreground: #ffffff;
+    --primary: var(--brand);
+    --primary-foreground: #ffffff;
+    --secondary: #1a1a1a;
+    --secondary-foreground: #ffffff;
+    --muted: #1f1f1f;
+    --muted-foreground: #a1a1aa;
+    --accent: #27272a;
+    --accent-foreground: #ffffff;
+    --destructive: #ef4444;
+    --border: #27272a;
+    --input: #27272a;
+    --ring: var(--brand);
+    --chart-1: #06b6d4;
+    --chart-2: #0ea5e9;
+    --chart-3: #14b8a6;
+    --chart-4: #3b82f6;
+    --chart-5: #10b981;
+    --sidebar: #0d0d0d;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: var(--brand);
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #1a1a1a;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #27272a;
+    --sidebar-ring: var(--brand);
 }
 
 @utility glass-panel {
@@ -186,9 +192,17 @@ html[data-chrome="borderless"] .atlas-bg-surface {
 /* Custom window chrome (Linux/Windows): the OS gives us a transparent
  * borderless window, and we paint the rounded corners + border + shadow
  * ourselves so the app doesn't look naked on GNOME/KDE/Hyprland. */
-html[data-chrome="borderless"],
-html[data-chrome="borderless"] body {
+/* Truly transparent windows (Linux) let the compositor show through the
+ * painted radius. Opaque windows (Windows) must fill the page with the app
+ * background instead — a transparent body there exposes the webview's
+ * default white as rectangular notches behind the rounded corners. */
+html[data-chrome="borderless"][data-transparent="true"],
+html[data-chrome="borderless"][data-transparent="true"] body {
   background: transparent !important;
+}
+html[data-chrome="borderless"]:not([data-transparent="true"]),
+html[data-chrome="borderless"]:not([data-transparent="true"]) body {
+  background: var(--background) !important;
 }
 html[data-chrome="borderless"] #root,
 html[data-chrome="borderless"] #settings-root {

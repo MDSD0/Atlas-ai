@@ -16,43 +16,55 @@ function provider(patch: Partial<LspProviderInfo> = {}): LspProviderInfo {
   };
 }
 
-describe("lspChips", () => {
+describe("lspChips (healthy is silent)", () => {
   it("reads 'none' when no provider is discovered", () => {
-    expect(lspChips(null)).toEqual([{ label: "diag: none", tone: "muted" }]);
-    expect(lspChips([])).toEqual([{ label: "diag: none", tone: "muted" }]);
-  });
-
-  it("marks a live provider on only when diagnostics are actually delivered", () => {
-    expect(lspChips([provider({ status: "available" })])).toEqual([
-      { label: "diag typescript: on", tone: "ok" },
+    expect(lspChips(null)).toEqual([
+      { label: "diagnostics: none", tone: "muted" },
     ]);
-    expect(lspChips([provider({ status: "connected" })])).toEqual([
-      { label: "diag typescript: on", tone: "ok" },
+    expect(lspChips([])).toEqual([
+      { label: "diagnostics: none", tone: "muted" },
     ]);
   });
 
-  it("reads 'detected' for an installed server whose diagnostics are deferred", () => {
-    // A custom registered server can still be detected while diagnostics are disabled.
-    expect(
-      lspChips([
-        provider({
-          language: "rust",
-          status: "available",
-          diagnostics_enabled: false,
-        }),
-      ])[0],
-    ).toMatchObject({ label: "diag rust: detected", tone: "muted" });
+  it("collapses healthy providers into a single summary chip", () => {
+    const chips = lspChips([
+      provider({ language: "typescript", status: "available" }),
+      provider({ language: "python", status: "connected" }),
+      provider({ language: "rust", status: "available" }),
+    ]);
+    expect(chips).toEqual([{ label: "diagnostics: 3 ready", tone: "ok" }]);
   });
 
-  it("never claims on for missing or broken servers", () => {
-    expect(lspChips([provider({ status: "unavailable" })])[0]).toMatchObject({
-      label: "diag typescript: off",
-      tone: "muted",
-    });
-    expect(lspChips([provider({ status: "broken" })])[0]).toMatchObject({
-      label: "diag typescript: broken",
-      tone: "warn",
-    });
+  it("counts only providers that actually deliver diagnostics", () => {
+    // Detected-but-deferred and not-installed are normal states: no chip,
+    // and they must not inflate the ready count.
+    const chips = lspChips([
+      provider({ language: "typescript", status: "available" }),
+      provider({
+        language: "rust",
+        status: "available",
+        diagnostics_enabled: false,
+      }),
+      provider({ language: "java", status: "unavailable" }),
+    ]);
+    expect(chips).toEqual([{ label: "diagnostics: 1 ready", tone: "ok" }]);
+  });
+
+  it("spends individual chips only on broken servers", () => {
+    const chips = lspChips([
+      provider({ language: "typescript", status: "available" }),
+      provider({ language: "python", status: "broken" }),
+    ]);
+    expect(chips).toEqual([
+      { label: "diagnostics: 1 ready", tone: "ok" },
+      { label: "python: broken", tone: "warn" },
+    ]);
+  });
+
+  it("reads 'none active' when servers exist but none deliver", () => {
+    expect(lspChips([provider({ status: "unavailable" })])).toEqual([
+      { label: "diagnostics: none active", tone: "muted" },
+    ]);
   });
 });
 
@@ -60,9 +72,9 @@ function memory(sm: MemoryStatus["simplemem"]): MemoryStatus {
   return { primary: "local_records", simplemem: sm };
 }
 
-describe("memoryChips", () => {
-  it("always shows local memory as active", () => {
-    expect(memoryChips(null)).toEqual([{ label: "Memory: local", tone: "ok" }]);
+describe("memoryChips (default earns no chip)", () => {
+  it("shows nothing for the always-on local default", () => {
+    expect(memoryChips(null)).toEqual([]);
   });
 
   it("shows SimpleMem on only when its health probe passed", () => {
@@ -76,7 +88,7 @@ describe("memoryChips", () => {
         detail: "ok",
       }),
     );
-    expect(chips).toContainEqual({ label: "SimpleMem: on", tone: "ok" });
+    expect(chips).toEqual([{ label: "SimpleMem: on", tone: "ok" }]);
   });
 
   it("hides SimpleMem entirely when disabled (opt-in, not started)", () => {
@@ -88,7 +100,7 @@ describe("memoryChips", () => {
         detail: "disabled",
       }),
     );
-    expect(chips).toEqual([{ label: "Memory: local", tone: "ok" }]);
+    expect(chips).toEqual([]);
   });
 
   it("warns when an enabled SimpleMem sidecar is unreachable", () => {
@@ -102,6 +114,6 @@ describe("memoryChips", () => {
         detail: "timeout",
       }),
     );
-    expect(chips).toContainEqual({ label: "SimpleMem: off", tone: "warn" });
+    expect(chips).toEqual([{ label: "SimpleMem: off", tone: "warn" }]);
   });
 });

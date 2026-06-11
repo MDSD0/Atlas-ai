@@ -23,36 +23,46 @@ function lspState(p: LspProviderInfo): { suffix: string; tone: StatusChip["tone"
 }
 
 /**
- * One chip per language server. These describe semantic DIAGNOSTICS, not
- * indexing — the repo map indexes TS/JS/TSX/Python/Rust regardless. A provider
- * reads "on" only when it is live AND Atlas actually delivers its diagnostics;
- * an installed-but-deferred server reads "detected", a missing one "off", never
- * a semantic guarantee. The "diag:" prefix keeps it distinct from indexing.
+ * Healthy is silent. Nine "diag X: on" chips carry zero information — the
+ * footer summarizes working diagnostics in ONE chip and spends individual
+ * chips only on actual problems (broken servers). Installed-but-deferred and
+ * not-installed servers are normal states and stay out of the footer; the
+ * Ext tab keeps the full per-provider table. Still honest by construction:
+ * "ready" counts only providers that are live AND deliver diagnostics.
  */
 export function lspChips(providers: LspProviderInfo[] | null): StatusChip[] {
   if (!providers || providers.length === 0) {
-    return [{ label: "diag: none", tone: "muted" }];
+    return [{ label: "diagnostics: none", tone: "muted" }];
   }
-  return providers.map((p) => {
-    const { suffix, tone } = lspState(p);
-    return { label: `diag ${p.language}: ${suffix}`, tone };
-  });
+  const states = providers.map(lspState);
+  const ready = states.filter((s) => s.suffix === "on").length;
+  const chips: StatusChip[] = [
+    ready > 0
+      ? { label: `diagnostics: ${ready} ready`, tone: "ok" }
+      : { label: "diagnostics: none active", tone: "muted" },
+  ];
+  for (let i = 0; i < providers.length; i++) {
+    if (states[i].suffix === "broken") {
+      chips.push({ label: `${providers[i].language}: broken`, tone: "warn" });
+    }
+  }
+  return chips;
 }
 
 /**
- * Memory chips: LocalRecords is always the active default; SimpleMem reads as
- * on only when its optional sidecar health probe passed.
+ * Memory chips: LocalRecords is the always-on default, so it earns no chip —
+ * only deviations surface (SimpleMem healthy, or enabled-but-unreachable).
  */
 export function memoryChips(memory: MemoryStatus | null): StatusChip[] {
-  if (!memory) return [{ label: "Memory: local", tone: "ok" }];
-  const chips: StatusChip[] = [{ label: "Memory: local", tone: "ok" }];
+  if (!memory) return [];
   const sm = memory.simplemem;
   if (sm.status === "available") {
-    chips.push({ label: "SimpleMem: on", tone: "ok" });
-  } else if (sm.status === "unavailable") {
-    chips.push({ label: "SimpleMem: off", tone: "warn" });
+    return [{ label: "SimpleMem: on", tone: "ok" }];
+  }
+  if (sm.status === "unavailable") {
+    return [{ label: "SimpleMem: off", tone: "warn" }];
   }
   // "disabled" (opt-in, not started) shows nothing — no noise for a feature
   // the user hasn't enabled.
-  return chips;
+  return [];
 }

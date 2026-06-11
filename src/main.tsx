@@ -14,10 +14,15 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import ReactDOM from "react-dom/client";
 import App from "./app/App";
 import { initLaunchDir } from "./lib/launchDir";
-import { USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
+import { IS_LINUX, USE_CUSTOM_WINDOW_CONTROLS } from "./lib/platform";
 
 if (USE_CUSTOM_WINDOW_CONTROLS) {
   document.documentElement.dataset.chrome = "borderless";
+  // Only Linux windows are created transparent. On an opaque window (Windows)
+  // a transparent body exposes the webview's default WHITE behind our painted
+  // corner radius — the white notch bug. Mark transparency explicitly so the
+  // CSS can fill the page with the app background everywhere else.
+  if (IS_LINUX) document.documentElement.dataset.transparent = "true";
 
   // A maximized/fullscreen window must be square — the OS doesn't round
   // edges there, so our painted radius leaves dark notches in the corners.

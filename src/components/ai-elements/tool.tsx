@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { useChatStore } from "@/modules/ai/store/chatStore";
+import { fileIconUrl, folderIconUrl } from "@/modules/explorer/lib/iconResolver";
 
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import type { ComponentProps, ReactNode } from "react";
@@ -36,6 +37,20 @@ const TOOL_META: Record<string, { label: string; icon: typeof File01Icon }> = {
   run_subagent: { label: "Subagent", icon: RobotIcon },
   todo_write: { label: "Todos", icon: CheckListIcon },
 };
+
+// Tools whose summary is a file path — the header shows the file type's
+// canon-colored icon (python file -> python icon) instead of a generic glyph.
+const FILE_PATH_TOOLS = new Set([
+  "read_file",
+  "write_file",
+  "edit",
+  "multi_edit",
+]);
+
+function pathBasename(p: string): string {
+  const parts = p.split(/[\\/]/).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : p;
+}
 
 const STATUS_DOT: Record<ToolPart["state"], string> = {
   "approval-requested": "bg-amber-500",
@@ -162,11 +177,19 @@ const ToolImpl = ({
           className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[state])}
           aria-label={STATUS_LABEL[state]}
         />
-        <Icon
-          size={13}
-          strokeWidth={1.5}
-          className="shrink-0 text-muted-foreground"
-        />
+        {FILE_PATH_TOOLS.has(toolName) && summary ? (
+          <img
+            src={fileIconUrl(pathBasename(summary))}
+            alt=""
+            className="size-[14px] shrink-0"
+          />
+        ) : (
+          <Icon
+            size={13}
+            strokeWidth={1.5}
+            className="shrink-0 text-muted-foreground"
+          />
+        )}
         <span className="shrink-0 font-medium text-foreground">{label}</span>
         {summary ? (
           <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
@@ -388,10 +411,10 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
             key={`d-${e.name}`}
             className="flex items-center gap-1.5 truncate"
           >
-            <FolderOpenIcon
-              size={11}
-              strokeWidth={1.5}
-              className="shrink-0 text-muted-foreground"
+            <img
+              src={folderIconUrl(e.name, false)}
+              alt=""
+              className="size-3 shrink-0"
             />
             <span className="truncate text-foreground">{e.name}/</span>
           </div>
@@ -401,10 +424,10 @@ function renderToolOutput(toolName: string, output: unknown): ReactNode | null {
             key={`f-${e.name}`}
             className="flex items-center gap-1.5 truncate"
           >
-            <File01Icon
-              size={11}
-              strokeWidth={1.5}
-              className="shrink-0 text-muted-foreground"
+            <img
+              src={fileIconUrl(e.name)}
+              alt=""
+              className="size-3 shrink-0"
             />
             <span className="truncate text-muted-foreground">{e.name}</span>
           </div>

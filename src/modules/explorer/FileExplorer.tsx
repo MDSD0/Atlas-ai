@@ -279,7 +279,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             <Button
               variant="default"
               size="sm"
-              className="w-full text-[11px] font-medium bg-[#A5E605]/10 text-[#A5E605] hover:bg-[#A5E605]/20 border border-[#A5E605]/30 shadow-none"
+              className="w-full text-[11px] font-medium bg-brand/10 text-brand hover:bg-brand/20 border border-brand/30 shadow-none"
               onClick={openFolder}
             >
               Open project…
@@ -287,7 +287,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
             <Button
               variant="outline"
               size="sm"
-              className="w-full text-[11px] font-medium border-border/60 hover:text-[#A5E605] hover:border-[#A5E605]/40 hover:bg-[#A5E605]/5 transition-colors"
+              className="w-full text-[11px] font-medium border-border/60 hover:text-brand hover:border-brand/40 hover:bg-brand/5 transition-colors"
               onClick={() => startUnboundSession()}
             >
               Don&apos;t work in a project

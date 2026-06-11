@@ -302,7 +302,7 @@ async function runRealDesktopUiPhase() {
   const probeFile = join(projectDir, "atlas_gui_probe.txt");
   const appDataRoaming = process.env.APPDATA ?? join(outDir, "appdata", "Roaming");
   const appDataLocal = process.env.LOCALAPPDATA ?? join(outDir, "appdata", "Local");
-  const atlasDataDir = join(appDataRoaming, "app.terax.atlas");
+  const atlasDataDir = join(appDataRoaming, "app.atlas");
   const appDataBackupDir = join(outDir, "appdata-backup");
   const proofStorePath = join(atlasDataDir, "atlas-ai-proof-receipts.json");
   const traceStorePath = join(atlasDataDir, "atlas-ai-session-traces.json");
