@@ -163,7 +163,9 @@ export function buildFsTools(ctx: ToolContext) {
         path: z.string(),
         content: z.string(),
       }),
-      needsApproval: () => editNeedsApproval(ctx.getApprovalMode()),
+      needsApproval: () =>
+        !usePlanStore.getState().isActive(ctx.getSessionId()) &&
+        editNeedsApproval(ctx.getApprovalMode()),
       execute: async ({ path, content }) => {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);
@@ -233,7 +235,9 @@ export function buildFsTools(ctx: ToolContext) {
       inputSchema: z.object({
         path: z.string(),
       }),
-      needsApproval: () => editNeedsApproval(ctx.getApprovalMode()),
+      needsApproval: () =>
+        !usePlanStore.getState().isActive(ctx.getSessionId()) &&
+        editNeedsApproval(ctx.getApprovalMode()),
       execute: async ({ path }) => {
         const project = ctx.getProjectContext();
         const blocked = checkMutationAllowed(project);

@@ -26,6 +26,28 @@ export function verificationRecovery(
   );
 }
 
+export function commandFailureRecovery(
+  command: string,
+  exitCode: number | null,
+  stderr: string,
+): string | null {
+  if (exitCode === null || exitCode === 0) return null;
+  const verification = verificationRecovery(command, exitCode);
+  if (verification) return verification;
+  if (/The token '&&' is not a valid statement separator/i.test(stderr)) {
+    return (
+      "COMMAND FAILED - this shell rejected '&&'. Run the failed steps again " +
+      "using separate bash_run calls or a shell-appropriate separator, then " +
+      "continue only after the required install/build step exits 0."
+    );
+  }
+  return (
+    `COMMAND FAILED - exit ${exitCode}. Do not treat this step as complete. ` +
+    "Read stdout/stderr, fix the root cause or rerun with the correct command, " +
+    "and do not start a preview or claim success until the prerequisite command exits 0."
+  );
+}
+
 /**
  * Interactive programs that read stdin (e.g. a Python `input()` REPL) always
  * die with EOF under the agent shell — there is no stdin to give them. That

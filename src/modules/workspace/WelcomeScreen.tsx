@@ -11,6 +11,7 @@ import { useCallback, useEffect, useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { openProjectFromDialog, openProjectFromPath } from "./projectFlow";
 import { PendingApprovals } from "@/modules/ai/components/PendingApprovals";
+import { PlanReviewDock } from "@/modules/ai/components/PlanReviewDock";
 import {
   useWorkspaceStore,
   workspaceBindingErrorMessage,
@@ -246,6 +247,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
       </div>
       
       <div className="mx-auto w-full max-w-4xl shrink-0 px-4">
+        <PlanReviewDock sessionId={sessionId} messages={helpers.messages} />
         <PendingApprovals
           messages={helpers.messages}
           onRespond={(id, approved) =>

@@ -34,6 +34,7 @@ import { TodoStrip } from "./TodoStrip";
 import { ReceiptStrip } from "./ReceiptStrip";
 import { AiInput } from "./AiInputBar";
 import { PendingApprovals } from "./PendingApprovals";
+import { PlanReviewDock } from "./PlanReviewDock";
 
 const SUGGESTIONS = [
   {
@@ -260,6 +261,7 @@ function Body({
 
       <TodoStrip sessionId={sessionId} />
       <ReceiptStrip sessionId={sessionId} />
+      <PlanReviewDock sessionId={sessionId} messages={helpers.messages} />
       <PendingApprovals
         messages={helpers.messages}
         onRespond={(id, approved) =>

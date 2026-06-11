@@ -177,4 +177,31 @@ describe("serve_preview run resources", () => {
     expect(native.shellBgSpawn).not.toHaveBeenCalled();
     expect(killedHandles).toEqual([]);
   });
+
+  it("does not open preview when the server exits during startup", async () => {
+    vi.spyOn(native, "shellBgList").mockResolvedValue([]);
+    vi.spyOn(native, "shellBgSpawn").mockResolvedValue(51);
+    vi.spyOn(native, "shellBgLogs").mockResolvedValue({
+      bytes: "Error: Cannot find module 'ws'",
+      next_offset: 30,
+      dropped: 0,
+      exited: true,
+      exit_code: 1,
+    });
+    const context = ctx();
+    const result = await buildShellTools(context).serve_preview.execute?.(
+      {
+        command: "node server.js",
+        url: "http://localhost:3000",
+        wait_ms: 0,
+      },
+      { abortSignal: new AbortController().signal, toolCallId: "tc-1", messages: [] },
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining("preview server exited"),
+      logs: { exit_code: 1, exited: true },
+    });
+  });
 });

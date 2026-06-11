@@ -5,7 +5,7 @@ import { checkShellCommand } from "../lib/security";
 import { shellNeedsApproval } from "../lib/permissions";
 import { redactSensitive } from "../lib/redact";
 import { registerRunBackgroundHandle } from "../lib/runResources";
-import { interactiveEofHint, verificationRecovery } from "../lib/verificationLoop";
+import { commandFailureRecovery, interactiveEofHint, verificationRecovery } from "../lib/verificationLoop";
 import { resolvePath, type ToolContext } from "./context";
 import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace/env";
 
@@ -176,7 +176,12 @@ export function buildShellTools(ctx: ToolContext) {
             cwd,
             timeout_secs,
           );
-          const recovery = verificationRecovery(command, r.exit_code);
+          const verification = verificationRecovery(command, r.exit_code);
+          const recovery = commandFailureRecovery(
+            command,
+            r.exit_code,
+            r.stderr,
+          );
           const eofHint = interactiveEofHint(r.exit_code, r.stderr);
           return {
             command,
@@ -188,7 +193,9 @@ export function buildShellTools(ctx: ToolContext) {
             cwd,
             cwd_after: r.cwd_after,
             duration_ms: Date.now() - startedAt,
-            ...(recovery ? { verification_failed: true, recovery } : {}),
+            ...(r.exit_code !== 0 ? { command_failed: true } : {}),
+            ...(verification ? { verification_failed: true } : {}),
+            ...(recovery ? { recovery } : {}),
             ...(eofHint ? { interactive_stdin_note: eofHint } : {}),
           };
         } catch (e) {
@@ -250,6 +257,34 @@ export function buildShellTools(ctx: ToolContext) {
             await new Promise((resolve) => setTimeout(resolve, wait));
           }
           const logs = await native.shellBgLogs(handle, 0).catch(() => null);
+          const exitedBadly =
+            !!logs?.exited &&
+            typeof logs.exit_code === "number" &&
+            logs.exit_code !== 0;
+          if (exitedBadly) {
+            return {
+              ok: false,
+              reused: !!existing,
+              handle,
+              command,
+              cwd: effectiveCwd,
+              url: previewUrl,
+              logs: {
+                bytes: redactShellOutput(logs.bytes.slice(-4000)),
+                exited: logs.exited,
+                exit_code: logs.exit_code,
+                dropped: logs.dropped,
+                next_offset: logs.next_offset,
+              },
+              error:
+                "preview server exited before it became usable; fix the logged error before opening preview",
+              recovery: commandFailureRecovery(
+                command,
+                logs.exit_code,
+                logs.bytes,
+              ),
+            };
+          }
           const opened = ctx.openPreview(previewUrl);
           return {
             ok: opened,

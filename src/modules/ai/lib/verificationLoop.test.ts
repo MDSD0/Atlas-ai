@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { interactiveEofHint, verificationRecovery } from "./verificationLoop";
+import {
+  commandFailureRecovery,
+  interactiveEofHint,
+  verificationRecovery,
+} from "./verificationLoop";
 
 describe("verificationRecovery (diff-as-feedback loop)", () => {
   it("emits a directive when a recognized check fails", () => {
@@ -32,6 +36,24 @@ describe("verificationRecovery (diff-as-feedback loop)", () => {
 
   it("ignores unknown/null exit codes (e.g. timeouts)", () => {
     expect(verificationRecovery("pnpm test", null)).toBeNull();
+  });
+});
+
+describe("commandFailureRecovery", () => {
+  it("marks ordinary failed commands as incomplete", () => {
+    expect(commandFailureRecovery("npm install", 1, "network failed")).toContain(
+      "COMMAND FAILED",
+    );
+  });
+
+  it("gives a specific recovery for Windows shell separator failures", () => {
+    expect(
+      commandFailureRecovery(
+        "cd app && npm install",
+        1,
+        "The token '&&' is not a valid statement separator in this version.",
+      ),
+    ).toContain("rejected '&&'");
   });
 });
 

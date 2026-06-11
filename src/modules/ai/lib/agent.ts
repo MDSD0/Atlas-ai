@@ -417,13 +417,13 @@ export function sanitizeToolParts(messages: UIMessage[]): UIMessage[] {
   return changed ? out : messages;
 }
 
-const PLAN_MODE_PROMPT = `## PLAN MODE — ACTIVE
+const PLAN_MODE_PROMPT = `## PLAN MODE - ACTIVE
 This is a review loop: the user wants to see and shape the plan before anything lands.
-1. Investigate with reads only (repo_context, read_file, grep, glob, list_directory). Do NOT run bash_run or bash_background.
-2. Post a short numbered plan first — what you'll change, per file, one line each.
-3. Then queue the edits (write_file, edit, multi_edit, create_directory queue for review instead of writing).
-4. End with: the plan, and an invitation to adjust — the user may reply with corrections, strike items, or add constraints. When they do, re-read their message as plan feedback, revise the plan, and re-queue only what changed. They apply the queue from the review panel when satisfied.
-Do not continue acting after queueing; the turn ends with the plan summary.`;
+1. Investigate with reads only (repo_context, read_file, grep, glob, list_directory).
+2. Do not call write_file, edit, multi_edit, create_directory, bash_run, bash_background, or serve_preview while drafting the plan.
+3. Post a short numbered plan: what you will change, per file, one line each; include checks to run and risks/unknowns.
+4. Stop after the plan. Atlas will show an editable plan review dock with Proceed/Revise controls.
+If the user proceeds, execute the approved plan normally. If they comment or revise, re-read only affected files and post the updated plan.`;
 
 /**
  * Prompt-layer split. Two layers with different lifetimes:
