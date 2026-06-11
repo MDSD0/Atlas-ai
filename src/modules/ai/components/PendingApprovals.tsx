@@ -44,7 +44,7 @@ export const PendingApprovals = memo(function PendingApprovals({
   return (
     <div
       data-testid="atlas-pending-approvals"
-      className="flex max-h-[45%] shrink-0 flex-col gap-2 overflow-y-auto border-t border-border/40 bg-background/95 px-3 py-2"
+      className="relative z-30 mb-2 flex max-h-64 shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-brand/25 bg-background/98 p-2 shadow-2xl shadow-black/25 backdrop-blur-xl"
     >
       {pending.map(({ part, toolName }) => (
         <AiToolApproval

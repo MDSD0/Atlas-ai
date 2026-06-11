@@ -247,7 +247,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
         )}
       </div>
       
-      <div className="mx-auto w-full max-w-4xl shrink-0 px-4">
+      <div className="relative z-30 mx-auto w-full max-w-4xl shrink-0 px-4">
         <PlanReviewDock sessionId={sessionId} messages={helpers.messages} />
         <PendingApprovals
           messages={helpers.messages}

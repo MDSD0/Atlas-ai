@@ -724,16 +724,9 @@ const RenderedTool = memo(function RenderedTool({
       : part.type.replace(/^tool-/, "");
 
   if (part.state === "approval-requested") {
-    // The actionable card lives in the PendingApprovals dock above the
-    // composer so it can't scroll out of reach; inline we only mark the spot.
-    return (
-      <div className="flex items-center gap-2 rounded-md border border-border/50 bg-muted/40 px-2.5 py-1.5 text-[11px] text-muted-foreground">
-        <span className="size-1.5 shrink-0 rounded-full bg-brand animate-pulse" />
-        <span className="truncate">
-          {toolName} is waiting for approval below
-        </span>
-      </div>
-    );
+    // Approval UI is owned by the composer dock. Rendering anything inline
+    // makes approvals look like ordinary scrollback and they get missed.
+    return null;
   }
 
   return (
