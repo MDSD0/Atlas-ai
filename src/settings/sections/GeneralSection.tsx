@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Tooltip,
   TooltipContent,
@@ -31,12 +33,13 @@ import {
   setTerminalWebglEnabled,
   setVimMode,
   setZoomLevel,
+  setCustomInstructions,
 } from "@/modules/settings/store";
 import { useTheme } from "@/modules/theme";
 
 
 import { disable, enable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 import { SettingRow } from "../components/SettingRow";
 
@@ -73,6 +76,7 @@ export function GeneralSection() {
   const terminalScrollback = usePreferencesStore((s) => s.terminalScrollback);
   const zoomLevel = usePreferencesStore((s) => s.zoomLevel);
   const agentNotifications = usePreferencesStore((s) => s.agentNotifications);
+  const customInstructions = usePreferencesStore((s) => s.customInstructions);
 
   useEffect(() => {
     let alive = true;
@@ -105,6 +109,20 @@ export function GeneralSection() {
         title="General"
         description="Mode, editor, and startup."
       />
+
+      <div className="flex flex-col gap-2">
+        <Label>Atlas</Label>
+        <CustomInstructionsBlock value={customInstructions} />
+        <SettingRow
+          title="Coding agent notifications"
+          description="Alert when Claude Code or Codex running in a terminal needs your input or finishes. Desktop notification when Atlas is unfocused, in-app otherwise."
+        >
+          <Switch
+            checked={agentNotifications}
+            onCheckedChange={(v) => void setAgentNotifications(v)}
+          />
+        </SettingRow>
+      </div>
 
       <div className="flex flex-col gap-2">
         <Label>Appearance</Label>
@@ -292,19 +310,6 @@ export function GeneralSection() {
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label>Agents</Label>
-        <SettingRow
-          title="Coding agent notifications"
-          description="Alert when Claude Code or Codex running in a terminal needs your input or finishes. Desktop notification when Atlas is unfocused, in-app otherwise."
-        >
-          <Switch
-            checked={agentNotifications}
-            onCheckedChange={(v) => void setAgentNotifications(v)}
-          />
-        </SettingRow>
-      </div>
-
-      <div className="flex flex-col gap-2">
         <Label>Startup</Label>
         <div className="flex flex-col gap-2">
           <SettingRow
@@ -327,6 +332,45 @@ export function GeneralSection() {
           </SettingRow>
         </div>
       </div>
+    </div>
+  );
+}
+
+function CustomInstructionsBlock({ value }: { value: string }) {
+  const [draft, setDraft] = useState(value);
+  const hadFirstSync = useRef(false);
+  const dirty = draft !== value;
+
+  useEffect(() => {
+    if (!hadFirstSync.current) {
+      hadFirstSync.current = true;
+      setDraft(value);
+    }
+  }, [value]);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-card/45 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[12px] font-medium">Custom instructions</span>
+          <span className="text-[10.5px] leading-relaxed text-muted-foreground">
+            Appended to Atlas prompts unless they conflict with project rules.
+          </span>
+        </div>
+        <Button
+          size="xs"
+          disabled={!dirty}
+          onClick={() => void setCustomInstructions(draft)}
+        >
+          Save
+        </Button>
+      </div>
+      <Textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="e.g. Prefer concise answers. Always report exact test exit codes. Use pnpm for this workspace."
+        className="min-h-[96px] resize-y bg-background/60 text-[12px] leading-relaxed"
+      />
     </div>
   );
 }

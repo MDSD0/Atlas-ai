@@ -37,7 +37,7 @@ function queuedEdit(originalContent: string): QueuedEdit {
 describe("plan edit freshness", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    usePlanStore.setState({ active: false, queue: [] });
+    usePlanStore.setState({ active: false, queue: [], sessions: {} });
     mocks.lspDiagnostics.mockResolvedValue({
       provider: "typescript",
       status: "fresh",
@@ -90,7 +90,7 @@ describe("plan edit freshness", () => {
 describe("plan per-file accept (applySome)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    usePlanStore.setState({ active: false, queue: [] });
+    usePlanStore.setState({ active: false, queue: [], sessions: {} });
     mocks.lspDiagnostics.mockResolvedValue({
       provider: "typescript",
       status: "fresh",
@@ -135,5 +135,46 @@ describe("plan per-file accept (applySome)", () => {
     const [result] = await usePlanStore.getState().applySome(["q-1"]);
     expect(result.ok).toBe(false);
     expect(usePlanStore.getState().queue.map((q) => q.id)).toEqual(["q-1"]);
+  });
+});
+
+describe("plan sessions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    usePlanStore.setState({ active: false, queue: [], sessions: {} });
+    mocks.createDir.mockResolvedValue(undefined);
+  });
+
+  function dirEdit(id: string, path: string): QueuedEdit {
+    return {
+      id,
+      kind: "create_directory",
+      path,
+      projectRoot: "/repo",
+      originalContent: "",
+      proposedContent: "",
+      isNewFile: true,
+    };
+  }
+
+  it("keeps active state and queued edits scoped to the chat session", async () => {
+    const store = usePlanStore.getState();
+    store.enable("chat-a");
+    store.enqueue(dirEdit("q-a", "/repo/a"), "chat-a");
+    store.enqueue(dirEdit("q-b", "/repo/b"), "chat-b");
+
+    expect(store.isActive("chat-a")).toBe(true);
+    expect(store.isActive("chat-b")).toBe(false);
+    expect(store.queueFor("chat-a").map((q) => q.id)).toEqual(["q-a"]);
+    expect(store.queueFor("chat-b").map((q) => q.id)).toEqual(["q-b"]);
+
+    await expect(store.applyAll("chat-a")).resolves.toEqual([
+      { id: "q-a", ok: true },
+    ]);
+    expect(mocks.createDir).toHaveBeenCalledWith("/repo/a", "/repo");
+    expect(usePlanStore.getState().queueFor("chat-a")).toEqual([]);
+    expect(usePlanStore.getState().queueFor("chat-b").map((q) => q.id)).toEqual([
+      "q-b",
+    ]);
   });
 });

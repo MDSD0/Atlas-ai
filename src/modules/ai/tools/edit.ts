@@ -101,10 +101,11 @@ export async function applyEdits(
   edits: { old_string: string; new_string: string; replace_all?: boolean }[],
   kind: "edit" | "multi_edit",
   readCache: Map<string, ReadFingerprint>,
+  sessionId?: string | null,
 ): Promise<EditResult> {
   const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
   return withFileMutationQueue(abs, () =>
-    applyEditsUnlocked(abs, projectRoot, edits, kind, readCache),
+    applyEditsUnlocked(abs, projectRoot, edits, kind, readCache, sessionId),
     canonicalize,
   );
 }
@@ -115,6 +116,7 @@ async function applyEditsUnlocked(
   edits: { old_string: string; new_string: string; replace_all?: boolean }[],
   kind: "edit" | "multi_edit",
   readCache: Map<string, ReadFingerprint>,
+  sessionId?: string | null,
 ): Promise<EditResult> {
   const r = await agentNative.readFile(abs, projectRoot);
   if (r.kind === "binary")
@@ -186,7 +188,7 @@ async function applyEditsUnlocked(
     }
   }
 
-  if (usePlanStore.getState().active) {
+  if (usePlanStore.getState().isActive(sessionId)) {
     usePlanStore.getState().enqueue({
       id: newQueuedEditId(),
       kind,
@@ -196,7 +198,7 @@ async function applyEditsUnlocked(
       proposedContent: content,
       isNewFile: false,
       expectedFingerprint: currentFingerprint,
-    });
+    }, sessionId);
     return {
       ok: true,
       replacements: totalReplacements,
@@ -259,6 +261,7 @@ export function buildEditTools(ctx: ToolContext) {
           [{ old_string, new_string, replace_all }],
           "edit",
           ctx.readCache,
+          ctx.getSessionId(),
         );
       },
     }),
@@ -298,7 +301,14 @@ export function buildEditTools(ctx: ToolContext) {
             path: abs,
           };
         }
-        return applyEdits(abs, projectRoot, edits, "multi_edit", ctx.readCache);
+        return applyEdits(
+          abs,
+          projectRoot,
+          edits,
+          "multi_edit",
+          ctx.readCache,
+          ctx.getSessionId(),
+        );
       },
     }),
   } as const;

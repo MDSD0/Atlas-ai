@@ -418,7 +418,12 @@ export function sanitizeToolParts(messages: UIMessage[]): UIMessage[] {
 }
 
 const PLAN_MODE_PROMPT = `## PLAN MODE — ACTIVE
-Mutating tools (write_file, edit, multi_edit, create_directory) will queue their changes for the user to review as a single diff. Do NOT execute bash_run or bash_background while plan mode is active; restrict yourself to reads (repo_context, read_file, grep, glob, list_directory) and the queued mutations. After queueing the full set of edits, stop and return a brief summary; do not continue acting until the user has accepted/rejected.`;
+This is a review loop: the user wants to see and shape the plan before anything lands.
+1. Investigate with reads only (repo_context, read_file, grep, glob, list_directory). Do NOT run bash_run or bash_background.
+2. Post a short numbered plan first — what you'll change, per file, one line each.
+3. Then queue the edits (write_file, edit, multi_edit, create_directory queue for review instead of writing).
+4. End with: the plan, and an invitation to adjust — the user may reply with corrections, strike items, or add constraints. When they do, re-read their message as plan feedback, revise the plan, and re-queue only what changed. They apply the queue from the review panel when satisfied.
+Do not continue acting after queueing; the turn ends with the plan summary.`;
 
 /**
  * Prompt-layer split. Two layers with different lifetimes:

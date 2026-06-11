@@ -29,16 +29,22 @@ export type QueuedEdit = {
 };
 
 type PlanState = {
+  /** Legacy/default plan state used by tests and any callsites without a session. */
   active: boolean;
   queue: QueuedEdit[];
-  toggle: () => void;
-  enable: () => void;
-  disable: () => void;
-  enqueue: (q: QueuedEdit) => void;
-  removeOne: (id: string) => void;
-  clear: () => void;
+  sessions: Record<string, { active: boolean; queue: QueuedEdit[] }>;
+  isActive: (sessionId?: string | null) => boolean;
+  queueFor: (sessionId?: string | null) => QueuedEdit[];
+  toggle: (sessionId?: string | null) => void;
+  enable: (sessionId?: string | null) => void;
+  disable: (sessionId?: string | null) => void;
+  enqueue: (q: QueuedEdit, sessionId?: string | null) => void;
+  removeOne: (id: string, sessionId?: string | null) => void;
+  clear: (sessionId?: string | null) => void;
   /** Apply queued edits in order. Returns per-edit results. */
-  applyAll: () => Promise<{ id: string; ok: boolean; error?: string }[]>;
+  applyAll: (
+    sessionId?: string | null,
+  ) => Promise<{ id: string; ok: boolean; error?: string }[]>;
   /**
    * Apply only the given queued edits, in queue order. Successfully applied
    * edits leave the queue; edits that fail or were not selected remain so the
@@ -46,6 +52,7 @@ type PlanState = {
    */
   applySome: (
     ids: readonly string[],
+    sessionId?: string | null,
   ) => Promise<{ id: string; ok: boolean; error?: string }[]>;
 };
 
@@ -68,19 +75,118 @@ async function assertQueuedEditFresh(q: QueuedEdit): Promise<void> {
 export const usePlanStore = create<PlanState>((set, get) => ({
   active: false,
   queue: [],
-  toggle: () =>
-    set((s) => ({ active: !s.active, queue: s.active ? [] : s.queue })),
-  enable: () => set({ active: true }),
-  disable: () => set({ active: false, queue: [] }),
-  enqueue: (q) => set((s) => ({ queue: [...s.queue, q] })),
-  removeOne: (id) =>
-    set((s) => ({ queue: s.queue.filter((q) => q.id !== id) })),
-  clear: () => set({ queue: [] }),
-  async applyAll() {
-    return applyQueued(get, set, get().queue.map((q) => q.id));
+  sessions: {},
+  isActive: (sessionId) => {
+    if (!sessionId) return get().active;
+    return get().sessions[sessionId]?.active ?? false;
   },
-  async applySome(ids) {
-    return applyQueued(get, set, ids);
+  queueFor: (sessionId) => {
+    if (!sessionId) return get().queue;
+    return get().sessions[sessionId]?.queue ?? [];
+  },
+  toggle: (sessionId) => {
+    if (!sessionId) {
+      set((s) => ({ active: !s.active, queue: s.active ? [] : s.queue }));
+      return;
+    }
+    set((s) => {
+      const cur = s.sessions[sessionId] ?? { active: false, queue: [] };
+      return {
+        sessions: {
+          ...s.sessions,
+          [sessionId]: {
+            active: !cur.active,
+            queue: cur.active ? [] : cur.queue,
+          },
+        },
+      };
+    });
+  },
+  enable: (sessionId) => {
+    if (!sessionId) {
+      set({ active: true });
+      return;
+    }
+    set((s) => ({
+      sessions: {
+        ...s.sessions,
+        [sessionId]: {
+          active: true,
+          queue: s.sessions[sessionId]?.queue ?? [],
+        },
+      },
+    }));
+  },
+  disable: (sessionId) => {
+    if (!sessionId) {
+      set({ active: false, queue: [] });
+      return;
+    }
+    set((s) => ({
+      sessions: {
+        ...s.sessions,
+        [sessionId]: { active: false, queue: [] },
+      },
+    }));
+  },
+  enqueue: (q, sessionId) => {
+    if (!sessionId) {
+      set((s) => ({ queue: [...s.queue, q] }));
+      return;
+    }
+    set((s) => {
+      const cur = s.sessions[sessionId] ?? { active: false, queue: [] };
+      return {
+        sessions: {
+          ...s.sessions,
+          [sessionId]: { ...cur, queue: [...cur.queue, q] },
+        },
+      };
+    });
+  },
+  removeOne: (id, sessionId) => {
+    if (!sessionId) {
+      set((s) => ({ queue: s.queue.filter((q) => q.id !== id) }));
+      return;
+    }
+    set((s) => {
+      const cur = s.sessions[sessionId] ?? { active: false, queue: [] };
+      return {
+        sessions: {
+          ...s.sessions,
+          [sessionId]: {
+            ...cur,
+            queue: cur.queue.filter((q) => q.id !== id),
+          },
+        },
+      };
+    });
+  },
+  clear: (sessionId) => {
+    if (!sessionId) {
+      set({ queue: [] });
+      return;
+    }
+    set((s) => {
+      const cur = s.sessions[sessionId] ?? { active: false, queue: [] };
+      return {
+        sessions: {
+          ...s.sessions,
+          [sessionId]: { ...cur, queue: [] },
+        },
+      };
+    });
+  },
+  async applyAll(sessionId) {
+    return applyQueued(
+      get,
+      set,
+      get().queueFor(sessionId).map((q) => q.id),
+      sessionId,
+    );
+  },
+  async applySome(ids, sessionId) {
+    return applyQueued(get, set, ids, sessionId);
   },
 }));
 
@@ -106,9 +212,10 @@ async function applyQueued(
   get: () => PlanState,
   set: (partial: Partial<PlanState>) => void,
   ids: readonly string[],
+  sessionId?: string | null,
 ): Promise<{ id: string; ok: boolean; error?: string }[]> {
   const selected = new Set(ids);
-  const items = get().queue.filter((q) => selected.has(q.id));
+  const items = get().queueFor(sessionId).filter((q) => selected.has(q.id));
   const results: { id: string; ok: boolean; error?: string }[] = [];
   const appliedOk = new Set<string>();
   for (const q of items) {
@@ -120,6 +227,20 @@ async function applyQueued(
       results.push({ id: q.id, ok: false, error: String(e) });
     }
   }
-  set({ queue: get().queue.filter((q) => !appliedOk.has(q.id)) });
+  if (!sessionId) {
+    set({ queue: get().queue.filter((q) => !appliedOk.has(q.id)) });
+  } else {
+    const sessions = get().sessions;
+    const cur = sessions[sessionId] ?? { active: false, queue: [] };
+    set({
+      sessions: {
+        ...sessions,
+        [sessionId]: {
+          ...cur,
+          queue: cur.queue.filter((q) => !appliedOk.has(q.id)),
+        },
+      },
+    });
+  }
   return results;
 }

@@ -25,10 +25,8 @@ import {
   newSnippetId,
   useSnippetsStore,
 } from "@/modules/ai/store/snippetsStore";
-import { usePreferencesStore } from "@/modules/settings/preferences";
-import { setCustomInstructions } from "@/modules/settings/store";
 import { Plus as Add01Icon, CheckCircle2 as CheckmarkCircle02Icon, Trash2 as Delete02Icon, Edit2 as Edit02Icon, Sparkles as SparklesIcon } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { SectionHeader } from "../components/SectionHeader";
 
 const ICON_OPTIONS: AgentIconId[] = [
@@ -41,7 +39,6 @@ const ICON_OPTIONS: AgentIconId[] = [
 ];
 
 export function SkillsSection() {
-  const customInstructions = usePreferencesStore((s) => s.customInstructions);
   const customAgents = useAgentsStore((s) => s.customAgents);
   const activeAgentId = useAgentsStore((s) => s.activeId);
   const setActiveAgentId = useAgentsStore((s) => s.setActiveId);
@@ -68,8 +65,6 @@ export function SkillsSection() {
         title="Skills"
         description="Personas and skills the AI uses. Select skills from the input bar."
       />
-
-      <CustomInstructionsBlock value={customInstructions} />
 
       <section className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -511,40 +506,6 @@ function SnippetEditorDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-function CustomInstructionsBlock({ value }: { value: string }) {
-  const [draft, setDraft] = useState(value);
-  const hadFirstSync = useRef(false);
-
-  useEffect(() => {
-    if (!hadFirstSync.current) {
-      hadFirstSync.current = true;
-      setDraft(value);
-    }
-  }, [value]);
-
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <Label>Custom instructions</Label>
-        {/* {savedTick > 0 ? (
-          <span className="text-[10px] text-muted-foreground">Saved</span>
-        ) : null} */}
-        {draft && (
-          <Button size="xs" onClick={() => void setCustomInstructions(draft)}>
-            Save
-          </Button>
-        )}
-      </div>
-      <Textarea
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder="e.g. Always reply in concise bullet points. Prefer pnpm over npm. My machine is an M-series Mac."
-        className="min-h-[100px] resize-y bg-card/60 font-sans text-[12px] leading-relaxed border border-border"
-      />
-    </div>
   );
 }
 

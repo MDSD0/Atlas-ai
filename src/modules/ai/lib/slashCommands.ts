@@ -1,4 +1,12 @@
-import { ListChecks as CheckListIcon, Bot as ClaudeIcon, Sparkles as SparklesIcon, type LucideIcon } from "lucide-react";
+import {
+  Bot as ClaudeIcon,
+  Bug as ReviewIcon,
+  CheckCircle2 as TestIcon,
+  FileText as ExplainIcon,
+  ListChecks as CheckListIcon,
+  Sparkles as SparklesIcon,
+  type LucideIcon,
+} from "lucide-react";
 import { usePlanStore } from "../store/planStore";
 
 /**
@@ -63,6 +71,24 @@ export const SLASH_COMMANDS: Record<string, SlashCommandMeta> = {
     label: "Delegate to Claude Code",
     icon: ClaudeIcon,
   },
+  review: {
+    name: "review",
+    invocation: "/review",
+    label: "Review changes",
+    icon: ReviewIcon,
+  },
+  test: {
+    name: "test",
+    invocation: "/test",
+    label: "Run relevant checks",
+    icon: TestIcon,
+  },
+  explain: {
+    name: "explain",
+    invocation: "/explain",
+    label: "Explain context",
+    icon: ExplainIcon,
+  },
 };
 
 export const ATLAS_CMD_RE =
@@ -72,7 +98,10 @@ export function wrapWithCommandMarker(prompt: string, name: string): string {
   return `<atlas-command name="${name}" />\n\n${prompt}`;
 }
 
-export function tryRunSlashCommand(input: string): SlashOutcome {
+export function tryRunSlashCommand(
+  input: string,
+  sessionId?: string | null,
+): SlashOutcome {
   const trimmed = input.trim();
   const lead = trimmed[0];
   if (lead !== "/" && lead !== "#") return { kind: "none" };
@@ -84,11 +113,17 @@ export function tryRunSlashCommand(input: string): SlashOutcome {
     case "plan": {
       const store = usePlanStore.getState();
       if (tail === "off" || tail === "exit") {
-        store.disable();
+        store.disable(sessionId);
         return { kind: "handled", toast: "Plan mode off" };
       }
-      store.toggle();
-      const nowActive = usePlanStore.getState().active;
+      if (tail) {
+        // "/plan build X" must NOT swallow the task: enable plan mode and
+        // send the task as the prompt.
+        store.enable(sessionId);
+        return { kind: "send-prompt", prompt: tail, commandName: "plan" };
+      }
+      store.toggle(sessionId);
+      const nowActive = usePlanStore.getState().isActive(sessionId);
       return {
         kind: "handled",
         toast: nowActive ? "Plan mode on" : "Plan mode off",
@@ -109,6 +144,33 @@ export function tryRunSlashCommand(input: string): SlashOutcome {
         kind: "send-prompt",
         prompt: claudeCodeDirective(tail),
         commandName: "claude-code",
+      };
+    }
+    case "review": {
+      return {
+        kind: "send-prompt",
+        prompt:
+          tail ||
+          "Review the current workspace changes. Prioritize bugs, regressions, missing tests, and UX issues. Use git diff and relevant reads before reporting findings.",
+        commandName: "review",
+      };
+    }
+    case "test": {
+      return {
+        kind: "send-prompt",
+        prompt:
+          tail ||
+          "Run the narrowest relevant checks for the current workspace state, report the exact commands and exit codes, and fix only failures caused by the current task.",
+        commandName: "test",
+      };
+    }
+    case "explain": {
+      return {
+        kind: "send-prompt",
+        prompt:
+          tail ||
+          "Explain the active file or selected context and how it fits into the project. Read only the files needed to ground the explanation.",
+        commandName: "explain",
       };
     }
     default:

@@ -274,8 +274,9 @@ function Body({
 }
 
 function PlanModeStrip() {
-  const active = usePlanStore((s) => s.active);
-  const queueLen = usePlanStore((s) => s.queue.length);
+  const sessionId = useChatStore((s) => s.activeSessionId);
+  const active = usePlanStore((s) => s.isActive(sessionId));
+  const queueLen = usePlanStore((s) => s.queueFor(sessionId).length);
   const disable = usePlanStore((s) => s.disable);
   if (!active) return null;
   return (
@@ -288,7 +289,7 @@ function PlanModeStrip() {
       <span className="flex-1" />
       <button
         type="button"
-        onClick={() => disable()}
+        onClick={() => disable(sessionId)}
         className="rounded px-1.5 py-0.5 text-[10.5px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
         Exit

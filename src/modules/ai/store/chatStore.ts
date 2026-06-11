@@ -328,7 +328,7 @@ function makeChat(sessionId: string): Chat<UIMessage> {
         project: live.getProjectContext(),
       };
     },
-    getPlanMode: () => usePlanStore.getState().active,
+    getPlanMode: () => usePlanStore.getState().isActive(sessionId),
     getLmstudioBaseURL: () => usePreferencesStore.getState().lmstudioBaseURL,
     getLmstudioModelId: () => usePreferencesStore.getState().lmstudioModelId,
     getMlxBaseURL: () => usePreferencesStore.getState().mlxBaseURL,

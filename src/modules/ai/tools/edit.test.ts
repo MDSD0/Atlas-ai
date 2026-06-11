@@ -23,6 +23,7 @@ vi.mock("../store/planStore", () => ({
   usePlanStore: {
     getState: () => ({
       active: mocks.planActive,
+      isActive: () => mocks.planActive,
       enqueue: mocks.enqueue,
     }),
   },

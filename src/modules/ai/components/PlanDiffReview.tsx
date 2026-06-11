@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 
 
 import { useState } from "react";
+import { useChatStore } from "../store/chatStore";
 import { usePlanStore, type QueuedEdit } from "../store/planStore";
 
 function basename(p: string): string {
@@ -27,7 +28,8 @@ function diffStats(
 }
 
 export function PlanDiffReview() {
-  const queue = usePlanStore((s) => s.queue);
+  const sessionId = useChatStore((s) => s.activeSessionId);
+  const queue = usePlanStore((s) => s.queueFor(sessionId));
   const removeOne = usePlanStore((s) => s.removeOne);
   const clear = usePlanStore((s) => s.clear);
   const applyAll = usePlanStore((s) => s.applyAll);
@@ -39,7 +41,7 @@ export function PlanDiffReview() {
   const onApply = async () => {
     setBusy(true);
     try {
-      const results = await applyAll();
+      const results = await applyAll(sessionId);
       const failed = results.filter((r) => !r.ok);
       if (failed.length) {
         console.error("plan apply failures:", failed);
@@ -52,7 +54,7 @@ export function PlanDiffReview() {
   const onAcceptOne = async (id: string) => {
     setBusy(true);
     try {
-      const [result] = await applySome([id]);
+      const [result] = await applySome([id], sessionId);
       if (result && !result.ok) console.error("plan apply failure:", result);
     } finally {
       setBusy(false);
@@ -76,7 +78,7 @@ export function PlanDiffReview() {
             size="sm"
             variant="ghost"
             className="h-7 gap-1.5 text-[11px] hover:bg-destructive/10 hover:text-destructive"
-            onClick={() => clear()}
+            onClick={() => clear(sessionId)}
             disabled={busy}
           >
             <Cancel01Icon size={12} strokeWidth={1.5} />
@@ -101,7 +103,7 @@ export function PlanDiffReview() {
             item={q}
             busy={busy}
             onAccept={() => onAcceptOne(q.id)}
-            onReject={() => removeOne(q.id)}
+            onReject={() => removeOne(q.id, sessionId)}
           />
         ))}
       </ul>

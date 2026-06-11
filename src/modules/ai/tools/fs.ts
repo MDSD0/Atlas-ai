@@ -177,7 +177,8 @@ export function buildFsTools(ctx: ToolContext) {
         const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
 
-        if (usePlanStore.getState().active) {
+        const sessionId = ctx.getSessionId();
+        if (usePlanStore.getState().isActive(sessionId)) {
           let original = "";
           let isNewFile = false;
           let expectedFingerprint: ReadFingerprint | undefined;
@@ -199,7 +200,7 @@ export function buildFsTools(ctx: ToolContext) {
             proposedContent: content,
             isNewFile,
             expectedFingerprint,
-          });
+          }, sessionId);
           return {
             path: abs,
             queued_for_plan_review: true,
@@ -245,7 +246,8 @@ export function buildFsTools(ctx: ToolContext) {
         const abs = safety.canonical;
         const boundary = await validateWithinWorkspace(abs, project, canonicalize);
         if (!boundary.ok) return { error: boundary.reason, path: abs };
-        if (usePlanStore.getState().active) {
+        const sessionId = ctx.getSessionId();
+        if (usePlanStore.getState().isActive(sessionId)) {
           usePlanStore.getState().enqueue({
             id: newQueuedEditId(),
             kind: "create_directory",
@@ -255,7 +257,7 @@ export function buildFsTools(ctx: ToolContext) {
             proposedContent: "",
             isNewFile: true,
             description: "Create directory",
-          });
+          }, sessionId);
           return { path: abs, queued_for_plan_review: true, ok: true };
         }
         try {

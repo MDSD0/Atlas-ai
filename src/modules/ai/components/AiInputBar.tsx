@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
-import { ArrowUp, X as Cancel01Icon, Code as CodeIcon, Hash as HashtagIcon, Key as Key01Icon, Mic as Mic01Icon, Plus as PlusSignIcon, Terminal as TerminalIcon, BookOpen } from "lucide-react";
+import { ArrowUp, X as Cancel01Icon, Code as CodeIcon, Hash as HashtagIcon, Key as Key01Icon, ListChecks as PlanIcon, Mic as Mic01Icon, Plus as PlusSignIcon, Terminal as TerminalIcon, BookOpen } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +19,7 @@ import { useWorkspaceFiles } from "../hooks/useWorkspaceFiles";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
 import type { Snippet } from "../lib/snippets";
 import { useChatStore } from "../store/chatStore";
+import { usePlanStore } from "../store/planStore";
 import { useSnippetsStore } from "../store/snippetsStore";
 import { ModelDropdown } from "./AiStatusBarControls";
 import { ProjectChip } from "./ProjectChip";
@@ -30,6 +31,33 @@ import { hasAnyKey } from "../lib/keyring";
 import { openSettingsWindow } from "@/modules/settings/openSettingsWindow";
 import { open } from "@tauri-apps/plugin-dialog";
 
+/** Composer toggle for plan mode: edits queue for review instead of writing. */
+function PlanToggle() {
+  const sessionId = useChatStore((s) => s.activeSessionId);
+  const active = usePlanStore((s) => s.isActive(sessionId));
+  const toggle = usePlanStore((s) => s.toggle);
+  return (
+    <button
+      type="button"
+      onClick={() => toggle(sessionId)}
+      aria-pressed={active}
+      title={
+        active
+          ? "Plan mode on — edits queue for your review instead of writing"
+          : "Plan mode — review every edit before it touches disk"
+      }
+      className={cn(
+        "flex h-6 shrink-0 items-center gap-1 rounded-md px-1.5 text-[11px] font-medium transition-colors",
+        active
+          ? "bg-brand/15 text-brand"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+      )}
+    >
+      <PlanIcon size={12} strokeWidth={2} />
+      Plan
+    </button>
+  );
+}
 export function AiInput() {
   const apiKeys = useChatStore((s) => s.apiKeys);
   const lmstudioModelId = usePreferencesStore((s) => s.lmstudioModelId);
@@ -338,6 +366,22 @@ export function AiInputBar() {
                     c.submit();
                   }
                 }}
+                onPaste={(e) => {
+                  const files = Array.from(e.clipboardData.files);
+                  for (const item of Array.from(e.clipboardData.items)) {
+                    if (item.kind !== "file") continue;
+                    const file = item.getAsFile();
+                    if (file && !files.some((f) => f === file)) {
+                      files.push(file);
+                    }
+                  }
+                  // Pasted images/files become attachment chips with
+                  // thumbnails; plain text falls through to the textarea.
+                  if (files.length > 0) {
+                    e.preventDefault();
+                    void c.addFiles(files);
+                  }
+                }}
                 placeholder="Ask Atlas anything   ·   # skills   @ files"
                 rows={1}
                 className={cn(
@@ -396,6 +440,7 @@ export function AiInputBar() {
             <ProjectChip />
             <AccessChip />
             <ModelDropdown />
+            <PlanToggle />
           </div>
 
           {/* Pick file from OS (Images/External) or Skills */}

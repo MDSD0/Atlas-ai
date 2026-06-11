@@ -53,7 +53,9 @@ for (const memorySurfaceTool of [
 }
 assert.match(transport, /onContextPacked/);
 assert.match(harnessInspector, /Last packed model input/);
-assert.match(harnessInspector, /Task subgraph preview - not auto-injected/);
+assert.match(harnessInspector, /Task subgraph preview/);
+assert.match(harnessInspector, /onOpenPath=\{onOpenFile\}/);
+assert.match(harnessInspector, /onClick=\{\(\) => onOpenFile\(selectedPath\)\}/);
 assert.match(harnessInspector, /Flight recorder timeline/);
 assert.match(proofRecorder, /lifecycle\.session_started/);
 assert.match(proofRecorder, /approval\.\$\{stage\}/);
