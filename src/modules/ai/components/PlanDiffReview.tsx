@@ -29,14 +29,15 @@ function diffStats(
 
 export function PlanDiffReview() {
   const sessionId = useChatStore((s) => s.activeSessionId);
-  const queue = usePlanStore((s) => s.queueFor(sessionId));
+  const queueLen = usePlanStore((s) => s.queueFor(sessionId).length);
   const removeOne = usePlanStore((s) => s.removeOne);
   const clear = usePlanStore((s) => s.clear);
   const applyAll = usePlanStore((s) => s.applyAll);
   const applySome = usePlanStore((s) => s.applySome);
+  const queue = usePlanStore.getState().queueFor(sessionId);
   const [busy, setBusy] = useState(false);
 
-  if (queue.length === 0) return null;
+  if (queueLen === 0) return null;
 
   const onApply = async () => {
     setBusy(true);

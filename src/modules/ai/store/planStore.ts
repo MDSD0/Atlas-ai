@@ -57,6 +57,8 @@ type PlanState = {
 };
 
 let nextId = 1;
+const EMPTY_QUEUE: QueuedEdit[] = [];
+
 export function newQueuedEditId(): string {
   return `q-${Date.now().toString(36)}-${(nextId++).toString(36)}`;
 }
@@ -82,7 +84,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
   queueFor: (sessionId) => {
     if (!sessionId) return get().queue;
-    return get().sessions[sessionId]?.queue ?? [];
+    return get().sessions[sessionId]?.queue ?? EMPTY_QUEUE;
   },
   toggle: (sessionId) => {
     if (!sessionId) {

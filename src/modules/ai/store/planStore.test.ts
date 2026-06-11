@@ -177,4 +177,10 @@ describe("plan sessions", () => {
       "q-b",
     ]);
   });
+
+  it("returns a stable empty queue for sessions without plan edits", () => {
+    const store = usePlanStore.getState();
+
+    expect(store.queueFor("missing")).toBe(store.queueFor("missing"));
+  });
 });
