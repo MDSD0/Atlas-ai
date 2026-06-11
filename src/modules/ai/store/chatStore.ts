@@ -29,6 +29,7 @@ import {
   saveActiveId,
   saveMessages,
   saveSessionsList,
+  normalizeMessageHistory,
   type SessionMeta,
 } from "../lib/sessions";
 import { pushRecentModel } from "../lib/modelPrefs";
@@ -691,6 +692,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   persistMessages: (id, messages) => {
+    const normalizedMessages = normalizeMessageHistory(messages);
     // Debounce the message-blob write so streaming doesn't pound the store.
     const existing = pendingPersist.get(id);
     if (existing) clearTimeout(existing.timer);
@@ -700,7 +702,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
       pendingPersist.delete(id);
       void saveMessages(id, entry.latest);
     }, PERSIST_DEBOUNCE_MS);
-    pendingPersist.set(id, { latest: messages, timer });
+    pendingPersist.set(id, { latest: normalizedMessages, timer });
 
     // Update zustand session list only when the derived title actually
     // changes — otherwise we'd rewrite the sessions array (and trigger
@@ -710,7 +712,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
     if (!meta) return;
     const isUntitled = !meta.title || meta.title === "New chat";
     if (!isUntitled) return;
-    const nextTitle = deriveTitle(messages);
+    const nextTitle = deriveTitle(normalizedMessages);
     if (nextTitle === meta.title) return;
     const next = sessions.map((s) =>
       s.id === id ? { ...s, title: nextTitle, updatedAt: Date.now() } : s,

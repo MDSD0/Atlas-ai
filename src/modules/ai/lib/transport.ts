@@ -22,6 +22,7 @@ import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
 import { buildActiveWorkPacketContext } from "../workPackets";
 import { contextLedger, type PackedContextSource } from "../contextLedger";
 import { selectAgentRunPolicy } from "./lanePolicy";
+import { normalizeMessageHistory } from "./sessions";
 import {
   beginRunResources,
   killRunResourcesForSignal,
@@ -102,13 +103,14 @@ type SendOptions = {
 
 export function createContextAwareTransport(deps: Deps) {
   const run = async (options: SendOptions) => {
+    const uiMessages = normalizeMessageHistory(options.messages);
     const live = deps.getLive();
-    const prompt = lastUserText(options.messages);
+    const prompt = lastUserText(uiMessages);
     const sessionId = deps.toolContext.getSessionId() ?? "unknown";
     beginRunResources(sessionId, options.abortSignal);
     const planMode = deps.getPlanMode?.() ?? false;
     const runPolicy = selectAgentRunPolicy({
-      prompt: recentUserText(options.messages),
+      prompt: recentUserText(uiMessages),
       planMode,
       activeFile: live.activeFile,
     });
@@ -126,7 +128,7 @@ export function createContextAwareTransport(deps: Deps) {
       reason: runPolicy.reason,
       activeFile: live.activeFile,
     });
-    for (const observedTool of observedToolResults(options.messages)) {
+    for (const observedTool of observedToolResults(uiMessages)) {
       recordSessionTraceEvent(trace, "tool.finished", {
         ...observedTool,
         source: "ui-message-history",
@@ -204,8 +206,8 @@ export function createContextAwareTransport(deps: Deps) {
         .join("\n\n") || null;
     const contextBlock = atlasContextBlock(live.project);
     const messagesForRun = contextBlock
-      ? injectEnvIntoLastUser(options.messages, contextBlock)
-      : options.messages;
+      ? injectEnvIntoLastUser(uiMessages, contextBlock)
+      : uiMessages;
 
     // Hard hook: record one proof run around this agent turn. Journal failures
     // must never block the agent, so recorder creation and calls are guarded.
@@ -337,7 +339,7 @@ export function createContextAwareTransport(deps: Deps) {
           contextLedger.capture(snapshot);
           recordSessionTraceEvent(trace, "context.packed", snapshot);
         },
-        uiMessages: messagesForRun,
+      uiMessages: messagesForRun,
         abortSignal: options.abortSignal,
       });
       // Close the receipt and release run resources when the model stream

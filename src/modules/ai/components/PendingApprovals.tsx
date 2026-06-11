@@ -11,11 +11,20 @@ export function collectPendingApprovals(
   messages: UIMessage[],
 ): PendingApproval[] {
   const out: PendingApproval[] = [];
+  const seen = new Set<string>();
   for (const m of messages) {
     if (m.role !== "assistant") continue;
     for (const raw of m.parts) {
-      const p = raw as { type?: string; state?: string; toolName?: string };
+      const p = raw as {
+        type?: string;
+        state?: string;
+        toolName?: string;
+        approval?: { id?: string };
+      };
       if (p.state !== "approval-requested") continue;
+      const approvalId = p.approval?.id;
+      if (!approvalId || seen.has(approvalId)) continue;
+      seen.add(approvalId);
       const type = p.type ?? "";
       const toolName =
         type === "dynamic-tool"

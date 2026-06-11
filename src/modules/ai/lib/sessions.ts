@@ -42,7 +42,8 @@ export async function loadAll(): Promise<LoadedSessions> {
 }
 
 export async function loadMessages(id: string): Promise<UIMessage[] | null> {
-  return (await store.get<UIMessage[]>(messagesKey(id))) ?? null;
+  const messages = (await store.get<UIMessage[]>(messagesKey(id))) ?? null;
+  return messages ? normalizeMessageHistory(messages) : null;
 }
 
 export async function saveSessionsList(sessions: SessionMeta[]): Promise<void> {
@@ -57,7 +58,7 @@ export async function saveMessages(
   id: string,
   messages: UIMessage[],
 ): Promise<void> {
-  await store.set(messagesKey(id), messages);
+  await store.set(messagesKey(id), normalizeMessageHistory(messages));
 }
 
 export async function deleteSessionData(id: string): Promise<void> {
@@ -102,4 +103,22 @@ export function deriveTitle(messages: UIMessage[]): string {
     }
   }
   return "New chat";
+}
+
+export function normalizeMessageHistory(messages: UIMessage[]): UIMessage[] {
+  const order: string[] = [];
+  const byId = new Map<string, UIMessage>();
+  const out: UIMessage[] = [];
+  messages.forEach((message, index) => {
+    const id = typeof message.id === "string" && message.id
+      ? message.id
+      : `__atlas_no_id_${index}`;
+    if (!byId.has(id)) order.push(id);
+    byId.set(id, message);
+  });
+  for (const id of order) {
+    const message = byId.get(id);
+    if (message) out.push(message);
+  }
+  return out;
 }

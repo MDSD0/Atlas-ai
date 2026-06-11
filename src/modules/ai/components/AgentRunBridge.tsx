@@ -108,14 +108,17 @@ function Bridge({
   }, [sessionId]);
 
   const approvalsPending = useMemo(() => {
-    let n = 0;
+    const seen = new Set<string>();
     for (const m of messages) {
       if (m.role !== "assistant") continue;
       for (const p of m.parts) {
-        if ((p as { state?: string }).state === "approval-requested") n++;
+        const part = p as { state?: string; approval?: { id?: string } };
+        if (part.state !== "approval-requested") continue;
+        const id = part.approval?.id;
+        if (id) seen.add(id);
       }
     }
-    return n;
+    return seen.size;
   }, [messages]);
 
   useEffect(() => {

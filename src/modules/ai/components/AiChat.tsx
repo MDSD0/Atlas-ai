@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 import { ChevronRight as ArrowRight01Icon, Code as CodeIcon, FileText as File01Icon, Hash as HashtagIcon, Terminal as TerminalIcon } from "lucide-react";
 import { SLASH_COMMANDS, ATLAS_CMD_RE } from "../lib/slashCommands";
+import { normalizeMessageHistory } from "../lib/sessions";
 import { Spinner } from "@/components/ui/spinner";
 import { useChatStore, sendMessage } from "../store/chatStore";
 import { usePlanStore } from "../store/planStore";
@@ -184,11 +185,15 @@ export function AiChatView({
   scrollKey,
 }: Props) {
   const conversationRef = useRef<StickToBottomContext | null>(null);
+  const displayMessages = useMemo(
+    () => normalizeMessageHistory(messages),
+    [messages],
+  );
   const hasSavedScroll = scrollKey
     ? chatScrollPositions.has(scrollKey)
     : false;
   const isBusy = status === "submitted" || status === "streaming";
-  const lastMessage = messages[messages.length - 1];
+  const lastMessage = displayMessages[displayMessages.length - 1];
   const showSpinner = isBusy && lastMessage?.role === "user";
   const streamingMessageId =
     status === "streaming" && lastMessage?.role === "assistant"
@@ -211,8 +216,8 @@ export function AiChatView({
   const planQueueLen = usePlanStore((s) => s.queueFor(sessionId).length);
   const hiddenPlanMessageId = useMemo(() => {
     if (!planActive || planQueueLen > 0) return null;
-    for (let i = messages.length - 1; i >= 0; i -= 1) {
-      const message = messages[i];
+    for (let i = displayMessages.length - 1; i >= 0; i -= 1) {
+      const message = displayMessages[i];
       if (message?.role !== "assistant") continue;
       const hasText = message.parts.some(
         (part) => part.type === "text" && part.text.trim().length > 0,
@@ -220,7 +225,7 @@ export function AiChatView({
       return hasText ? message.id : null;
     }
     return null;
-  }, [messages, planActive, planQueueLen]);
+  }, [displayMessages, planActive, planQueueLen]);
 
   useLayoutEffect(() => {
     if (!scrollKey) return;
@@ -243,14 +248,14 @@ export function AiChatView({
       save();
       scrollEl.removeEventListener("scroll", save);
     };
-  }, [scrollKey, messages.length]);
+  }, [scrollKey, displayMessages.length]);
 
   function basenameWs(p: string): string {
     const parts = p.replace(/\\/g, "/").split("/").filter(Boolean);
     return parts.length ? parts[parts.length - 1] : p;
   }
 
-  if (messages.length === 0) {
+  if (displayMessages.length === 0) {
     const title = workspaceRoot
       ? `Ask about ${basenameWs(workspaceRoot)}`
       : (
@@ -288,7 +293,7 @@ export function AiChatView({
       resize="instant"
     >
       <ConversationContent className="gap-5 p-3">
-        {messages.map((m) => (
+        {displayMessages.map((m) => (
           <RenderedMessage
             key={m.id}
             message={m}
