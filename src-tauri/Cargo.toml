@@ -1,6 +1,6 @@
 [package]
 name = "atlas"
-version = "0.7.3"
+version = "0.7.4"
 description = "Atlas — an open-source AI-native terminal emulator"
 authors = ["Atlas"]
 license = "Apache-2.0"

@@ -56,7 +56,7 @@
 }
 
 :root {
-    --brand: #06B6D4; /* Electric Cyan / Scientific Teal */
+    --brand: #149595; /* Premium Muted Teal */
     --background: #ffffff;
     --foreground: #18181b;
     --card: #ffffff;
@@ -75,7 +75,7 @@
     --border: #e4e4e7;
     --input: #e4e4e7;
     --ring: var(--brand);
-    --chart-1: #06b6d4;
+    --chart-1: #149595;
     --chart-2: #0ea5e9;
     --chart-3: #14b8a6;
     --chart-4: #3b82f6;
@@ -111,7 +111,7 @@
     --border: #27272a;
     --input: #27272a;
     --ring: var(--brand);
-    --chart-1: #06b6d4;
+    --chart-1: #149595;
     --chart-2: #0ea5e9;
     --chart-3: #14b8a6;
     --chart-4: #3b82f6;
@@ -207,9 +207,9 @@ html[data-chrome="borderless"]:not([data-transparent="true"]) body {
 html[data-chrome="borderless"] #root,
 html[data-chrome="borderless"] #settings-root {
   height: 100%;
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: none;
   background: var(--background);
 }
 /* Activity indicator: dash chasing around the infinity path (pathLength=100). */

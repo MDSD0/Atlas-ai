@@ -16,13 +16,19 @@ function add(id, status, summary, details = {}) {
 }
 
 function executable(name) {
+  const names =
+    platform === "win32" && !/\.[a-z0-9]+$/i.test(name)
+      ? [name, `${name}.exe`, `${name}.cmd`, `${name}.bat`]
+      : [name];
   for (const directory of (process.env.PATH ?? "").split(delimiter)) {
-    const candidate = join(directory, name);
-    try {
-      accessSync(candidate, constants.X_OK);
-      return candidate;
-    } catch {
-      continue;
+    for (const candidateName of names) {
+      const candidate = join(directory, candidateName);
+      try {
+        accessSync(candidate, platform === "win32" ? constants.F_OK : constants.X_OK);
+        return candidate;
+      } catch {
+        continue;
+      }
     }
   }
   return null;
@@ -64,19 +70,22 @@ function contains(haystack, needle) {
 
 const packageJson = JSON.parse(read("package.json"));
 const tauriConfig = JSON.parse(read("src-tauri/tauri.conf.json"));
+const cargoToml = read("src-tauri/Cargo.toml");
 const releaseWorkflow = read(".github/workflows/release.yml");
 const ciWorkflow = read(".github/workflows/ci.yml");
 const releasePreflight = read("scripts/release-preflight.mjs");
 const sweBenchPreflight = read("scripts/external-benchmark-preflight.mjs");
 const terminalBenchPreflight = read("scripts/terminal-benchmark-preflight.mjs");
 
-if (packageJson.version === tauriConfig.version) {
-  add("version-sync", "passed", "package.json and Tauri config versions match", {
+const cargoVersion = cargoToml.match(/^version = "([^"]+)"/m)?.[1] ?? "";
+if (packageJson.version === tauriConfig.version && packageJson.version === cargoVersion) {
+  add("version-sync", "passed", "package.json, Cargo.toml, and Tauri config versions match", {
     version: packageJson.version,
   });
 } else {
-  add("version-sync", "blocked", "package.json and Tauri config versions differ", {
+  add("version-sync", "blocked", "package.json, Cargo.toml, and Tauri config versions differ", {
     packageVersion: packageJson.version,
+    cargoVersion,
     tauriVersion: tauriConfig.version,
   });
 }

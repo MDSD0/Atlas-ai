@@ -194,7 +194,18 @@ export function AiChatView({
     : false;
   const isBusy = status === "submitted" || status === "streaming";
   const lastMessage = displayMessages[displayMessages.length - 1];
-  const showSpinner = isBusy && lastMessage?.role === "user";
+  // Show the "Thinking…" spinner when:
+  //   1. We're waiting for the first token (last message is from the user), OR
+  //   2. The assistant is streaming but only has reasoning parts so far — the model
+  //      is actively thinking but hasn't produced any visible text or tool calls yet.
+  const assistantOnlyReasoning =
+    isBusy &&
+    lastMessage?.role === "assistant" &&
+    lastMessage.parts.length > 0 &&
+    lastMessage.parts.every(
+      (p) => p.type === "reasoning" || (p.type === "text" && !(p as { text?: string }).text?.trim()),
+    );
+  const showSpinner = (isBusy && lastMessage?.role === "user") || assistantOnlyReasoning;
   const streamingMessageId =
     status === "streaming" && lastMessage?.role === "assistant"
       ? lastMessage.id
@@ -311,7 +322,9 @@ export function AiChatView({
         {showSpinner && (
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
             <Spinner />
-            <span className="truncate">{step ?? "Thinking…"}</span>
+            <span className="truncate">
+              {assistantOnlyReasoning ? "Thinking…" : (step ?? "Thinking…")}
+            </span>
           </div>
         )}
         {showContinue && (

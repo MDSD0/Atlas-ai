@@ -425,6 +425,14 @@ This is a review loop: the user wants to see and shape the plan before anything 
 4. Stop after the plan. Atlas will show an editable plan review dock with Proceed/Revise controls.
 If the user proceeds, execute the approved plan normally. If they comment or revise, re-read only affected files and post the updated plan.`;
 
+export const PLAN_MODE_ACTIVE_TOOLS = [
+  "repo_context",
+  "read_file",
+  "grep",
+  "glob",
+  "list_directory",
+] as const;
+
 /**
  * Prompt-layer split. Two layers with different lifetimes:
  *   - stableText: base system prompt + session-stable persona/custom instructions.
@@ -724,7 +732,13 @@ export async function runAgentStream(opts: RunAgentOptions) {
       return repaired === null ? null : { ...toolCall, input: repaired };
     },
     prepareStep:
-      opts.forceActiveTools?.length
+      opts.planMode
+        ? () => ({
+            activeTools: PLAN_MODE_ACTIVE_TOOLS.filter((name) =>
+              allToolNames.has(name),
+            ) as (keyof typeof tools)[],
+          })
+        : opts.forceActiveTools?.length
         ? () => ({
             activeTools: opts.forceActiveTools!.filter((name) =>
               allToolNames.has(name),
