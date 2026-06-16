@@ -109,7 +109,7 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "group relative flex items-center gap-2 rounded-md px-2 py-1 text-[12px] transition-colors",
+        "group relative flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 py-1 text-[12px] transition-colors",
         isActive
           ? "bg-accent font-medium text-foreground"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
@@ -131,9 +131,9 @@ function SessionRow({
       ) : (
         <button
           type="button"
-          className="min-w-0 flex-1 truncate text-left"
+          className="block min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-left"
           onClick={() => onSelect(session.id)}
-          title={session.title}
+          aria-label={session.title}
         >
           {session.title}
         </button>
@@ -144,7 +144,7 @@ function SessionRow({
       </span>
 
       {/* Three-dot menu */}
-      <div className="relative">
+      <div className="relative shrink-0">
         <button
           type="button"
           aria-label="Session options"
@@ -219,7 +219,7 @@ function WorkspaceGroupSection({
   const label = workspaceLabel(group.workspaceRoot);
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-w-0 flex-col overflow-hidden">
       <div className="flex items-center gap-0.5 px-1.5 py-0.5">
         <button
           type="button"
@@ -281,7 +281,7 @@ function WorkspaceGroupSection({
       </div>
 
       {!collapsed && (
-        <div className="mb-1 ml-[18px] mr-1.5 flex flex-col gap-px border-l border-border/50 pl-1.5">
+        <div className="mb-1 ml-[18px] mr-1.5 flex min-w-0 flex-col gap-px overflow-hidden border-l border-border/50 pl-1.5">
           {group.sessions.map((s) => (
             <SessionRow
               key={s.id}
@@ -415,7 +415,7 @@ export function SessionsList({
     <div
       data-testid="atlas-sessions-panel"
       className={cn(
-        "flex h-full min-h-0 flex-col overflow-y-auto px-2 py-1",
+        "flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overflow-x-hidden px-2 py-1",
         compact && "max-h-[min(70vh,620px)] w-[min(92vw,400px)] py-2",
       )}
     >
