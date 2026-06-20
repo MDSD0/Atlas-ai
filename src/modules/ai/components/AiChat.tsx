@@ -6,6 +6,8 @@ import {
 } from "@/components/ai-elements/conversation";
 import {
   Message,
+  MessageAction,
+  MessageActions,
   MessageContent,
   MessageResponse,
 } from "@/components/ai-elements/message";
@@ -22,7 +24,7 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
-import { ChevronRight as ArrowRight01Icon, Code as CodeIcon, FileText as File01Icon, Hash as HashtagIcon, Terminal as TerminalIcon } from "lucide-react";
+import { CheckCircle as CheckmarkCircle01Icon, ChevronRight as ArrowRight01Icon, Code as CodeIcon, Copy as CopyIcon, FileText as File01Icon, Hash as HashtagIcon, Terminal as TerminalIcon } from "lucide-react";
 import { SLASH_COMMANDS, ATLAS_CMD_RE } from "../lib/slashCommands";
 import { normalizeMessageHistory } from "../lib/sessions";
 import { Spinner } from "@/components/ui/spinner";
@@ -36,7 +38,7 @@ import type {
   UIMessagePart,
 } from "ai";
 import type { StickToBottomContext } from "use-stick-to-bottom";
-import { memo, useCallback, useLayoutEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 
 function CommandSnippet({ name }: { name: string }) {
@@ -436,20 +438,26 @@ const RenderedMessage = memo(function RenderedMessage({
     const commandName = cmdMatch?.[1] ?? null;
     const withoutCmd = cmdMatch ? rawText.slice(cmdMatch[0].length) : rawText;
     const stripped = stripUserContextBlocks(withoutCmd);
+    const copyText = stripped.text || withoutCmd.trim() || rawText.trim();
 
     return (
       <Message from="user">
-        <MessageContent>
-          {commandName ? <CommandSnippet name={commandName} /> : null}
-          {stripped.chips.length > 0 ? (
-            <ContextChips chips={stripped.chips} />
-          ) : null}
-          {stripped.text ? (
-            <p className="whitespace-pre-wrap wrap-break-word">
-              {stripped.text}
-            </p>
-          ) : null}
-        </MessageContent>
+        <div className="flex max-w-full flex-col items-end gap-1">
+          <MessageContent>
+            {commandName ? <CommandSnippet name={commandName} /> : null}
+            {stripped.chips.length > 0 ? (
+              <ContextChips chips={stripped.chips} />
+            ) : null}
+            {stripped.text ? (
+              <p className="whitespace-pre-wrap wrap-break-word">
+                {stripped.text}
+              </p>
+            ) : null}
+          </MessageContent>
+          <MessageActions className="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <CopyMessageAction text={copyText} />
+          </MessageActions>
+        </div>
       </Message>
     );
   }
@@ -459,6 +467,7 @@ const RenderedMessage = memo(function RenderedMessage({
   const groups = useMemo(() => buildPartGroups(message.parts as AnyPart[]), [
     message.parts,
   ]);
+  const copyText = useMemo(() => messageTextForCopy(message), [message]);
 
   return (
     <Message from={message.role}>
@@ -495,9 +504,54 @@ const RenderedMessage = memo(function RenderedMessage({
           })}
         </div>
       </MessageContent>
+      {copyText ? (
+        <MessageActions className="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          <CopyMessageAction text={copyText} />
+        </MessageActions>
+      ) : null}
     </Message>
   );
 });
+
+const COPY_RESET_MS = 1400;
+
+const CopyMessageAction = memo(function CopyMessageAction({
+  text,
+}: {
+  text: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const onCopy = useCallback(async () => {
+    if (!text.trim()) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), COPY_RESET_MS);
+    } catch (err) {
+      console.error("Failed to copy message", err);
+    }
+  }, [text]);
+  const Icon = copied ? CheckmarkCircle01Icon : CopyIcon;
+  return (
+    <MessageAction
+      tooltip={copied ? "Copied" : "Copy"}
+      label={copied ? "Copied" : "Copy message"}
+      onClick={onCopy}
+      className="size-6 rounded-md text-muted-foreground/80 hover:text-foreground"
+      disabled={!text.trim()}
+    >
+      <Icon size={12} strokeWidth={1.7} />
+    </MessageAction>
+  );
+});
+
+function messageTextForCopy(message: UIMessage): string {
+  return message.parts
+    .filter((part): part is { type: "text"; text: string } => part.type === "text")
+    .map((part) => part.text.trim())
+    .filter(Boolean)
+    .join("\n\n");
+}
 
 function parseHiddenAtlasControl(text: string): string | null {
   const match = text.match(
