@@ -11,7 +11,8 @@ export function collectPendingApprovals(
   messages: UIMessage[],
 ): PendingApproval[] {
   const out: PendingApproval[] = [];
-  const seen = new Set<string>();
+  const seenRequests = new Set<string>();
+  const settled = new Set<string>();
   for (const m of messages) {
     if (m.role !== "assistant") continue;
     for (const raw of m.parts) {
@@ -21,10 +22,21 @@ export function collectPendingApprovals(
         toolName?: string;
         approval?: { id?: string };
       };
-      if (p.state !== "approval-requested") continue;
       const approvalId = p.approval?.id;
-      if (!approvalId || seen.has(approvalId)) continue;
-      seen.add(approvalId);
+      if (!approvalId) continue;
+      if (
+        p.state === "approval-responded" ||
+        p.state === "output-available" ||
+        p.state === "output-error" ||
+        p.state === "output-denied"
+      ) {
+        settled.add(approvalId);
+        continue;
+      }
+      if (p.state !== "approval-requested" || seenRequests.has(approvalId)) {
+        continue;
+      }
+      seenRequests.add(approvalId);
       const type = p.type ?? "";
       const toolName =
         type === "dynamic-tool"
@@ -33,7 +45,7 @@ export function collectPendingApprovals(
       out.push({ part: raw as unknown as ApprovalPart, toolName });
     }
   }
-  return out;
+  return out.filter((pending) => !settled.has(pending.part.approval.id));
 }
 
 /**
