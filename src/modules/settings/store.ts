@@ -170,7 +170,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   favoriteModelIds: [],
   recentModelIds: [],
   vimMode: false,
-  showHidden: false,
+  showHidden: true,
   terminalWebglEnabled: true,
   terminalFontFamily: "",
   terminalLetterSpacing: 0,
