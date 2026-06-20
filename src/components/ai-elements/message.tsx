@@ -10,6 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useChatStore } from "@/modules/ai/store/chatStore";
 
 
 import type { UIMessage } from "ai";
@@ -26,6 +27,49 @@ import {
 import { Streamdown } from "streamdown";
 import { ChatStreamingProvider } from "./chat-code";
 import { MarkdownCode } from "./markdown-code";
+
+function isLocalPreviewUrl(href: string | undefined): href is string {
+  if (!href) return false;
+  try {
+    const url = new URL(href);
+    const host = url.hostname;
+    return (
+      (url.protocol === "http:" || url.protocol === "https:") &&
+      (host === "localhost" ||
+        host === "127.0.0.1" ||
+        host === "0.0.0.0" ||
+        host === "::1" ||
+        host === "[::1]" ||
+        host.endsWith(".localhost"))
+    );
+  } catch {
+    return false;
+  }
+}
+
+function MarkdownAnchor({
+  href,
+  children,
+  onClick,
+  ...props
+}: ComponentProps<"a">) {
+  const localPreview = isLocalPreviewUrl(href);
+  return (
+    <a
+      href={href}
+      {...props}
+      onClick={(event) => {
+        onClick?.(event);
+        if (event.defaultPrevented || !localPreview || !href) return;
+        event.preventDefault();
+        useChatStore.getState().live.openPreview(href);
+      }}
+      title={localPreview ? "Open in Atlas preview" : props.title}
+    >
+      {children}
+    </a>
+  );
+}
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -322,7 +366,7 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown> & {
   streaming?: boolean;
 };
 
-const streamdownComponents = { code: MarkdownCode };
+const streamdownComponents = { a: MarkdownAnchor, code: MarkdownCode };
 
 export const MessageResponse = memo(
   ({ className, streaming = false, ...props }: MessageResponseProps) => (
