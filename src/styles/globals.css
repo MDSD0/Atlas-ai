@@ -56,82 +56,82 @@
 }
 
 :root {
-    --brand: #149595; /* Premium Muted Teal */
-    --background: #ffffff;
-    --foreground: #18181b;
+    --brand: #9cff12; /* Atlas lime */
+    --background: #fbfcf8;
+    --foreground: #15171a;
     --card: #ffffff;
-    --card-foreground: #18181b;
-    --popover: #f4f4f5;
-    --popover-foreground: #18181b;
+    --card-foreground: #15171a;
+    --popover: #f3f6ee;
+    --popover-foreground: #15171a;
     --primary: var(--brand);
-    --primary-foreground: #ffffff;
-    --secondary: #f4f4f5;
-    --secondary-foreground: #18181b;
-    --muted: #e4e4e7;
-    --muted-foreground: #71717a;
-    --accent: #f4f4f5;
-    --accent-foreground: #18181b;
+    --primary-foreground: #071007;
+    --secondary: #eef2e8;
+    --secondary-foreground: #15171a;
+    --muted: #e7ebe1;
+    --muted-foreground: #667063;
+    --accent: #eef5e4;
+    --accent-foreground: #111411;
     --destructive: #ef4444;
-    --border: #e4e4e7;
-    --input: #e4e4e7;
+    --border: #dde5d5;
+    --input: #dde5d5;
     --ring: var(--brand);
-    --chart-1: #149595;
-    --chart-2: #0ea5e9;
-    --chart-3: #14b8a6;
-    --chart-4: #3b82f6;
-    --chart-5: #10b981;
+    --chart-1: #84cc16;
+    --chart-2: #22c55e;
+    --chart-3: #10b981;
+    --chart-4: #06b6d4;
+    --chart-5: #a3e635;
     --radius: 0.625rem;
-    --sidebar: #f4f4f5;
-    --sidebar-foreground: #18181b;
+    --sidebar: #f2f5ed;
+    --sidebar-foreground: #15171a;
     --sidebar-primary: var(--brand);
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #e4e4e7;
-    --sidebar-accent-foreground: #18181b;
-    --sidebar-border: #e4e4e7;
+    --sidebar-primary-foreground: #071007;
+    --sidebar-accent: #e6ecdE;
+    --sidebar-accent-foreground: #15171a;
+    --sidebar-border: #dde5d5;
     --sidebar-ring: var(--brand);
 }
 
 .dark {
-    /* Layered cool-graphite surfaces for an elegant, professional coding harness. */
-    --background: #0d0d0d;
-    --foreground: #ffffff;
-    --card: #151515;
-    --card-foreground: #ffffff;
-    --popover: #1a1a1a;
-    --popover-foreground: #ffffff;
+    /* Cool graphite surfaces matched to the Atlas lime mark. */
+    --background: #07090d;
+    --foreground: #f4f7ef;
+    --card: #0e1117;
+    --card-foreground: #f4f7ef;
+    --popover: #11151c;
+    --popover-foreground: #f4f7ef;
     --primary: var(--brand);
-    --primary-foreground: #ffffff;
-    --secondary: #1a1a1a;
-    --secondary-foreground: #ffffff;
-    --muted: #1f1f1f;
-    --muted-foreground: #a1a1aa;
-    --accent: #27272a;
-    --accent-foreground: #ffffff;
+    --primary-foreground: #071007;
+    --secondary: #151a22;
+    --secondary-foreground: #f4f7ef;
+    --muted: #181d26;
+    --muted-foreground: #9aa39a;
+    --accent: #1f2630;
+    --accent-foreground: #f4f7ef;
     --destructive: #ef4444;
-    --border: #27272a;
-    --input: #27272a;
+    --border: #252d38;
+    --input: #252d38;
     --ring: var(--brand);
-    --chart-1: #149595;
-    --chart-2: #0ea5e9;
-    --chart-3: #14b8a6;
-    --chart-4: #3b82f6;
-    --chart-5: #10b981;
-    --sidebar: #0d0d0d;
-    --sidebar-foreground: #ffffff;
+    --chart-1: #9cff12;
+    --chart-2: #55f36b;
+    --chart-3: #22d99a;
+    --chart-4: #12b7c7;
+    --chart-5: #c6ff40;
+    --sidebar: #090c11;
+    --sidebar-foreground: #f4f7ef;
     --sidebar-primary: var(--brand);
-    --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #1a1a1a;
-    --sidebar-accent-foreground: #ffffff;
-    --sidebar-border: #27272a;
+    --sidebar-primary-foreground: #071007;
+    --sidebar-accent: #151a22;
+    --sidebar-accent-foreground: #f4f7ef;
+    --sidebar-border: #252d38;
     --sidebar-ring: var(--brand);
 }
 
 @utility glass-panel {
-  background: rgba(18, 18, 18, 0.6);
+  background: rgba(12, 15, 20, 0.72);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(156, 255, 18, 0.10);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.035);
 }
 
 @layer base {

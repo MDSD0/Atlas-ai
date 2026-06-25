@@ -292,7 +292,7 @@ export function AiChatView({
           <ConversationEmptyState
             title={title as any}
             description={description}
-            icon={<img src="/logo-transparent.png" alt="Atlas Logo" className="w-16 h-16 opacity-80" style={{ filter: "hue-rotate(70deg) saturate(1.2)" }} />}
+            icon={<img src="/logo-transparent.png" alt="Atlas Logo" className="w-16 h-16 object-contain opacity-95" />}
           />
         </ConversationContent>
       </Conversation>
