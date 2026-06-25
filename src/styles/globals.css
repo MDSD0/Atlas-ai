@@ -93,41 +93,41 @@
 
 .dark {
     /* Cool graphite surfaces matched to the Atlas lime mark. */
-    --background: #07090d;
+    --background: #101216;
     --foreground: #f4f7ef;
-    --card: #0e1117;
+    --card: #171a20;
     --card-foreground: #f4f7ef;
-    --popover: #11151c;
+    --popover: #1a1e25;
     --popover-foreground: #f4f7ef;
     --primary: var(--brand);
     --primary-foreground: #071007;
-    --secondary: #151a22;
+    --secondary: #1c2129;
     --secondary-foreground: #f4f7ef;
-    --muted: #181d26;
-    --muted-foreground: #9aa39a;
-    --accent: #1f2630;
+    --muted: #202630;
+    --muted-foreground: #a5aea4;
+    --accent: #27303b;
     --accent-foreground: #f4f7ef;
     --destructive: #ef4444;
-    --border: #252d38;
-    --input: #252d38;
+    --border: #303945;
+    --input: #303945;
     --ring: var(--brand);
     --chart-1: #9cff12;
     --chart-2: #55f36b;
     --chart-3: #22d99a;
     --chart-4: #12b7c7;
     --chart-5: #c6ff40;
-    --sidebar: #090c11;
+    --sidebar: #111419;
     --sidebar-foreground: #f4f7ef;
     --sidebar-primary: var(--brand);
     --sidebar-primary-foreground: #071007;
-    --sidebar-accent: #151a22;
+    --sidebar-accent: #1c2129;
     --sidebar-accent-foreground: #f4f7ef;
-    --sidebar-border: #252d38;
+    --sidebar-border: #303945;
     --sidebar-ring: var(--brand);
 }
 
 @utility glass-panel {
-  background: rgba(12, 15, 20, 0.72);
+  background: rgba(18, 21, 27, 0.78);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(156, 255, 18, 0.10);
