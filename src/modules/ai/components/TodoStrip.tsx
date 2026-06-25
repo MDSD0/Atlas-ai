@@ -2,6 +2,11 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -10,7 +15,8 @@ import {
 import { cn } from "@/lib/utils";
 
 
-import { useEffect } from "react";
+import { ChevronRight as ChevronRightIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { Todo } from "../lib/todos";
 import { useTodosStore } from "../store/todoStore";
 
@@ -23,6 +29,7 @@ export function TodoStrip({ sessionId }: Props) {
   const todos =
     useTodosStore((s) => (sessionId ? s.bySession[sessionId] : undefined)) ??
     EMPTY_TODOS;
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (sessionId) void hydrate(sessionId);
@@ -33,24 +40,43 @@ export function TodoStrip({ sessionId }: Props) {
   const completed = todos.filter((t) => t.status === "completed").length;
   if (completed === todos.length) return null;
   const pct = Math.round((completed / todos.length) * 100);
+  const active = todos.find((t) => t.status === "in_progress");
+  const pending = todos.length - completed;
 
   return (
-    <div className="flex flex-col min-h-0 shrink-0 border-t-2 border-border/40 bg-muted/80 px-3 py-1.5 max-h-[35%] shadow-[0_-4px_12px_-8px_rgba(0,0,0,0.2)]">
-      <div className="my-1.5 flex items-center gap-2 shrink-0">
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      className="shrink-0 border-t border-border/40 bg-muted/55"
+    >
+      <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        <ChevronRightIcon
+          size={12}
+          strokeWidth={1.5}
+          className={cn("shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
+        />
         <span className="text-[11px] font-medium text-foreground">Todos</span>
         <Progress value={pct} className="h-1 flex-1" />
-        <span className="text-[11px] tabular-nums font-mono text-muted-foreground">
+        <span className="font-mono text-[11px] tabular-nums text-muted-foreground">
           {completed}/{todos.length}
         </span>
-      </div>
-      <ScrollArea className="flex-1 min-h-0">
-        <ul className="flex flex-col gap-0.5">
-          {todos.map((t) => (
-            <TodoRow key={t.id} todo={t} />
-          ))}
-        </ul>
-      </ScrollArea>
-    </div>
+      </CollapsibleTrigger>
+      {!open && active ? (
+        <div className="truncate px-8 pb-2 text-[10.5px] text-muted-foreground">
+          {active.title}
+          {pending > 1 ? ` · ${pending - 1} waiting` : ""}
+        </div>
+      ) : null}
+      <CollapsibleContent>
+        <ScrollArea className="max-h-48 min-h-0 px-3 pb-2">
+          <ul className="flex flex-col gap-0.5">
+            {todos.map((t) => (
+              <TodoRow key={t.id} todo={t} />
+            ))}
+          </ul>
+        </ScrollArea>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 

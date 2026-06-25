@@ -149,7 +149,7 @@ const ToolImpl = ({
   const label = meta?.label ?? toolName;
   const summary = deriveSummary(toolName, input);
   const isError = state === "output-error";
-  const open = defaultOpen ?? isError;
+  const open = defaultOpen ?? false;
   const isHeavy = HEAVY_CONTENT_TOOLS.has(toolName);
   // For heavy tools, only show details on error — never the streamed input
   // body, which is huge and re-renders per token.
@@ -203,6 +203,13 @@ const ToolImpl = ({
             failed
           </span>
         )}
+        {hasDetails ? (
+          <ArrowRight01Icon
+            size={12}
+            strokeWidth={1.5}
+            className="shrink-0 text-muted-foreground transition-transform group-data-[state=open]/tool:rotate-90"
+          />
+        ) : null}
       </CollapsibleTrigger>
 
       {hasDetails && (

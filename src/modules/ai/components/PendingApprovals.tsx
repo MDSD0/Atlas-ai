@@ -1,4 +1,11 @@
-import { memo, useMemo } from "react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { cn } from "@/lib/utils";
+import { ChevronRight as ChevronRightIcon } from "lucide-react";
+import { memo, useMemo, useState } from "react";
 import type { ToolUIPart, UIMessage } from "ai";
 import { AiToolApproval } from "./AiToolApproval";
 
@@ -61,20 +68,54 @@ export const PendingApprovals = memo(function PendingApprovals({
   onRespond: (approvalId: string, approved: boolean) => void;
 }) {
   const pending = useMemo(() => collectPendingApprovals(messages), [messages]);
+  const [open, setOpen] = useState(false);
   if (pending.length === 0) return null;
+  const first = pending[0];
   return (
-    <div
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
       data-testid="atlas-pending-approvals"
-      className="relative z-30 mb-2 flex max-h-64 shrink-0 flex-col gap-2 overflow-y-auto rounded-xl border border-brand/25 bg-background/98 p-2 shadow-2xl shadow-black/25 backdrop-blur-xl"
+      className="relative z-30 mb-2 shrink-0 overflow-hidden rounded-xl border border-brand/25 bg-background/98 shadow-2xl shadow-black/25 backdrop-blur-xl"
     >
-      {pending.map(({ part, toolName }) => (
-        <AiToolApproval
-          key={part.approval.id}
-          part={part}
-          toolName={toolName}
-          onRespond={(approved) => onRespond(part.approval.id, approved)}
+      <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+        <span className="size-1.5 shrink-0 rounded-full bg-brand" />
+        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
+          {pending.length === 1
+            ? `${first.toolName} needs approval`
+            : `${pending.length} approvals`}
+        </span>
+        <ChevronRightIcon
+          size={12}
+          strokeWidth={1.5}
+          className={cn("shrink-0 text-muted-foreground transition-transform", open && "rotate-90")}
         />
-      ))}
-    </div>
+      </CollapsibleTrigger>
+      {!open ? (
+        <div className="truncate px-3 pb-2 font-mono text-[10.5px] text-muted-foreground">
+          {previewSummary(first)}
+        </div>
+      ) : null}
+      <CollapsibleContent>
+        <div className="flex max-h-72 flex-col gap-2 overflow-y-auto p-2 pt-0">
+          {pending.map(({ part, toolName }) => (
+            <AiToolApproval
+              key={part.approval.id}
+              part={part}
+              toolName={toolName}
+              onRespond={(approved) => onRespond(part.approval.id, approved)}
+            />
+          ))}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 });
+
+function previewSummary({ part, toolName }: PendingApproval): string {
+  const input = part.input as Record<string, unknown> | undefined;
+  if (!input) return toolName;
+  const path = typeof input.path === "string" ? input.path : null;
+  const command = typeof input.command === "string" ? input.command : null;
+  return path ?? command ?? toolName;
+}

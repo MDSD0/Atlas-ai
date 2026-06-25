@@ -123,10 +123,11 @@ function PreviewBlock({
     const content = typeof input.content === "string" ? input.content : "";
     const lines = content ? content.split("\n").length : 0;
     return (
-      <div className="space-y-0.5 font-mono text-[11px]">
+      <div className="space-y-1.5 font-mono text-[11px]">
         <div className="text-muted-foreground">{String(input.path ?? "")}</div>
+        <AddedPreview content={content} />
         <div className="text-[10.5px] text-muted-foreground/80">
-          {lines} line{lines === 1 ? "" : "s"} · review in the diff tab
+          {lines} line{lines === 1 ? "" : "s"}
         </div>
       </div>
     );
@@ -175,6 +176,33 @@ function PreviewBlock({
     <pre className="overflow-auto rounded-md bg-muted/60 p-2 font-mono text-[11px] leading-relaxed">
       {JSON.stringify(input, null, 2)}
     </pre>
+  );
+}
+
+function AddedPreview({ content }: { content: string }) {
+  if (!content) return null;
+  const lines = content.split("\n");
+  const shown = lines.slice(0, 10);
+  const more = lines.length - shown.length;
+  return (
+    <div className="overflow-hidden rounded-md border border-border/50 text-[10.5px] leading-relaxed">
+      {shown.map((line, i) => (
+        <div
+          key={i}
+          className="flex bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+        >
+          <span className="w-4 shrink-0 select-none text-center opacity-70">+</span>
+          <span className="min-w-0 flex-1 overflow-x-auto whitespace-pre pr-2">
+            {line || " "}
+          </span>
+        </div>
+      ))}
+      {more > 0 ? (
+        <div className="px-2 text-[10px] italic text-muted-foreground">
+          …{more} more added
+        </div>
+      ) : null}
+    </div>
   );
 }
 
