@@ -74,7 +74,7 @@ macOS WKWebView does not provide the same WebDriver path as Linux/Windows deskto
 The GitHub release workflow must:
 
 - Build macOS Apple Silicon, macOS Intel, Linux, and Windows artifacts
-- Use `tauri-apps/tauri-action@v1`
+- Use `tauri-apps/tauri-action@v0.6.2`
 - Upload updater JSON
 - Upload updater signatures
 - Fail unless the draft release contains `latest.json` and `.sig` assets

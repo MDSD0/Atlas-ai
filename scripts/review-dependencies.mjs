@@ -10,7 +10,7 @@ function packageRuntime(text) {
 }
 
 function cargoRuntime(text) {
-  const lines = text.split("\n");
+  const lines = text.split(/\r?\n/);
   const names = [];
   let active = false;
   for (const line of lines) {

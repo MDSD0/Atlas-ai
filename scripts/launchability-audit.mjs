@@ -91,10 +91,8 @@ if (packageJson.version === tauriConfig.version && packageJson.version === cargo
 }
 
 const releaseContractOk =
-  contains(releaseWorkflow, "tauri-apps/tauri-action@v1") &&
-  !contains(releaseWorkflow, "tauri-apps/tauri-action@v0") &&
-  contains(releaseWorkflow, "uploadUpdaterJson: true") &&
-  contains(releaseWorkflow, "uploadUpdaterSignatures: true") &&
+  contains(releaseWorkflow, "tauri-apps/tauri-action@v0.6.2") &&
+  contains(releaseWorkflow, "includeUpdaterJson: true") &&
   /grep -q '\^latest\\\.json\$'/.test(releaseWorkflow) &&
   /grep -q '\\\.sig\$'/.test(releaseWorkflow);
 
@@ -105,9 +103,8 @@ add(
     ? "release workflow builds four platforms and verifies signed updater assets"
     : "release workflow is missing the current signed updater contract",
   {
-    tauriActionV1: contains(releaseWorkflow, "tauri-apps/tauri-action@v1"),
-    updaterJson: contains(releaseWorkflow, "uploadUpdaterJson: true"),
-    updaterSignatures: contains(releaseWorkflow, "uploadUpdaterSignatures: true"),
+    tauriActionV062: contains(releaseWorkflow, "tauri-apps/tauri-action@v0.6.2"),
+    updaterJson: contains(releaseWorkflow, "includeUpdaterJson: true"),
     macArm: contains(releaseWorkflow, "aarch64-apple-darwin"),
     macX64: contains(releaseWorkflow, "x86_64-apple-darwin"),
     linux: contains(releaseWorkflow, "ubuntu-22.04"),
@@ -116,8 +113,8 @@ add(
 );
 
 const releasePreflightOk =
-  contains(releasePreflight, "tauri-apps\\/tauri-action@v1") &&
-  contains(releasePreflight, "uploadUpdaterSignatures: true");
+  contains(releasePreflight, "tauri-apps\\/tauri-action@v0\\.6\\.2") &&
+  contains(releasePreflight, "includeUpdaterJson: true");
 add(
   "release-preflight",
   releasePreflightOk ? "passed" : "blocked",
