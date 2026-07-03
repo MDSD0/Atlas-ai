@@ -1,6 +1,9 @@
 name: Release unsigned Linux bundles
 
 on:
+  push:
+    tags:
+      - linux-preview-*
   workflow_dispatch:
     inputs:
       release_tag:
@@ -49,7 +52,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          gh release upload "$RELEASE_TAG" \
+          tag="$RELEASE_TAG"
+          if [ -z "$tag" ]; then
+            tag="${GITHUB_REF_NAME#linux-preview-}"
+          fi
+          gh release upload "$tag" \
             src-tauri/target/release/bundle/deb/*.deb \
             src-tauri/target/release/bundle/rpm/*.rpm \
             src-tauri/target/release/bundle/appimage/*.AppImage \
