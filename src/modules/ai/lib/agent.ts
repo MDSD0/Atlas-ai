@@ -568,6 +568,9 @@ export type RunAgentOptions = {
    * active even if the model searches for them). Used to A/B a capability's
    * value, e.g. blockCapabilities=["repo_intel"] for a grep-only arm. */
   blockCapabilities?: string[];
+  /** Union of currently-enabled skills' `allowedTools` (null/empty = no
+   * restriction). Narrows the gateway-active toolbelt for the whole run. */
+  skillToolRestriction?: string[] | null;
   onStep?: (step: string | null) => void;
   onUsage?: (delta: AgentUsageDelta) => void;
   onCompact?: (info: { droppedCount: number }) => void;
@@ -746,9 +749,11 @@ export async function runAgentStream(opts: RunAgentOptions) {
           })
         : gatewayActive
           ? () => ({
-              activeTools: activeToolNames(sessionId, opts.blockCapabilities).filter(
-                (name) => allToolNames.has(name),
-              ) as (keyof typeof tools)[],
+              activeTools: activeToolNames(
+                sessionId,
+                opts.blockCapabilities,
+                opts.skillToolRestriction,
+              ).filter((name) => allToolNames.has(name)) as (keyof typeof tools)[],
             })
           : undefined,
     abortSignal: opts.abortSignal,

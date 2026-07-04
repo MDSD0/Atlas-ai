@@ -23,17 +23,38 @@ export type LifecycleHookResult = {
   detail: string;
 };
 
+/** Either a fixed hook list, or a provider re-evaluated on every `run()` call
+ * (used to reflect currently-enabled skills' hooks without a stale snapshot
+ * or a mutable singleton). */
+export type HooksSource =
+  | readonly LifecycleHook[]
+  | (() => readonly LifecycleHook[] | Promise<readonly LifecycleHook[]>);
+
 export class LifecycleHookRunner {
   constructor(
-    private readonly hooks: readonly LifecycleHook[],
+    private readonly source: HooksSource,
     private readonly timeoutMs = LIFECYCLE_HOOK_TIMEOUT_MS,
   ) {}
+
+  private async resolveHooks(): Promise<readonly LifecycleHook[]> {
+    if (typeof this.source !== "function") return this.source;
+    // A dynamic source (e.g. reading currently-enabled skills from storage)
+    // can fail for reasons unrelated to any hook's own logic — resolving it
+    // must fail closed (no hooks fired) rather than let a storage hiccup
+    // propagate out of what's meant to be a best-effort side channel.
+    try {
+      return await this.source();
+    } catch {
+      return [];
+    }
+  }
 
   async run(
     event: AtlasLifecycleEvent,
     payload: Record<string, unknown> = {},
   ): Promise<LifecycleHookResult[]> {
-    const selected = this.hooks.filter(
+    const hooks = await this.resolveHooks();
+    const selected = hooks.filter(
       (hook) => hook.enabled && hook.events.includes(event),
     );
     const results: LifecycleHookResult[] = [];
@@ -76,5 +97,3 @@ export class LifecycleHookRunner {
     }
   }
 }
-
-export const lifecycleHookRunner = new LifecycleHookRunner([]);

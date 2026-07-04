@@ -169,7 +169,7 @@ pub fn project(
         max_tokens,
         projected_tokens: context.chars().count().div_ceil(4),
         naive_tokens: snapshot.naive_tokens,
-        ranking_strategy: "aider_weighted_pagerank".to_string(),
+        ranking_strategy: "bounded_symbol_reference_pagerank_v2".to_string(),
         graph_edge_count: graph_ranking.edge_count,
         rank_iterations: RANK_ITERATIONS,
         graph_relations: graph_ranking.relations,

@@ -18,15 +18,52 @@ for await (const line of lines) {
     initialized = true;
     continue;
   }
+  if (message.method === "tools/list") {
+    if (!initialized) {
+      fail(message.id, -32002, "fixture requires initialize before tools/list");
+      continue;
+    }
+    reply(message.id, {
+      tools: [
+        {
+          name: "echo",
+          description: "Return the supplied arguments.",
+          inputSchema: { type: "object", additionalProperties: true },
+        },
+        {
+          name: "sleep",
+          description: "Wait for a bounded fixture delay.",
+          inputSchema: {
+            type: "object",
+            properties: { ms: { type: "number" } },
+          },
+        },
+      ],
+    });
+    continue;
+  }
   if (message.method === "tools/call") {
     if (!initialized) {
       fail(message.id, -32002, "fixture requires initialize before tools/call");
       continue;
     }
     calls += 1;
+    const args = message.params.arguments;
+    if (message.params.name === "sleep") {
+      // Used by cancellation tests: delays the reply so a test can cancel
+      // the call while it's still in flight.
+      setTimeout(() => {
+        reply(message.id, {
+          content: [{ type: "text", text: "slept" }],
+          structuredContent: { calls, arguments: args },
+          isError: false,
+        });
+      }, Number(args?.ms) || 1000);
+      continue;
+    }
     reply(message.id, {
-      content: [{ type: "text", text: JSON.stringify(message.params.arguments) }],
-      structuredContent: { calls, arguments: message.params.arguments },
+      content: [{ type: "text", text: JSON.stringify(args) }],
+      structuredContent: { calls, arguments: args },
       isError: false,
     });
     continue;

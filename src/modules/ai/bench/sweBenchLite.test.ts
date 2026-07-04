@@ -1,4 +1,4 @@
-﻿import { describe, it, vi } from "vitest";
+﻿import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -190,7 +190,17 @@ run("Atlas SWE-bench Lite trial (real harness â†’ predictions)", () => {
           `LOCALIZATION (n=${n}): hitRate=${hitRate} avgRecall=${avg((s) => s.recall)} avgPrecision=${avg((s) => s.precision)}\n` +
           `Predictions: ${PREDICTIONS_FILE}\n`,
       );
-      if (!existsSync(PREDICTIONS_FILE)) throw new Error("predictions not written");
+      expect(existsSync(PREDICTIONS_FILE), "predictions file was not written").toBe(true);
+      // Empty patches are diagnostic (a genuinely hard instance can legitimately
+      // produce one), but a whole run producing near-zero non-empty patches is
+      // an infra/harness failure, not a capability result — gate on the rate
+      // instead of only checking the file exists.
+      const minPatchRate = Number(process.env.BENCH_MIN_PATCH_RATE ?? 0.5);
+      const patchRate = predictions.length > 0 ? nonEmpty / predictions.length : 0;
+      expect(
+        patchRate,
+        `only ${nonEmpty}/${predictions.length} predictions produced a non-empty patch (min ${minPatchRate})\nsee ${PREDICTIONS_FILE}`,
+      ).toBeGreaterThanOrEqual(minPatchRate);
     },
     TEST_TIMEOUT_MS,
   );

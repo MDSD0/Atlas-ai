@@ -1,5 +1,6 @@
 use std::ffi::{OsStr, OsString};
-use std::path::Path;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 
 use crate::modules::git::errors::{GitError, Result};
 use crate::modules::git::parser::{parse_porcelain_v2, parse_worktree_porcelain};
@@ -961,9 +962,14 @@ pub fn worktree_create(
 ) -> Result<WorktreeCreateResult> {
     let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
     ensure_git_available(&repo_root.workspace)?;
+    ensure_atlas_internal_excluded(&repo_root)?;
     let name = safe_worktree_name(name)?;
     let branch = format!("atlas/{name}");
-    let local_path = repo_root.local_path.join(".atlas").join("worktrees").join(name);
+    let local_path = repo_root
+        .local_path
+        .join(".atlas")
+        .join("worktrees")
+        .join(name);
     if local_path.exists() {
         return Err(GitError::InvalidPath(display_path(&local_path)));
     }
@@ -1001,6 +1007,53 @@ pub fn worktree_create(
             is_main: false,
         });
     Ok(WorktreeCreateResult { worktree })
+}
+
+pub fn prepare_atlas_internal(
+    registry: &WorkspaceRegistry,
+    repo_root: &str,
+    workspace: &WorkspaceEnv,
+) -> Result<()> {
+    let repo_root = authorized_repo_root(registry, repo_root, workspace)?;
+    ensure_git_available(&repo_root.workspace)?;
+    ensure_atlas_internal_excluded(&repo_root)
+}
+
+fn ensure_atlas_internal_excluded(repo_root: &ResolvedGitDirectory) -> Result<()> {
+    const PATTERN: &str = "/.atlas/";
+    let output = run_git(
+        &repo_root.workspace,
+        Some(&repo_root.git_path),
+        ["rev-parse", "--git-path", "info/exclude"],
+        DEFAULT_TIMEOUT_SECS,
+    )?;
+    ensure_success(&output, "failed to resolve repository exclude file")?;
+    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if raw.is_empty() {
+        return Err(GitError::InvalidPath("empty Git exclude path".into()));
+    }
+    let raw_path = PathBuf::from(&raw);
+    let exclude = if raw_path.is_absolute() {
+        crate::modules::workspace::resolve_path(&raw, &repo_root.workspace)
+    } else {
+        repo_root.local_path.join(raw_path)
+    };
+    let existing = std::fs::read_to_string(&exclude).unwrap_or_default();
+    if existing.lines().any(|line| line.trim() == PATTERN) {
+        return Ok(());
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&exclude)
+        .map_err(GitError::Io)?;
+    if !existing.is_empty() && !existing.ends_with('\n') {
+        file.write_all(b"\n").map_err(GitError::Io)?;
+    }
+    file.write_all(
+        format!("# Atlas internal worktrees and runtime artifacts\n{PATTERN}\n").as_bytes(),
+    )
+    .map_err(GitError::Io)
 }
 
 pub fn worktree_remove(
@@ -1125,7 +1178,8 @@ fn atlas_worktree_path(repo_root: &Path, path: &str) -> Result<std::path::PathBu
 fn same_display_path(a: &str, b: &str) -> bool {
     #[cfg(windows)]
     {
-        a.replace('\\', "/").eq_ignore_ascii_case(&b.replace('\\', "/"))
+        a.replace('\\', "/")
+            .eq_ignore_ascii_case(&b.replace('\\', "/"))
     }
     #[cfg(not(windows))]
     {
@@ -1182,15 +1236,32 @@ mod tests {
         let created = worktree_create(&registry, &repo_root, "task-one", None, &workspace)
             .expect("create worktree");
         assert_eq!(created.worktree.branch.as_deref(), Some("atlas/task-one"));
-        assert!(created.worktree.path.replace('\\', "/").ends_with(
-            "/.atlas/worktrees/task-one"
-        ));
+        assert!(created
+            .worktree
+            .path
+            .replace('\\', "/")
+            .ends_with("/.atlas/worktrees/task-one"));
 
         let list = worktree_list(&registry, &repo_root, &workspace).expect("list worktrees");
         assert!(list.iter().any(|wt| wt.is_main));
         assert!(list
             .iter()
             .any(|wt| wt.branch.as_deref() == Some("atlas/task-one")));
+
+        let status = Command::new("git")
+            .args(["status", "--porcelain"])
+            .current_dir(tmp.path())
+            .output()
+            .expect("git status");
+        assert!(status.status.success());
+        assert!(
+            status.stdout.is_empty(),
+            "Atlas worktree dirtied main checkout: {}",
+            String::from_utf8_lossy(&status.stdout)
+        );
+        let exclude =
+            std::fs::read_to_string(tmp.path().join(".git/info/exclude")).expect("local exclude");
+        assert!(exclude.lines().any(|line| line.trim() == "/.atlas/"));
 
         worktree_remove(&registry, &repo_root, &created.worktree.path, &workspace)
             .expect("remove worktree");

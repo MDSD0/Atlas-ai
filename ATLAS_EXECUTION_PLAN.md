@@ -1643,3 +1643,45 @@ Atlas is launch-candidate ready only when:
 - Clean-shell `scripts/release-qualify.sh` passes with Vitest `210`, warning-free production build `3199`, Rust `144 + 3` intentional ignores, fixture harness `3`, golden eval, desktop contract, dependency review, graph preflight, both external benchmark preflights, and signed-release preflight.
 - Click-driven packaged macOS evidence covers the bounded relationship map, task-focused context, proof, memory, extensions, MCP status, and local reliability tabs.
 - No optional service started while walking the inspector tabs, and no new updater failure was appended during package launch.
+
+### Corrective C23 evidence recorded
+
+- Receipt state now preserves the last meaningful run across lifecycle-only chat turns and reports actual action counts rather than journal row counts.
+- Read-only tool work completes without an alarming unverified verdict, and verification requires an actual recognized check-runner invocation.
+- Composer attachments support picker, paste, and drop through one bounded policy with image and PDF file parts, text/code context, deduplication, size/count limits, and explicit rejection feedback.
+- Sent file parts are rendered in the user transcript instead of becoming blank message bubbles.
+- Focused Vitest passed `32`, full Vitest passed `408` with four paid suites intentionally skipped, and TypeScript completed without errors.
+
+### Corrective C24 evidence recorded
+
+- Persistent shell output is bounded, and independent MCP servers no longer
+  share one call-duration mutex.
+- The legacy full-access flag cannot bypass the native project root.
+- Session persistence is byte-bounded and flushes inactive stream completion.
+- Code Reality now suppresses ambiguous duplicate-name links and synthetic
+  self-links. The strategy is identified as
+  `bounded_symbol_reference_pagerank_v2`.
+- Atlas-managed worktree operations are progressively disclosed agent tools;
+  create, remove, and merge require approval. Automatic whole-run worktree
+  routing is still not claimed.
+- Unbound chats skip project-only persistent context sources using workspace
+  presence, not prompt or active-editor heuristics.
+- Full Vitest passed `415` with four paid suites skipped. Full Rust library
+  tests passed `199` with three host-dependent tests ignored. TypeScript passed.
+
+### Corrective C25 evidence recorded
+
+- Bounded parallel subagents now inherit top-level cancellation.
+- MCP supports real tool discovery, project-root cwd binding, Windows npm
+  shims, and browser-length timeout/cancellation behavior.
+- The pinned Playwright MCP preset was host-qualified with real headless Edge
+  navigation and an accessibility snapshot assertion against a local fixture.
+- Worktrees now have a bound coding worker and complete inspect/stage/unstage/
+  commit/merge/remove handoff. The worker is intentionally file-only and marks
+  parent verification required.
+- Atlas runtime directories are excluded through `.git/info/exclude`, leaving
+  tracked `.gitignore` untouched and worktree creation status-clean.
+- Known text-only models reject image/PDF submissions before provider spend.
+- Full Vitest passed `423` with four paid suites skipped. Full Rust library
+  tests passed `201` with four host-dependent tests ignored. Production build,
+  TypeScript, formatting, and diff hygiene passed.

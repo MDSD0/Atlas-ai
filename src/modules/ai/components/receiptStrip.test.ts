@@ -8,6 +8,7 @@ function summary(patch: Partial<ReceiptSummary> = {}): ReceiptSummary {
     sessionId: "s1",
     status: "running",
     eventCount: 0,
+    actionCount: 0,
     changedFiles: [],
     checks: [],
     diagnostics: [],
@@ -24,17 +25,14 @@ describe("shouldShowReceipt", () => {
     expect(shouldShowReceipt(undefined)).toBe(false);
   });
 
-  it("shows a running run once it has activity", () => {
-    expect(shouldShowReceipt(summary({ eventCount: 1 }))).toBe(true);
+  it("shows a running run once it has a real action", () => {
+    expect(shouldShowReceipt(summary({ eventCount: 3, actionCount: 1 }))).toBe(true);
     expect(shouldShowReceipt(summary({ changedFiles: ["/a.ts"] }))).toBe(true);
   });
 
-  it("hides a finished run that recorded no actions (pure-chat turn)", () => {
-    // A receipt is evidence of actions; an empty finished run has nothing to
-    // prove and must not render "Incomplete - 0 actions" noise.
-    expect(shouldShowReceipt(summary({ status: "unverified" }))).toBe(false);
-    expect(shouldShowReceipt(summary({ status: "cancelled" }))).toBe(false);
-    expect(shouldShowReceipt(summary({ status: "verified" }))).toBe(false);
+  it("hides a pure-chat run even though lifecycle events were journaled", () => {
+    expect(shouldShowReceipt(summary({ status: "unverified", eventCount: 4 }))).toBe(false);
+    expect(shouldShowReceipt(summary({ status: "cancelled", eventCount: 4 }))).toBe(false);
   });
 
   it("shows a finished verdict once it carries evidence", () => {
@@ -63,6 +61,6 @@ describe("receiptNeedsAttention", () => {
     expect(
       receiptNeedsAttention(summary({ status: "completed", changedFiles: ["/a.ts", "/b.ts"] })),
     ).toBe(false);
-    expect(receiptNeedsAttention(summary({ status: "smoke_checked", eventCount: 3 }))).toBe(false);
+    expect(receiptNeedsAttention(summary({ status: "smoke_checked", eventCount: 5, actionCount: 1 }))).toBe(false);
   });
 });

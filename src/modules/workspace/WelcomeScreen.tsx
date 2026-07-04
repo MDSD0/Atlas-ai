@@ -177,6 +177,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
               status={helpers.status}
               error={helpers.error}
               clearError={helpers.clearError}
+              regenerate={helpers.regenerate}
               addToolApprovalResponse={helpers.addToolApprovalResponse}
               stop={helpers.stop}
               sessionId={sessionId}
@@ -188,7 +189,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
             <div className="flex w-full max-w-2xl flex-col gap-6">
               {/* Wordmark */}
               <div className="flex flex-col gap-1 items-center text-center mb-4">
-                <img src="/logo-transparent.png" alt="Atlas Logo" className="w-12 h-12 mb-1 object-contain opacity-95" />
+                <img src="/logo.png" alt="Atlas Logo" className="w-12 h-12 mb-1 object-contain opacity-95" />
                 <h1 
                   className="text-5xl tracking-tighter text-brand drop-shadow-[0_2px_15px_color-mix(in_srgb,var(--brand)_20%,transparent)] pb-1 pr-2"
                   style={{ fontFamily: "'Good Times', sans-serif" }}

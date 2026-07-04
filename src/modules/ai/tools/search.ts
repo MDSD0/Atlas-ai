@@ -87,6 +87,7 @@ export function buildSearchTools(ctx: ToolContext) {
           r.path,
           project,
           canonicalize,
+          ctx.getApprovalMode(),
         );
         if (!boundary.ok) return { error: boundary.reason, root: r.path };
         const cap = Math.min(max_results ?? 30, 500);
@@ -142,6 +143,7 @@ export function buildSearchTools(ctx: ToolContext) {
           r.path,
           project,
           canonicalize,
+          ctx.getApprovalMode(),
         );
         if (!boundary.ok) return { error: boundary.reason, root: r.path };
         try {

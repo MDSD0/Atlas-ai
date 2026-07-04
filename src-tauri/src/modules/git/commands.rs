@@ -195,6 +195,19 @@ pub async fn git_worktree_list(
 }
 
 #[tauri::command]
+pub async fn git_prepare_atlas_internal(
+    repo_root: String,
+    workspace: Option<WorkspaceEnv>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let workspace = WorkspaceEnv::from_option(workspace);
+    blocking(app, move |registry| {
+        operations::prepare_atlas_internal(registry, &repo_root, &workspace).map_err(Into::into)
+    })
+    .await
+}
+
+#[tauri::command]
 pub async fn git_worktree_create(
     repo_root: String,
     name: String,

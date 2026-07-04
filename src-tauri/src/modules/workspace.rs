@@ -228,11 +228,14 @@ fn require_agent_project_root(
     Ok(canonical)
 }
 
+/// Agent IPC is always confined to the explicitly bound project. The retained
+/// boolean parameter is ignored for backward compatibility with older clients.
 pub fn authorize_agent_existing_path(
     registry: &WorkspaceRegistry,
     raw: &str,
     project_root: &str,
     workspace: &WorkspaceEnv,
+    _full_access: bool,
 ) -> Result<PathBuf, String> {
     let root = require_agent_project_root(registry, project_root, workspace)?;
     let canonical = authorize_existing_path(registry, raw, workspace)?;
@@ -251,6 +254,7 @@ pub fn authorize_agent_path_target(
     raw: &str,
     project_root: &str,
     workspace: &WorkspaceEnv,
+    _full_access: bool,
 ) -> Result<PathBuf, String> {
     let root = require_agent_project_root(registry, project_root, workspace)?;
     let target = authorize_path_target(registry, raw, workspace)?;
@@ -938,8 +942,9 @@ mod auth_tests {
         let root_s = root.to_string_lossy().into_owned();
 
         authorize_existing_path(&reg, &note_s, &WorkspaceEnv::Local).expect("app read allowed");
-        let err = authorize_agent_existing_path(&reg, &note_s, &root_s, &WorkspaceEnv::Local)
-            .expect_err("app root must not grant agent access");
+        let err =
+            authorize_agent_existing_path(&reg, &note_s, &root_s, &WorkspaceEnv::Local, false)
+                .expect_err("app root must not grant agent access");
         assert!(
             err.contains("not authorized for agent access"),
             "got: {err}"
@@ -958,9 +963,95 @@ mod auth_tests {
         let root_s = root.to_string_lossy().into_owned();
 
         authorize_existing_path(&reg, &env_s, &WorkspaceEnv::Local).expect("manual app read");
-        let err = authorize_agent_existing_path(&reg, &env_s, &root_s, &WorkspaceEnv::Local)
+        let err = authorize_agent_existing_path(&reg, &env_s, &root_s, &WorkspaceEnv::Local, false)
             .expect_err("agent env read must fail");
         assert!(err.contains("sensitive-file pattern"), "got: {err}");
+    }
+
+    #[test]
+    fn legacy_full_access_flag_cannot_read_outside_project_root() {
+        let root = tempdir("full-access-root");
+        let outside = tempdir("full-access-outside");
+        let outside_file = outside.join("note.txt");
+        fs::write(&outside_file, b"hello").expect("write outside file");
+        let reg = WorkspaceRegistry::default();
+        reg.authorize_agent_project(&root)
+            .expect("authorize agent root");
+        let outside_s = outside_file.to_string_lossy().into_owned();
+        let root_s = root.to_string_lossy().into_owned();
+
+        let confined =
+            authorize_agent_existing_path(&reg, &outside_s, &root_s, &WorkspaceEnv::Local, false)
+                .expect_err("non-full-access must stay confined to the project root");
+        assert!(confined.contains("outside"), "got: {confined}");
+
+        let legacy =
+            authorize_agent_existing_path(&reg, &outside_s, &root_s, &WorkspaceEnv::Local, true)
+                .expect_err("legacy full flag must not bypass the project root");
+        assert!(legacy.contains("outside"), "got: {legacy}");
+
+        let env_file = root.join(".env");
+        fs::write(&env_file, b"TOKEN=secret").expect("write env");
+        let env_s = env_file.to_string_lossy().into_owned();
+        let err = authorize_agent_existing_path(&reg, &env_s, &root_s, &WorkspaceEnv::Local, true)
+            .expect_err("legacy full flag must still refuse secret-pattern paths");
+        assert!(err.contains("sensitive-file pattern"), "got: {err}");
+    }
+
+    #[test]
+    fn legacy_full_access_flag_cannot_write_outside_project_root() {
+        let root = tempdir("full-access-write-root");
+        let outside = tempdir("full-access-write-outside");
+        let outside_target = outside.join("planted.txt");
+        let reg = WorkspaceRegistry::default();
+        reg.authorize_agent_project(&root)
+            .expect("authorize agent root");
+        let outside_s = outside_target.to_string_lossy().into_owned();
+        let root_s = root.to_string_lossy().into_owned();
+
+        let confined =
+            authorize_agent_path_target(&reg, &outside_s, &root_s, &WorkspaceEnv::Local, false)
+                .expect_err("non-full-access must stay confined to the project root");
+        assert!(confined.contains("outside"), "got: {confined}");
+
+        let legacy =
+            authorize_agent_path_target(&reg, &outside_s, &root_s, &WorkspaceEnv::Local, true)
+                .expect_err("legacy full flag must not bypass the project root");
+        assert!(legacy.contains("outside"), "got: {legacy}");
+
+        let ssh = root.join(".ssh");
+        fs::create_dir_all(&ssh).expect("create ssh");
+        let protected_target = ssh.join("config");
+        let protected_s = protected_target.to_string_lossy().into_owned();
+        let err =
+            authorize_agent_path_target(&reg, &protected_s, &root_s, &WorkspaceEnv::Local, true)
+                .expect_err("legacy full flag must still refuse protected directories");
+        assert!(err.contains("protected directory"), "got: {err}");
+    }
+
+    #[test]
+    fn path_target_resolves_multiple_nonexistent_dirs_inside_root() {
+        // Authorization resolves missing descendants without creating them.
+        let root = tempdir("nested-agent-root");
+        let deep_target = root.join("a").join("b").join("c").join("new-file.txt");
+        let reg = WorkspaceRegistry::default();
+        reg.authorize_agent_project(&root)
+            .expect("authorize agent root");
+        let deep_s = deep_target.to_string_lossy().into_owned();
+        let root_s = root.to_string_lossy().into_owned();
+
+        let resolved =
+            authorize_agent_path_target(&reg, &deep_s, &root_s, &WorkspaceEnv::Local, true)
+                .expect("nested target inside root must resolve");
+        assert_eq!(
+            resolved,
+            fs::canonicalize(&root)
+                .unwrap()
+                .join("a")
+                .join("b")
+                .join("c")
+                .join("new-file.txt")
+        );
     }
 
     #[cfg(unix)]
@@ -977,8 +1068,9 @@ mod auth_tests {
         let link_s = link.to_string_lossy().into_owned();
         let root_s = root.to_string_lossy().into_owned();
 
-        let err = authorize_agent_existing_path(&reg, &link_s, &root_s, &WorkspaceEnv::Local)
-            .expect_err("agent symlink read must fail");
+        let err =
+            authorize_agent_existing_path(&reg, &link_s, &root_s, &WorkspaceEnv::Local, false)
+                .expect_err("agent symlink read must fail");
         assert!(err.contains("sensitive-file pattern"), "got: {err}");
     }
 
@@ -994,8 +1086,9 @@ mod auth_tests {
         let target_s = target.to_string_lossy().into_owned();
         let root_s = root.to_string_lossy().into_owned();
 
-        let err = authorize_agent_path_target(&reg, &target_s, &root_s, &WorkspaceEnv::Local)
-            .expect_err("agent protected write must fail");
+        let err =
+            authorize_agent_path_target(&reg, &target_s, &root_s, &WorkspaceEnv::Local, false)
+                .expect_err("agent protected write must fail");
         assert!(err.contains("protected directory"), "got: {err}");
     }
 

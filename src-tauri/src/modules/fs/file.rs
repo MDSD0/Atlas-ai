@@ -93,10 +93,17 @@ pub fn agent_fs_read_file(
     path: String,
     project_root: String,
     workspace: Option<WorkspaceEnv>,
+    full_access: Option<bool>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<ReadResult, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let p = authorize_agent_existing_path(&registry, &path, &project_root, &workspace)?;
+    let p = authorize_agent_existing_path(
+        &registry,
+        &path,
+        &project_root,
+        &workspace,
+        full_access.unwrap_or(false),
+    )?;
     read_file_at(&p)
 }
 
@@ -150,7 +157,10 @@ fn write_file_at(target: &Path, content: &str) -> Result<(), String> {
     if let Some(parent) = target.parent() {
         if !parent.exists() {
             fs::create_dir_all(parent).map_err(|e| {
-                log::warn!("fs_write_file create parents({}) failed: {e}", parent.display());
+                log::warn!(
+                    "fs_write_file create parents({}) failed: {e}",
+                    parent.display()
+                );
                 e.to_string()
             })?;
         }
@@ -173,10 +183,17 @@ pub fn agent_fs_write_file(
     content: String,
     project_root: String,
     workspace: Option<WorkspaceEnv>,
+    full_access: Option<bool>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let target = authorize_agent_path_target(&registry, &path, &project_root, &workspace)?;
+    let target = authorize_agent_path_target(
+        &registry,
+        &path,
+        &project_root,
+        &workspace,
+        full_access.unwrap_or(false),
+    )?;
     write_file_at(&target, &content)
 }
 
@@ -236,10 +253,17 @@ pub fn agent_fs_canonicalize(
     path: String,
     project_root: String,
     workspace: Option<WorkspaceEnv>,
+    full_access: Option<bool>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<String, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let canon = authorize_agent_existing_path(&registry, &path, &project_root, &workspace)?;
+    let canon = authorize_agent_existing_path(
+        &registry,
+        &path,
+        &project_root,
+        &workspace,
+        full_access.unwrap_or(false),
+    )?;
     Ok(super::to_canon(&canon))
 }
 

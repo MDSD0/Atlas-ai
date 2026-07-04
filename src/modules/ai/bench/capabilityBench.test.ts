@@ -1,4 +1,4 @@
-import { describe, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -187,10 +187,12 @@ run("Atlas capability stress (claude-haiku-4-5, real loop)", () => {
     "wide / narrow / narrower — SWE metrics",
     async () => {
       const key = anthropicKey();
+      expect(key, "anthropic key missing from .env — cannot run capability benchmark").not.toBe("");
       const keys: ProviderKeys = { ...EMPTY_PROVIDER_KEYS, anthropic: key };
       // eslint-disable-next-line no-console
       console.log(`[cap] model=${MODEL} maxSteps=${MAX_STEPS} key=${key ? "present" : "MISSING"}`);
       const summary: string[] = [];
+      const providerErrors: string[] = [];
       let totalIn = 0;
       let totalOut = 0;
       let passes = 0;
@@ -200,6 +202,7 @@ run("Atlas capability stress (claude-haiku-4-5, real loop)", () => {
         holder.invoke = createInvokeShim(dir);
         const task = t.build(dir);
         const m = await runHarnessTask(task, { keys, modelId: MODEL, maxSteps: MAX_STEPS });
+        if (m.error) providerErrors.push(`${t.id}: ${m.error.slice(0, 160)}`);
         const verdict = m.error ? { pass: false, note: `error=${m.error.slice(0, 120)}` } : t.judge(dir, m);
         if (verdict.pass) passes++;
         totalIn += m.inputTokens;
@@ -221,6 +224,17 @@ run("Atlas capability stress (claude-haiku-4-5, real loop)", () => {
           summary.join("\n") +
           `\n\nscore=${passes}/${TESTS.length} totalIn=${totalIn} totalOut=${totalOut} estCost=$${estCost.toFixed(4)}\n`,
       );
+
+      // A provider/tool error is an infra failure, not a capability result —
+      // it must fail the run rather than being silently absorbed into the
+      // pass count as just another judge failure.
+      expect(providerErrors, providerErrors.join(" | ")).toEqual([]);
+      const minPassRate = Number(process.env.BENCH_MIN_PASS_RATE ?? 0.66);
+      const passRate = TESTS.length > 0 ? passes / TESTS.length : 0;
+      expect(
+        passRate,
+        `capability pass rate ${passes}/${TESTS.length} (${passRate.toFixed(2)}) below threshold ${minPassRate}\n${summary.join("\n")}`,
+      ).toBeGreaterThanOrEqual(minPassRate);
     },
     600_000,
   );

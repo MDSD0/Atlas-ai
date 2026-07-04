@@ -69,7 +69,7 @@ function buildToolContext(projectDir: string, sessionId: string): ToolContext {
     readAgentOutput: () => null,
     readCache: new Map(),
     getSessionId: () => sessionId,
-    getApprovalMode: () => "full", // headless: auto-accept mutations + shell
+    getApprovalMode: () => "benchmark",
   };
 }
 

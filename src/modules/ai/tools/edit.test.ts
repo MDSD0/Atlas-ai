@@ -99,7 +99,7 @@ describe("agent edit freshness", () => {
         status: "fresh",
       },
     });
-    expect(mocks.writeFile).toHaveBeenCalledWith(path, proposed, "/repo");
+    expect(mocks.writeFile).toHaveBeenCalledWith(path, proposed, "/repo", false);
     expect(mocks.lspDiagnostics).toHaveBeenCalledWith("/repo", path);
     expect(readCache.get(path)).toEqual(fingerprintText(proposed));
   });

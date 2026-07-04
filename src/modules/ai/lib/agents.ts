@@ -42,7 +42,8 @@ export const BUILTIN_AGENTS: readonly Agent[] = [
   }
 ] as const;
 
-const STORE_PATH = "atlas-ai-agents.json";
+export const AGENTS_STORE_PATH = "atlas-ai-agents.json";
+const STORE_PATH = AGENTS_STORE_PATH;
 const KEY_CUSTOM = "customAgents";
 const KEY_ACTIVE = "activeAgentId";
 

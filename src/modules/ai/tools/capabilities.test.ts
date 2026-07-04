@@ -44,6 +44,9 @@ describe("capability gateway", () => {
     const mem = searchCapabilities("what did we decide in past sessions");
     expect(mem.map((c) => c.id)).toContain("memory");
 
+    const worktrees = searchCapabilities("create an isolated git worktree");
+    expect(worktrees.map((c) => c.id)).toContain("worktrees");
+
     expect(searchCapabilities("")).toEqual([]);
   });
 
@@ -92,5 +95,27 @@ describe("capability gateway", () => {
     expect(active).not.toContain("repo_map");
     expect(active).toContain("read_file");
     expect(active).toContain("grep");
+  });
+
+  it("skillToolRestriction narrows the active toolbelt to the given set (F-10)", () => {
+    const active = activeToolNames(SESSION, [], ["read_file", "grep"]);
+    expect(active).toEqual(["read_file", "grep"]);
+  });
+
+  it("skillToolRestriction can exclude capability_search itself, so a skill can't be routed around", () => {
+    const active = activeToolNames(SESSION, [], ["read_file"]);
+    expect(active).not.toContain("capability_search");
+  });
+
+  it("null or empty skillToolRestriction leaves the normal gateway output untouched", () => {
+    expect(activeToolNames(SESSION, [], null)).toEqual(activeToolNames(SESSION));
+    expect(activeToolNames(SESSION, [], [])).toEqual(activeToolNames(SESSION));
+  });
+
+  it("skillToolRestriction only narrows what the gateway already exposes, never adds beyond it", () => {
+    // "lsp_references" isn't active (no capability promoted), so listing it
+    // in the restriction must not make it appear.
+    const active = activeToolNames(SESSION, [], ["read_file", "lsp_references"]);
+    expect(active).toEqual(["read_file"]);
   });
 });

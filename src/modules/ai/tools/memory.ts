@@ -41,7 +41,7 @@ async function sourceArtifacts(
   const resolved: string[] = [];
   for (const path of paths) {
     const abs = resolvePath(path, project);
-    const boundary = await validateWithinWorkspace(abs, project, canonicalize);
+    const boundary = await validateWithinWorkspace(abs, project, canonicalize, ctx.getApprovalMode());
     if (!boundary.ok) throw new Error(boundary.reason);
     resolved.push(await canonicalize(abs));
   }
@@ -92,9 +92,13 @@ export function buildMemoryTools(ctx: ToolContext) {
     memory_surface_enable: tool({
       description:
         "Create and enable the managed .atlas/memory filesystem surface after explicit user approval. Initializes a small editable MEMORY.md index plus topics/, sessions/, and work-packets/ directories. Existing readable MEMORY.md content is preserved.",
-      inputSchema: z.object({ confirm: z.literal(true) }),
+      // Plain z.boolean() rather than z.literal(true): some providers (Gemini)
+      // reject a boolean-valued JSON Schema enum outright. `confirm` must
+      // still be explicitly true to proceed — enforced in execute() below.
+      inputSchema: z.object({ confirm: z.boolean() }),
       needsApproval: true,
-      execute: async () => {
+      execute: async ({ confirm }) => {
+        if (!confirm) return { error: "confirm must be true to proceed" };
         const root = projectRoot(ctx);
         if (typeof root !== "string") return root;
         try {
@@ -108,9 +112,10 @@ export function buildMemoryTools(ctx: ToolContext) {
     memory_surface_disable: tool({
       description:
         "Disable automatic use of the managed .atlas/memory filesystem surface. Existing project artifacts remain untouched.",
-      inputSchema: z.object({ confirm: z.literal(true) }),
+      inputSchema: z.object({ confirm: z.boolean() }),
       needsApproval: true,
-      execute: async () => {
+      execute: async ({ confirm }) => {
+        if (!confirm) return { error: "confirm must be true to proceed" };
         const root = projectRoot(ctx);
         if (typeof root !== "string") return root;
         try {
@@ -335,9 +340,12 @@ export function buildMemoryTools(ctx: ToolContext) {
 
     memory_clear_project: tool({
       description: "Clear all Atlas memory records for the bound project.",
-      inputSchema: z.object({ confirm: z.literal(true) }),
+      // See memory_surface_enable above: z.boolean(), not z.literal(true) —
+      // enforced explicitly in execute() for Gemini schema compatibility.
+      inputSchema: z.object({ confirm: z.boolean() }),
       needsApproval: true,
-      execute: async () => {
+      execute: async ({ confirm }) => {
+        if (!confirm) return { error: "confirm must be true to proceed" };
         const root = projectRoot(ctx);
         if (typeof root !== "string") return root;
         return { provider: "local_records", cleared: await localRecords.clearProject(root) };

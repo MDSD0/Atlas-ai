@@ -147,7 +147,7 @@ export function buildShellTools(ctx: ToolContext) {
   return {
     bash_run: tool({
       description:
-        "Run a foreground shell command in this session's persistent agent shell. Uses the current execution_cwd from Atlas context, not the active terminal cwd unless that mode is explicitly selected. Use for short-lived commands (lint, test, search, build, or OS opener commands like `cmd.exe /c start \"\" \"index.html\"`, `open index.html`, `xdg-open index.html`). For long-running or daemon processes (dev servers, watch tasks), use `bash_background`. NEVER invoke interactive tools (vim, less, top) because they will hang. Asks for user approval.",
+        "Run a foreground shell command in this session's persistent agent shell — a real long-lived shell process, so cwd, exports, aliases, functions, and shell options set by one command are visible to the next command in this session (e.g. `export FOO=bar` then `echo $FOO` in a later call). If a command times out or crashes the shell, the next call transparently gets a fresh shell — only that in-flight command's environment changes are lost, not earlier ones. Uses the current execution_cwd from Atlas context, not the active terminal cwd unless that mode is explicitly selected. Use for short-lived commands (lint, test, search, build, or OS opener commands like `cmd.exe /c start \"\" \"index.html\"`, `open index.html`, `xdg-open index.html`). For long-running or daemon processes (dev servers, watch tasks), use `bash_background`. NEVER invoke interactive tools (vim, less, top) because they will hang. Asks for user approval.",
       inputSchema: z.object({
         command: z.string(),
         timeout_secs: z.number().int().min(1).max(300).optional(),

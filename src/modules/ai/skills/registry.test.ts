@@ -33,7 +33,6 @@ describe("SkillRegistry", () => {
         description: "Runs a release checklist.",
         prompt: "Inspect evidence and run the narrow verifier.",
         allowedTools: ["read_file", "bash_run"],
-        fixture: "simple-ts",
       }),
     ).resolves.toMatchObject({ id: "skill-1", enabled: false });
     await expect(skills.setEnabled("skill-1", true)).resolves.toBe(true);

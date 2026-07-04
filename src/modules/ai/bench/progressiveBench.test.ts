@@ -1,4 +1,4 @@
-import { describe, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -270,6 +270,8 @@ run("Atlas progressive harness benchmark (real loop)", () => {
       // eslint-disable-next-line no-console
       console.log(`[bench] candidates: ${candidates.map((c) => `${c.label}(${c.keys.length})`).join(", ")}`);
       const rows: string[] = [];
+      const providerFailures: string[] = [];
+      const results: Array<{ difficulty: string; pass: boolean; toolCalls: number }> = [];
       for (const t of tasks.filter((t) => !ONLY || t.difficulty.includes(ONLY))) {
         const dir = mkdtempSync(join(tmpdir(), "atlas-bench-"));
         holder.invoke = createInvokeShim(dir);
@@ -277,6 +279,7 @@ run("Atlas progressive harness benchmark (real loop)", () => {
         const res = await runWithRotation(task, candidates);
         if (!res) {
           rows.push(`${t.difficulty} | NO PROVIDER`);
+          providerFailures.push(t.difficulty);
         } else {
           const m = res.metrics;
           // eslint-disable-next-line no-console
@@ -292,6 +295,7 @@ run("Atlas progressive harness benchmark (real loop)", () => {
           rows.push(
             `${t.difficulty} | via=${res.used} pass=${m.pass} steps=${m.steps} tools=${m.toolCalls} in=${m.inputTokens} unlocked=${m.unlockedCapabilities.join("/") || "-"}`,
           );
+          results.push({ difficulty: t.difficulty, pass: m.pass, toolCalls: m.toolCalls });
           if (!m.pass) {
             // eslint-disable-next-line no-console
             console.log(`[bench:${t.difficulty}] tree:\n${treeOf(dir).map((l) => "  " + l).join("\n")}`);
@@ -301,6 +305,28 @@ run("Atlas progressive harness benchmark (real loop)", () => {
       }
       // eslint-disable-next-line no-console
       console.log("\n=== Atlas progressive bench summary ===\n" + rows.join("\n") + "\n");
+
+      // A rotation that exhausts every candidate provider/key is an infra
+      // failure (dead keys, quota, auth), not a model capability result —
+      // it must fail the run rather than silently print "NO PROVIDER".
+      expect(
+        providerFailures,
+        `no working provider/key rotated for: ${providerFailures.join(", ")}`,
+      ).toEqual([]);
+      // A task cannot legitimately pass without calling any tool (every task
+      // requires writing/editing a file or running a command).
+      const zeroToolPasses = results.filter((r) => r.pass && r.toolCalls === 0);
+      expect(
+        zeroToolPasses,
+        "a task reported pass=true with zero tool calls — check() is likely too loose",
+      ).toEqual([]);
+      const minPassRate = Number(process.env.BENCH_MIN_PASS_RATE ?? 0.6);
+      const passCount = results.filter((r) => r.pass).length;
+      const passRate = results.length > 0 ? passCount / results.length : 0;
+      expect(
+        passRate,
+        `pass rate ${passCount}/${results.length} (${passRate.toFixed(2)}) below threshold ${minPassRate}\n${rows.join("\n")}`,
+      ).toBeGreaterThanOrEqual(minPassRate);
     },
     900_000,
   );

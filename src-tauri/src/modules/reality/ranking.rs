@@ -58,10 +58,6 @@ pub fn rank_files(
     let mut edge_count = 0;
     for (identifier, definers) in &definitions {
         let Some(referencers) = references.get(identifier) else {
-            for definer in definers {
-                add_edge(&mut edges, definer, definer, 0.1);
-                edge_count += 1;
-            }
             continue;
         };
         let display_name = display_names
@@ -74,7 +70,7 @@ pub fn rank_files(
             definers.len(),
         );
         for (referencer, reference_count) in referencers {
-            for definer in definers {
+            for definer in resolve_definers(referencer, identifier, definers) {
                 let weight = multiplier * (*reference_count as f64).sqrt();
                 add_edge(&mut edges, referencer, definer, weight);
                 *relations
@@ -111,6 +107,43 @@ pub fn rank_files(
         edge_count,
         relations,
     }
+}
+
+fn resolve_definers<'a>(
+    referencer: &str,
+    identifier: &str,
+    definers: &'a BTreeSet<String>,
+) -> Vec<&'a String> {
+    if definers.len() == 1 {
+        return definers.iter().collect();
+    }
+
+    if let Some(local) = definers.get(referencer) {
+        return vec![local];
+    }
+
+    let referencer_parent = Path::new(referencer).parent();
+    let same_directory: Vec<&String> = definers
+        .iter()
+        .filter(|path| Path::new(path).parent() == referencer_parent)
+        .collect();
+    if same_directory.len() == 1 {
+        return same_directory;
+    }
+
+    let module_named: Vec<&String> = definers
+        .iter()
+        .filter(|path| {
+            Path::new(path)
+                .file_stem()
+                .is_some_and(|stem| stem.to_string_lossy().eq_ignore_ascii_case(identifier))
+        })
+        .collect();
+    if module_named.len() == 1 {
+        return module_named;
+    }
+
+    Vec::new()
 }
 
 fn add_edge(
@@ -280,5 +313,55 @@ mod tests {
         let second = rank_files(&files, &symbols, &HashSet::new());
 
         assert_eq!(first.scores, second.scores);
+    }
+
+    #[test]
+    fn duplicate_names_do_not_create_cross_repository_fanout() {
+        let files = [
+            file("feature-a/caller.ts"),
+            file("feature-a/helpers.ts"),
+            file("feature-b/helpers.ts"),
+        ];
+        let symbols = [
+            symbol("feature-a/caller.ts", "render", false),
+            symbol("feature-a/helpers.ts", "render", true),
+            symbol("feature-b/helpers.ts", "render", true),
+        ];
+
+        let ranked = rank_files(&files, &symbols, &HashSet::new());
+
+        assert_eq!(ranked.edge_count, 1);
+        assert_eq!(ranked.relations.len(), 1);
+        assert_eq!(ranked.relations[0].target, "feature-a/helpers.ts");
+    }
+
+    #[test]
+    fn unresolved_duplicate_names_are_omitted_instead_of_inventing_links() {
+        let files = [
+            file("entry.ts"),
+            file("feature-a/helpers.ts"),
+            file("feature-b/helpers.ts"),
+        ];
+        let symbols = [
+            symbol("entry.ts", "render", false),
+            symbol("feature-a/helpers.ts", "render", true),
+            symbol("feature-b/helpers.ts", "render", true),
+        ];
+
+        let ranked = rank_files(&files, &symbols, &HashSet::new());
+
+        assert_eq!(ranked.edge_count, 0);
+        assert!(ranked.relations.is_empty());
+    }
+
+    #[test]
+    fn unreferenced_definitions_are_not_reported_as_graph_links() {
+        let files = [file("lonely.ts")];
+        let symbols = [symbol("lonely.ts", "lonely", true)];
+
+        let ranked = rank_files(&files, &symbols, &HashSet::new());
+
+        assert_eq!(ranked.edge_count, 0);
+        assert!(ranked.relations.is_empty());
     }
 }

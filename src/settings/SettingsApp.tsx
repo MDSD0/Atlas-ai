@@ -3,13 +3,14 @@ import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import type { SettingsTab } from "@/modules/settings/openSettingsWindow";
 import { usePreferencesStore } from "@/modules/settings/preferences";
-import { Bot, Info, Palette, Settings, BookOpen, Keyboard, Plug } from "lucide-react";
+import { Bot, Info, Palette, Settings, BookOpen, Keyboard, Plug, ShieldAlert } from "lucide-react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { JSX, useEffect, useState } from "react";
 import { AboutSection } from "./sections/AboutSection";
 import { SkillsSection } from "./sections/SkillsSection";
 import { GeneralSection } from "./sections/GeneralSection";
 import { ModelsSection } from "./sections/ModelsSection";
+import { PrivacyDataSection } from "./sections/PrivacyDataSection";
 import { ShortcutsSection } from "./sections/ShortcutsSection";
 import { ThemesSection } from "./sections/ThemesSection";
 import { McpSection } from "./sections/McpSection";
@@ -22,6 +23,7 @@ const TABS: { id: SettingsTab; label: string; icon: any, component: () => JSX.El
     { id: "models", label: "Models", icon: Bot, component: ModelsSection },
     { id: "agents", label: "Skills", icon: BookOpen, component: SkillsSection },
     { id: "mcp", label: "MCP", icon: Plug, component: McpSection },
+    { id: "privacy", label: "Privacy & Data", icon: ShieldAlert, component: PrivacyDataSection },
     { id: "about", label: "About", icon: Info, component: AboutSection },
   ];
 
@@ -32,6 +34,7 @@ const VALID_TABS: SettingsTab[] = [
   "models",
   "agents",
   "mcp",
+  "privacy",
   "about",
 ];
 

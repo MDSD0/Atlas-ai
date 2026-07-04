@@ -1,12 +1,11 @@
 // Approval policy. Pure functions: given the tool category, the command, and
 // the session's approval mode, decide whether a tool call needs an approval
-// PROMPT. This never decides whether a call is *allowed*: deny decisions
-// (dangerous shell via checkShellCommand, secret paths via checkWritable, and
-// out-of-workspace via the native boundary) live inside each tool's execute and
-// the Rust layer, and are NEVER skipped by any mode. A mode only suppresses the
-// prompt for an otherwise-permitted call.
+// PROMPT. This never decides whether a call is *allowed*: dangerous-command
+// (checkShellCommand) and secret-path (checkReadable/checkWritable) guards
+// live inside each tool's execute and the Rust layer, and are NEVER skipped by
+// any mode. No product mode lifts the workspace or secret boundaries.
 
-export type ApprovalMode = "default" | "acceptEdits" | "full";
+export type ApprovalMode = "default" | "acceptEdits" | "full" | "benchmark";
 
 export const APPROVAL_MODES: {
   id: ApprovalMode;
@@ -26,9 +25,8 @@ export const APPROVAL_MODES: {
   },
   {
     id: "full",
-    label: "Full access",
-    hint: "Run edits and commands without asking. Dangerous-command and out-of-workspace guards still apply.",
-    risky: true,
+    label: "Autonomous workspace",
+    hint: "Auto-apply edits inside this workspace. Only the small read-only command allow-list runs without approval; all other commands still ask.",
   },
 ];
 
@@ -85,17 +83,16 @@ export function isAutoRunShell(command: string): boolean {
   );
 }
 
-/** Edits/writes: only the default mode prompts; acceptEdits and full auto-apply. */
+/** Edits/writes: only the default mode prompts. Native boundaries always apply. */
 export function editNeedsApproval(mode: ApprovalMode): boolean {
   return mode === "default";
 }
 
 /**
- * Shell: safe read-only/open commands auto-run in any mode; otherwise only
- * full access skips the prompt. The execute-time circuit breaker still blocks
- * dangerous commands regardless of mode.
+ * Shell: safe read-only/open commands auto-run in any mode. Product modes ask
+ * for everything else; the internal benchmark harness is non-interactive.
  */
 export function shellNeedsApproval(command: string, mode: ApprovalMode): boolean {
   if (isAutoRunShell(command)) return false;
-  return mode !== "full";
+  return mode !== "benchmark";
 }

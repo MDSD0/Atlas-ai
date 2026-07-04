@@ -44,10 +44,17 @@ pub fn agent_fs_read_dir(
     path: String,
     project_root: String,
     workspace: Option<WorkspaceEnv>,
+    full_access: Option<bool>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<Vec<DirEntry>, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root = authorize_agent_existing_path(&registry, &path, &project_root, &workspace)?;
+    let root = authorize_agent_existing_path(
+        &registry,
+        &path,
+        &project_root,
+        &workspace,
+        full_access.unwrap_or(false),
+    )?;
     read_dir_entries(&root, false, true)
 }
 

@@ -251,6 +251,7 @@ function Body({
               status={helpers.status}
               error={helpers.error}
               clearError={helpers.clearError}
+              regenerate={helpers.regenerate}
               addToolApprovalResponse={helpers.addToolApprovalResponse}
               stop={helpers.stop}
               sessionId={sessionId}
@@ -567,7 +568,7 @@ function SessionNameLabel() {
 function EmptyState({ onPick }: { onPick: (text: string) => void }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 px-8 py-10 text-center">
-      <img src="/logo-transparent.png" alt="Atlas" className="size-11 object-contain opacity-95" />
+      <img src="/logo.png" alt="Atlas" className="size-11 object-contain opacity-95" />
       <div className="space-y-1.5">
         <p className="text-[16px] font-semibold tracking-tight">
           Ask <span 

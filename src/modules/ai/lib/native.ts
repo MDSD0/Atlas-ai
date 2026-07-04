@@ -136,6 +136,13 @@ export type McpStdioCallResponse = {
   output: unknown;
 };
 
+export type McpStdioListToolsResponse = {
+  transport: "stdio_rmcp_1_7";
+  serverInfo: unknown;
+  reusedClient: boolean;
+  tools: unknown;
+};
+
 export type GitRepoInfo = {
   repoRoot: string;
   branch: string;
@@ -354,6 +361,7 @@ export const native = {
       exit_code: number | null;
     }>("shell_bg_logs", { handle, sinceOffset: sinceOffset ?? null }),
   shellBgKill: (handle: number) => invoke<void>("shell_bg_kill", { handle }),
+  shellBgRemove: (handle: number) => invoke<void>("shell_bg_remove", { handle }),
   shellBgList: () =>
     invoke<
       {
@@ -508,36 +516,41 @@ export const native = {
 };
 
 export const agentNative = {
-  readFile: (path: string, projectRoot: string) =>
+  readFile: (path: string, projectRoot: string, fullAccess = false) =>
     invoke<ReadResult>("agent_fs_read_file", {
       path,
       projectRoot,
       workspace: currentWorkspaceEnv(),
+      fullAccess,
     }),
-  writeFile: (path: string, content: string, projectRoot: string) =>
+  writeFile: (path: string, content: string, projectRoot: string, fullAccess = false) =>
     invoke<void>("agent_fs_write_file", {
       path,
       content,
       projectRoot,
       workspace: currentWorkspaceEnv(),
+      fullAccess,
     }),
-  canonicalize: (path: string, projectRoot: string) =>
+  canonicalize: (path: string, projectRoot: string, fullAccess = false) =>
     invoke<string>("agent_fs_canonicalize", {
       path,
       projectRoot,
       workspace: currentWorkspaceEnv(),
+      fullAccess,
     }),
-  createDir: (path: string, projectRoot: string) =>
+  createDir: (path: string, projectRoot: string, fullAccess = false) =>
     invoke<void>("agent_fs_create_dir", {
       path,
       projectRoot,
       workspace: currentWorkspaceEnv(),
+      fullAccess,
     }),
-  readDir: (path: string, projectRoot: string) =>
+  readDir: (path: string, projectRoot: string, fullAccess = false) =>
     invoke<DirEntry[]>("agent_fs_read_dir", {
       path,
       projectRoot,
       workspace: currentWorkspaceEnv(),
+      fullAccess,
     }),
   grep: (
     params: {
@@ -578,19 +591,42 @@ export const agentNative = {
       workspace: currentWorkspaceEnv(),
     }),
   mcpStdioCall: (request: {
+    requestId: string;
     serverId: string;
     command: string;
     args: string[];
     toolName: string;
     input: Record<string, unknown>;
-  }) =>
+  }, projectRoot: string) =>
     invoke<McpStdioCallResponse>("agent_mcp_stdio_call", {
       request,
+      projectRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  gitPrepareAtlasInternal: (repoRoot: string) =>
+    invoke<void>("git_prepare_atlas_internal", {
+      repoRoot,
+      workspace: currentWorkspaceEnv(),
+    }),
+  mcpStdioListTools: (request: {
+    serverId: string;
+    command: string;
+    args: string[];
+  }, projectRoot: string) =>
+    invoke<McpStdioListToolsResponse>("agent_mcp_stdio_list_tools", {
+      request,
+      projectRoot,
+      workspace: currentWorkspaceEnv(),
     }),
   mcpStdioClose: (serverId?: string) =>
     invoke<number>("agent_mcp_stdio_close", {
       serverId: serverId ?? null,
     }),
+  /** Best-effort: wakes an in-flight call so it tears down its connection
+   * immediately instead of waiting out the native timeout. Cannot stop the
+   * external MCP server's own execution of an already-dispatched request. */
+  mcpStdioCancel: (requestId: string) =>
+    invoke<boolean>("agent_mcp_stdio_cancel", { requestId }),
   lspStatus: (projectRoot: string, file?: string) =>
     invoke<LspProviderInfo[]>("agent_lsp_status", {
       root: projectRoot,

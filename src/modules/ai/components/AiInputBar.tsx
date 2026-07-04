@@ -68,7 +68,6 @@ export function AiInput() {
   const ollamaBaseURL = usePreferencesStore((s) => s.ollamaBaseURL);
   const openaiCompatibleModelId = usePreferencesStore((s) => s.openaiCompatibleModelId);
   const openaiCompatibleBaseURL = usePreferencesStore((s) => s.openaiCompatibleBaseURL);
-
   const hasLocalModel =
     (lmstudioBaseURL.trim().length > 0 && lmstudioModelId.trim().length > 0) ||
     (mlxBaseURL.trim().length > 0 && mlxModelId.trim().length > 0) ||
@@ -138,6 +137,8 @@ function detectFileTrigger(
  * rounded card that visually belongs to the chat panel.
  */
 export function AiInputBar() {
+  const dragDepth = useRef(0);
+  const [filesDragging, setFilesDragging] = useState(false);
   const c = useComposer();
   const allSnippets = useSnippetsStore((s) => s.all());
   const workspaceRoot = useChatStore((s) => s.live.getWorkspaceRoot());
@@ -287,10 +288,35 @@ export function AiInputBar() {
     <div className="shrink-0 px-3 py-2">
       {/* Unified composer card */}
       <div
+        onDragEnter={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          dragDepth.current += 1;
+          setFilesDragging(true);
+        }}
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes("Files")) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+        }}
+        onDragLeave={(event) => {
+          if (!filesDragging) return;
+          event.preventDefault();
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setFilesDragging(false);
+        }}
+        onDrop={(event) => {
+          const dropped = Array.from(event.dataTransfer.files);
+          if (filesDragging || dropped.length > 0) event.preventDefault();
+          dragDepth.current = 0;
+          setFilesDragging(false);
+          if (dropped.length > 0) void c.addFiles(dropped);
+        }}
         className={cn(
           "glass-panel flex flex-col gap-0 rounded-2xl bg-card shadow-sm",
           "transition-shadow focus-within:shadow-md focus-within:border-border",
           "overflow-hidden",
+          filesDragging && "border-foreground/40 bg-muted/40",
         )}
       >
         {/* Chips row — file/snippet attachments */}

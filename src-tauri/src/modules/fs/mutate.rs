@@ -61,10 +61,17 @@ pub fn agent_fs_create_dir(
     path: String,
     project_root: String,
     workspace: Option<WorkspaceEnv>,
+    full_access: Option<bool>,
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<(), String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let p = authorize_agent_path_target(&registry, &path, &project_root, &workspace)?;
+    let p = authorize_agent_path_target(
+        &registry,
+        &path,
+        &project_root,
+        &workspace,
+        full_access.unwrap_or(false),
+    )?;
     if p.exists() {
         return Err(format!("already exists: {}", p.display()));
     }

@@ -23,6 +23,7 @@ export type ReceiptSummary = {
   sessionId: string;
   status: ProofRunStatus;
   eventCount: number;
+  actionCount: number;
   changedFiles: string[];
   checks: string[];
   diagnostics: string[];
@@ -116,18 +117,17 @@ function shellFailure(record: ToolStepRecord): string | null {
 // Matched on the command token stream so wrappers (npm run test, pnpm -w lint,
 // npx tsc, python -m pytest, cargo test) are caught without overfitting.
 const VERIFICATION_PATTERNS: RegExp[] = [
-  /\b(test|tests|spec|specs)\b/, // jest/vitest/pytest/cargo test/go test wrappers
-  /\bvitest\b/,
-  /\bpytest\b/,
-  /\btsc\b/, // typecheck
-  /\b(typecheck|type-check)\b/,
-  /\b(lint|eslint|clippy|ruff|flake8|mypy)\b/,
-  /\bcargo\s+(test|check|clippy|build)\b/,
-  /\bgo\s+(test|build|vet)\b/,
-  /\b(build|compile)\b/,
-  /\bgradle(w)?\b.*\b(test|build|check)\b/,
-  /\bmvn\b.*\b(test|verify|package)\b/,
-  /\bmake\b.*\b(test|check|build)\b/,
+  /(?:^|[;&|]\s*)(?:npm|pnpm|yarn|bun)(?:\s+(?:-w|--workspace-root|--filter\s+\S+|-C\s+\S+|--dir\s+\S+))*\s+(?:run\s+)?(?:test|lint|build|typecheck|type-check|check)(?::[\w.-]+)?(?:\s|$)/,
+  /(?:^|[;&|]\s*)(?:(?:pnpm\s+exec|npx|bunx)\s+)?(?:vitest|jest|mocha|ava|pytest|ruff|flake8|mypy|eslint|tsc)(?:\s|$)/,
+  /(?:^|[;&|]\s*)(?:python(?:3)?\s+-m|uv\s+run)\s+(?:pytest|unittest|mypy|ruff)(?:\s|$)/,
+  /(?:^|[;&|]\s*)cargo\s+(?:test|check|clippy|build)(?:\s|$)/,
+  /(?:^|[;&|]\s*)cargo\s+nextest\s+run(?:\s|$)/,
+  /(?:^|[;&|]\s*)go\s+(?:test|build|vet)(?:\s|$)/,
+  /(?:^|[;&|]\s*)(?:\.\/)?gradle(?:w)?(?:\.bat)?\b[^;&|]*\b(?:test|build|check)\b/,
+  /(?:^|[;&|]\s*)(?:\.\/)?mvn(?:w)?(?:\.cmd)?\b[^;&|]*\b(?:test|verify|package)\b/,
+  /(?:^|[;&|]\s*)make\b[^;&|]*\b(?:test|check|build)\b/,
+  /(?:^|[;&|]\s*)(?:dotnet|swift|deno)\s+(?:test|build|check|lint)(?:\s|$)/,
+  /(?:^|[;&|]\s*)(?:ctest|tox)(?:\s|$)/,
 ];
 
 /** True when a shell command is a recognized test/build/typecheck/lint check. */
@@ -299,9 +299,13 @@ export class RunRecorder {
   private readonly diagnostics: string[] = [];
   /** A recognized test/build/typecheck/lint command exited 0 this run. */
   private verifiedCheckRan = false;
+  private mutationVersion = 0;
+  private verifiedMutationVersion = -1;
   /** Some non-trivial command ran successfully (not necessarily a known check). */
   private anyCommandRan = false;
+  private anyToolRan = false;
   private eventCount = 0;
+  private actionCount = 0;
   private status: ProofRunStatus = "running";
   private finishedAt: number | null = null;
   private finishPromise: Promise<void> | null = null;
@@ -336,6 +340,7 @@ export class RunRecorder {
       sessionId: this.run.sessionId,
       status: this.status,
       eventCount: this.eventCount,
+      actionCount: this.actionCount,
       changedFiles: [...this.changedFiles],
       checks: [...this.shellChecks],
       diagnostics: [...this.diagnostics],
@@ -373,6 +378,7 @@ export class RunRecorder {
       payload: timelineValue(record.output, "output", 0, true),
     });
     this.eventCount += 1;
+    this.actionCount += 1;
     recordLocalMetric({
       name: "tool.completed",
       value: 1,
@@ -389,7 +395,10 @@ export class RunRecorder {
       return;
     }
 
+    this.anyToolRan = true;
+
     if (MUTATION_TOOLS.has(record.toolName) && typeof record.input.path === "string") {
+      this.mutationVersion += 1;
       this.changedFiles.add(record.input.path);
       await this.journal.upsertArtifact(this.run.id, {
         kind: "changed_file",
@@ -412,6 +421,7 @@ export class RunRecorder {
       this.anyCommandRan = true;
       if (isRecognizedCheck(record.input.command)) {
         this.verifiedCheckRan = true;
+        this.verifiedMutationVersion = this.mutationVersion;
       }
     }
     // Running the app counts as activity: a successful serve_preview (the fused
@@ -439,9 +449,16 @@ export class RunRecorder {
     event: AtlasLifecycleEvent,
     payload: Record<string, unknown>,
   ): Promise<void> {
-    const row = lifecycleRow(event, payload);
-    await this.journal.appendEvent(this.run.id, row);
-    this.eventCount += 1;
+    // before_tool/after_tool are observed only to drive skill hooks — recordTool
+    // (fed from onToolResult) already journals a richer, categorized row for the
+    // same tool call (mutation/shell/read, failure detection, changed files,
+    // verification-check detection). Journaling a second generic
+    // tool.started/tool.finished row here would be pure duplication.
+    if (event !== "before_tool" && event !== "after_tool") {
+      const row = lifecycleRow(event, payload);
+      await this.journal.appendEvent(this.run.id, row);
+      this.eventCount += 1;
+    }
     const results = await lifecycleHookRunner.run(event, payload);
     for (const result of results) {
       await this.journal.appendEvent(this.run.id, {
@@ -481,6 +498,7 @@ export class RunRecorder {
       },
     });
     this.eventCount += 1;
+    this.actionCount += 1;
     this.emit();
   }
 
@@ -514,11 +532,13 @@ export class RunRecorder {
       ? "cancelled"
       : outcome.errored || this.failures.length > 0
         ? "failed"
-        : this.verifiedCheckRan
+        : this.verifiedCheckRan &&
+            (this.changedFiles.size === 0 ||
+              this.verifiedMutationVersion === this.mutationVersion)
           ? "verified"
           : this.anyCommandRan
             ? "smoke_checked"
-            : this.changedFiles.size > 0
+            : this.changedFiles.size > 0 || this.anyToolRan
               ? "completed"
               : "unverified";
     await this.recordLifecycleNow("verdict", { status });

@@ -1,6 +1,6 @@
 import type { AblationMode } from "../tools/tools";
 
-export type AgentRunLane = "full";
+export type AgentRunLane = "full" | "unbound";
 
 export type AgentRunPolicy = {
   lane: AgentRunLane;
@@ -20,6 +20,7 @@ export type AgentRunPolicyInput = {
   prompt: string;
   planMode: boolean;
   activeFile: string | null;
+  hasWorkspace: boolean;
 };
 
 const FULL_POLICY: AgentRunPolicy = {
@@ -34,8 +35,20 @@ const FULL_POLICY: AgentRunPolicy = {
   reason: "default full harness lane",
 };
 
+const UNBOUND_POLICY: AgentRunPolicy = {
+  lane: "unbound",
+  toolMode: "full",
+  includeAtlasMd: false,
+  includeMemoryIndex: false,
+  includeLocalMemory: false,
+  includeSimpleMem: false,
+  includeWorkPacket: false,
+  includeSkills: true,
+  reason: "no workspace-bound context sources",
+};
+
 /**
- * Every run uses the full harness lane. There was once a narrowed
+ * Workspace-bound runs use the full harness lane. There was once a narrowed
  * `static_web_app` lane that keyed off prompt text and the open editor tab to
  * thin context for calculator-grade web tasks. It mis-fired in practice — a
  * stale `index.html` left open in the editor silently downgraded unrelated
@@ -43,8 +56,6 @@ const FULL_POLICY: AgentRunPolicy = {
  * beats a brittle binary heuristic, so the lane was removed. The input shape is
  * retained so callers don't churn.
  */
-export function selectAgentRunPolicy(
-  _input: AgentRunPolicyInput,
-): AgentRunPolicy {
-  return FULL_POLICY;
+export function selectAgentRunPolicy(input: AgentRunPolicyInput): AgentRunPolicy {
+  return input.hasWorkspace ? FULL_POLICY : UNBOUND_POLICY;
 }

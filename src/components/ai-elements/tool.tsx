@@ -35,6 +35,7 @@ const TOOL_META: Record<string, { label: string; icon: typeof File01Icon }> = {
   suggest_command: { label: "Suggest", icon: SparklesIcon },
   open_preview: { label: "Preview", icon: EyeIcon },
   run_subagent: { label: "Subagent", icon: RobotIcon },
+  run_subagents: { label: "Parallel subagents", icon: RobotIcon },
   todo_write: { label: "Todos", icon: CheckListIcon },
 };
 
@@ -101,6 +102,7 @@ function deriveSummary(toolName: string, input: unknown): string | null {
     case "open_preview":
       return str("path") ?? str("url");
     case "run_subagent":
+    case "run_subagents":
       return str("agent") ?? str("task");
     case "todo_write": {
       const items = Array.isArray(i.todos) ? i.todos : null;
@@ -131,6 +133,7 @@ const HEAVY_CONTENT_TOOLS = new Set([
   "edit",
   "multi_edit",
   "run_subagent",
+  "run_subagents",
   "todo_write",
 ]);
 

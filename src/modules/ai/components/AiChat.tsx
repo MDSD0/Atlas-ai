@@ -33,10 +33,12 @@ import { usePlanStore } from "../store/planStore";
 import type {
   ChatStatus,
   DynamicToolUIPart,
+  FileUIPart,
   ToolUIPart,
   UIMessage,
   UIMessagePart,
 } from "ai";
+import { isFileUIPart } from "ai";
 import type { StickToBottomContext } from "use-stick-to-bottom";
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
@@ -169,6 +171,7 @@ type Props = {
   status: ChatStatus;
   error: Error | undefined;
   clearError: () => void;
+  regenerate: () => void | PromiseLike<void>;
   addToolApprovalResponse: (arg: ApprovalArg) => void | PromiseLike<void>;
   stop: () => void | PromiseLike<void>;
   sessionId?: string;
@@ -182,6 +185,7 @@ export function AiChatView({
   status,
   error,
   clearError,
+  regenerate,
   addToolApprovalResponse,
   sessionId,
   scrollKey,
@@ -292,7 +296,7 @@ export function AiChatView({
           <ConversationEmptyState
             title={title as any}
             description={description}
-            icon={<img src="/logo-transparent.png" alt="Atlas Logo" className="w-16 h-16 object-contain opacity-95" />}
+            icon={<img src="/logo.png" alt="Atlas Logo" className="w-16 h-16 object-contain opacity-95" />}
           />
         </ConversationContent>
       </Conversation>
@@ -318,7 +322,10 @@ export function AiChatView({
         {compactionNotice && (
           <CompactionNotice
             droppedCount={compactionNotice.droppedCount}
-            onDismiss={() => patchAgentMeta({ compactionNotice: null })}
+            onDismiss={() => {
+              const id = sessionId ?? useChatStore.getState().activeSessionId;
+              if (id) patchAgentMeta(id, { compactionNotice: null });
+            }}
           />
         )}
         {showSpinner && (
@@ -332,7 +339,8 @@ export function AiChatView({
         {showContinue && (
           <ContinueRow
             onContinue={() => {
-              patchAgentMeta({ hitStepCap: false });
+              const id = sessionId ?? useChatStore.getState().activeSessionId;
+              if (id) patchAgentMeta(id, { hitStepCap: false });
               void sendMessage(
                 "Continue from where you stopped. Don't recap — just keep going.",
               );
@@ -345,13 +353,25 @@ export function AiChatView({
             <div className="mt-0.5 leading-relaxed opacity-90">
               {error.message}
             </div>
-            <button
-              type="button"
-              onClick={clearError}
-              className="mt-1 underline opacity-80 hover:opacity-100"
-            >
-              Dismiss
-            </button>
+            <div className="mt-1 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  clearError();
+                  void regenerate();
+                }}
+                className="underline opacity-80 hover:opacity-100"
+              >
+                Retry
+              </button>
+              <button
+                type="button"
+                onClick={clearError}
+                className="underline opacity-80 hover:opacity-100"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
       </ConversationContent>
@@ -439,6 +459,7 @@ const RenderedMessage = memo(function RenderedMessage({
     const withoutCmd = cmdMatch ? rawText.slice(cmdMatch[0].length) : rawText;
     const stripped = stripUserContextBlocks(withoutCmd);
     const copyText = stripped.text || withoutCmd.trim() || rawText.trim();
+    const fileParts = message.parts.filter(isFileUIPart);
 
     return (
       <Message from="user">
@@ -448,6 +469,7 @@ const RenderedMessage = memo(function RenderedMessage({
             {stripped.chips.length > 0 ? (
               <ContextChips chips={stripped.chips} />
             ) : null}
+            {fileParts.length > 0 ? <UserFileParts parts={fileParts} /> : null}
             {stripped.text ? (
               <p className="whitespace-pre-wrap wrap-break-word">
                 {stripped.text}
@@ -510,6 +532,37 @@ const RenderedMessage = memo(function RenderedMessage({
         </MessageActions>
       ) : null}
     </Message>
+  );
+});
+
+const UserFileParts = memo(function UserFileParts({ parts }: { parts: FileUIPart[] }) {
+  return (
+    <div className="flex max-w-full flex-wrap justify-end gap-1.5">
+      {parts.map((part, index) => {
+        const name = part.filename || `Attachment ${index + 1}`;
+        if (part.mediaType.startsWith("image/")) {
+          return (
+            <img
+              key={`${part.url}-${index}`}
+              src={part.url}
+              alt={name}
+              title={name}
+              className="size-14 rounded-md border border-border/60 object-cover"
+            />
+          );
+        }
+        return (
+          <div
+            key={`${part.url}-${index}`}
+            title={name}
+            className="flex max-w-48 items-center gap-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1 text-[11px]"
+          >
+            <File01Icon size={12} strokeWidth={1.5} className="shrink-0 text-muted-foreground" />
+            <span className="truncate">{name}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 });
 

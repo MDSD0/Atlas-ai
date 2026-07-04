@@ -85,7 +85,7 @@ pub fn agent_reality_context(
     state: State<'_, RealityState>,
 ) -> Result<RealityContextResponse, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace, false)?;
     if !root.is_dir() {
         return Err("repository context root is not a directory".into());
     }

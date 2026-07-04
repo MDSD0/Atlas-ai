@@ -15,12 +15,60 @@ export type SessionMeta = {
 };
 
 
-const STORE_PATH = "atlas-ai-sessions.json";
+export const SESSIONS_STORE_PATH = "atlas-ai-sessions.json";
+const STORE_PATH = SESSIONS_STORE_PATH;
 const KEY_SESSIONS = "sessions";
 const KEY_ACTIVE = "activeId";
 const messagesKey = (id: string) => `messages:${id}`;
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });
+
+// Retention caps (F-12): the sessions store has no size bound otherwise —
+// only the messages actually persisted to disk are capped, not the live
+// in-memory conversation of an open session, so a very long session simply
+// loses its oldest messages the next time it's flushed / after a restart.
+export const MAX_SESSIONS_KEPT = 100;
+export const MAX_MESSAGES_PER_SESSION = 1000;
+export const MAX_SESSION_PERSISTED_BYTES = 10 * 1024 * 1024;
+const textEncoder = new TextEncoder();
+
+/** Keeps the newest `max` sessions by `updatedAt`. Pure — no I/O. */
+export function pruneSessions(
+  sessions: SessionMeta[],
+  max = MAX_SESSIONS_KEPT,
+): SessionMeta[] {
+  if (sessions.length <= max) return sessions;
+  return [...sessions].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, max);
+}
+
+/** Keeps the newest `max` messages. Pure — no I/O. */
+export function pruneMessages(
+  messages: UIMessage[],
+  max = MAX_MESSAGES_PER_SESSION,
+  maxBytes = MAX_SESSION_PERSISTED_BYTES,
+): UIMessage[] {
+  if (
+    messages.length <= max &&
+    serializedMessagesBytes(messages) <= maxBytes
+  ) return messages;
+  const candidates = messages.slice(-max);
+  const kept: UIMessage[] = [];
+  let bytes = 2;
+  for (let index = candidates.length - 1; index >= 0; index -= 1) {
+    const message = candidates[index];
+    const messageBytes = textEncoder.encode(JSON.stringify(message)).byteLength + 1;
+    if (messageBytes > maxBytes) break;
+    if (bytes + messageBytes > maxBytes) break;
+    bytes += messageBytes;
+    kept.push(message);
+  }
+  kept.reverse();
+  return kept;
+}
+
+export function serializedMessagesBytes(messages: UIMessage[]): number {
+  return textEncoder.encode(JSON.stringify(messages)).byteLength;
+}
 
 export type LoadedSessions = {
   sessions: SessionMeta[];
@@ -47,7 +95,14 @@ export async function loadMessages(id: string): Promise<UIMessage[] | null> {
 }
 
 export async function saveSessionsList(sessions: SessionMeta[]): Promise<void> {
-  await store.set(KEY_SESSIONS, sessions);
+  const pruned = pruneSessions(sessions);
+  if (pruned.length < sessions.length) {
+    const keep = new Set(pruned.map((s) => s.id));
+    for (const s of sessions) {
+      if (!keep.has(s.id)) await store.delete(messagesKey(s.id)).catch(() => {});
+    }
+  }
+  await store.set(KEY_SESSIONS, pruned);
 }
 
 export async function saveActiveId(id: string | null): Promise<void> {
@@ -58,7 +113,7 @@ export async function saveMessages(
   id: string,
   messages: UIMessage[],
 ): Promise<void> {
-  await store.set(messagesKey(id), normalizeMessageHistory(messages));
+  await store.set(messagesKey(id), pruneMessages(normalizeMessageHistory(messages)));
 }
 
 export async function deleteSessionData(id: string): Promise<void> {

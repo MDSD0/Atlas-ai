@@ -1,6 +1,6 @@
 use std::io::Read;
 use std::process::Stdio;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::SystemTime;
@@ -9,6 +9,7 @@ use serde::Serialize;
 use shared_child::SharedChild;
 
 use super::ringbuffer::BoundedRingBuffer;
+use crate::modules::proc::JobGuard;
 use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 
 const RING_CAP: usize = 4 * 1024 * 1024;
@@ -22,6 +23,15 @@ pub struct BackgroundProc {
     pub exited: AtomicBool,
     pub exit_code: AtomicI32,
     pub exit_unknown: AtomicBool,
+    /// 0 until the process exits (naturally or killed); ms since epoch after.
+    /// Lets `ShellState` prune long-finished entries instead of retaining
+    /// every job for the app's lifetime.
+    pub finished_at_ms: AtomicU64,
+    /// Windows Job Object (KILL_ON_JOB_CLOSE) covering this process's whole
+    /// descendant tree. `None` if creation failed (falls back to killing
+    /// just the immediate process) or on non-Windows, where `kill()` uses a
+    /// process-group signal instead.
+    job: Mutex<Option<JobGuard>>,
 }
 
 #[derive(Serialize)]
@@ -62,6 +72,12 @@ impl BackgroundProc {
     }
 
     pub fn kill(&self) {
+        // Drop the Job Object first (fires KILL_ON_JOB_CLOSE on Windows,
+        // taking the whole descendant tree with it), then fall back to
+        // killing the immediate process either way — cheap and harmless if
+        // the Job already did the job.
+        self.job.lock().unwrap().take();
+        crate::modules::proc::kill_process_group(self.child.id());
         let _ = self.child.kill();
     }
 
@@ -112,6 +128,7 @@ pub fn spawn(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     crate::modules::proc::hide_console(&mut cmd);
+    crate::modules::proc::new_process_group(&mut cmd);
 
     let shared = Arc::new(SharedChild::spawn(&mut cmd).map_err(|e| e.to_string())?);
     let kill_on_fail = || {
@@ -125,6 +142,7 @@ pub fn spawn(
         kill_on_fail();
         "no stderr pipe".to_string()
     })?;
+    let job = crate::modules::proc::try_create_job(shared.id());
     let child = shared;
 
     let started_at_ms = SystemTime::now()
@@ -141,6 +159,8 @@ pub fn spawn(
         exited: AtomicBool::new(false),
         exit_code: AtomicI32::new(0),
         exit_unknown: AtomicBool::new(false),
+        finished_at_ms: AtomicU64::new(0),
+        job: Mutex::new(job),
     });
 
     {
@@ -182,9 +202,90 @@ pub fn spawn(
                 },
                 Err(_) => proc_ref.exit_unknown.store(true, Ordering::Release),
             }
+            let now = SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis() as u64)
+                .unwrap_or(0);
+            proc_ref.finished_at_ms.store(now, Ordering::Release);
             proc_ref.exited.store(true, Ordering::Release);
         });
     }
 
     Ok(proc)
+}
+
+#[cfg(windows)]
+#[cfg(test)]
+mod windows_descendant_kill_tests {
+    use super::*;
+    use std::fs;
+    use std::time::{Duration, Instant};
+
+    fn pid_alive(pid: u32) -> bool {
+        let out = std::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/NH"])
+            .output();
+        match out {
+            Ok(o) => String::from_utf8_lossy(&o.stdout).contains(&pid.to_string()),
+            Err(_) => false,
+        }
+    }
+
+    /// Proves F-07(b) for real: killing a `BackgroundProc` whose immediate
+    /// child (PowerShell) itself spawned a grandchild (`timeout.exe`) must
+    /// take the grandchild down too, not just the shell — the exact
+    /// "dev server survives its shell being killed" orphan the audit flagged.
+    #[test]
+    fn killing_the_background_proc_also_kills_its_spawned_descendant() {
+        let dir = std::env::temp_dir();
+        let pid_file = dir.join(format!("atlas_bg_kill_test_{}.txt", std::process::id()));
+        let _ = fs::remove_file(&pid_file);
+        let pid_file_str = pid_file.to_string_lossy().to_string();
+
+        // A second powershell.exe (not a console-mode tool like timeout.exe,
+        // which can refuse to start when its parent has no console at all —
+        // our BackgroundProc host is spawned with CREATE_NO_WINDOW) as the
+        // descendant to be orphaned/reaped.
+        let command = format!(
+            "$p = Start-Process -FilePath 'powershell.exe' -ArgumentList '-NoProfile','-NonInteractive','-Command','Start-Sleep -Seconds 60' -PassThru -WindowStyle Hidden; \
+             Set-Content -Path '{pid_file_str}' -Value $p.Id; Start-Sleep -Seconds 60"
+        );
+        let proc = spawn(command, None, WorkspaceEnv::Local).expect("spawn background proc");
+
+        // Wait for the descendant to actually start and report its pid.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut child_pid: Option<u32> = None;
+        while Instant::now() < deadline {
+            if let Ok(text) = fs::read_to_string(&pid_file) {
+                if let Ok(pid) = text.trim().parse::<u32>() {
+                    child_pid = Some(pid);
+                    break;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let child_pid = child_pid.expect("descendant pid was never reported");
+        assert!(
+            pid_alive(child_pid),
+            "descendant should be running before kill"
+        );
+
+        proc.kill();
+
+        // Give the OS a moment to actually tear the tree down.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let mut dead = false;
+        while Instant::now() < deadline {
+            if !pid_alive(child_pid) {
+                dead = true;
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let _ = fs::remove_file(&pid_file);
+        assert!(
+            dead,
+            "descendant process {child_pid} survived killing its parent BackgroundProc — tree-kill did not work"
+        );
+    }
 }

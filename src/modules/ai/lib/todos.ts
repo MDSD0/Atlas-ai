@@ -9,7 +9,8 @@ export type Todo = {
   status: TodoStatus;
 };
 
-const STORE_PATH = "atlas-ai-todos.json";
+export const TODOS_STORE_PATH = "atlas-ai-todos.json";
+const STORE_PATH = TODOS_STORE_PATH;
 const todosKey = (sessionId: string) => `todos:${sessionId}`;
 
 const store = new LazyStore(STORE_PATH, { defaults: {}, autoSave: 200 });

@@ -7,7 +7,6 @@ export const SKILL_DESCRIPTION_BYTES = 1024;
 export const SKILL_PROMPT_BYTES = 12_000;
 export const SKILL_CONTEXT_BYTES = 20_000;
 export const SKILL_TOOLS = 40;
-export const SKILL_FIXTURE_BYTES = 512;
 
 const SKILL_NAME_RE = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 const TOOL_NAME_RE = /^[a-z][a-z0-9_]*$/;
@@ -27,7 +26,6 @@ export type LocalSkillPackage = {
   prompt: string;
   allowedTools: string[];
   hooks: AtlasLifecycleEvent[];
-  fixture: string | null;
   enabled: boolean;
   createdAt: number;
   updatedAt: number;
@@ -39,7 +37,6 @@ export type InstallSkillInput = {
   prompt: string;
   allowedTools?: readonly string[];
   hooks?: readonly AtlasLifecycleEvent[];
-  fixture?: string | null;
   enabled?: boolean;
 };
 
@@ -76,7 +73,6 @@ export function validateSkillInput(input: InstallSkillInput): Omit<
     prompt,
     allowedTools,
     hooks: [...new Set(input.hooks ?? [])],
-    fixture: input.fixture ? bounded(input.fixture, SKILL_FIXTURE_BYTES) : null,
     enabled: input.enabled ?? false,
   };
 }

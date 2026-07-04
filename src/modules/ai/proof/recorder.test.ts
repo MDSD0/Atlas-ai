@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ProofJournal } from "@/modules/ai/proof/journal";
 import type { ProofPersistence } from "@/modules/ai/proof/persistence";
-import { RunRecorder } from "@/modules/ai/proof/recorder";
+import { isRecognizedCheck, RunRecorder } from "@/modules/ai/proof/recorder";
 
 class MemoryPersistence implements ProofPersistence {
   private readonly values = new Map<string, unknown>();
@@ -229,6 +229,21 @@ describe("RunRecorder", () => {
     expect(run?.status).toBe("smoke_checked");
   });
 
+  it("does not verify commands that merely mention check words", () => {
+    expect(isRecognizedCheck("echo test")).toBe(false);
+    expect(isRecognizedCheck("Write-Output build")).toBe(false);
+    expect(isRecognizedCheck("printf 'lint' ")).toBe(false);
+    expect(isRecognizedCheck("echo ok # pnpm test")).toBe(false);
+  });
+
+  it("recognizes actual check runner invocations after shell chaining", () => {
+    expect(isRecognizedCheck("pnpm test")).toBe(true);
+    expect(isRecognizedCheck("pnpm --filter web test:unit")).toBe(true);
+    expect(isRecognizedCheck("cd app && pnpm exec vitest run")).toBe(true);
+    expect(isRecognizedCheck("python -m pytest -q")).toBe(true);
+    expect(isRecognizedCheck("cargo clippy --locked")).toBe(true);
+  });
+
   it("verifies when a recognized check command passes", async () => {
     const journal = makeJournal();
     const rec = await RunRecorder.start(journal, {
@@ -246,7 +261,7 @@ describe("RunRecorder", () => {
     expect(run?.status).toBe("verified");
   });
 
-  it("is unverified when nothing meaningful happened", async () => {
+  it("marks a successful read-only run completed", async () => {
     const journal = makeJournal();
     const rec = await RunRecorder.start(journal, {
       sessionId: "s1",
@@ -260,7 +275,50 @@ describe("RunRecorder", () => {
     await rec.finish();
 
     const run = await journal.getRun(rec.runId);
-    expect(run?.status).toBe("unverified");
+    expect(run?.status).toBe("completed");
+  });
+
+  it("does not keep a passed verdict when a later mutation was not checked", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordTool({
+      toolName: "write_file",
+      input: { path: "/repo/a.ts" },
+      output: { ok: true },
+    });
+    await rec.recordTool({
+      toolName: "bash_run",
+      input: { command: "pnpm test" },
+      output: { exit_code: 0 },
+    });
+    await rec.recordTool({
+      toolName: "edit",
+      input: { path: "/repo/a.ts" },
+      output: { ok: true },
+    });
+    await rec.finish();
+
+    expect((await journal.getRun(rec.runId))?.status).toBe("smoke_checked");
+  });
+
+  it("keeps lifecycle-only runs unverified with zero actions", async () => {
+    const journal = makeJournal();
+    const rec = await RunRecorder.start(journal, {
+      sessionId: "s1",
+      workspaceRoot: "/repo",
+    });
+    await rec.recordLifecycle("run_start");
+    await rec.recordLifecycle("prompt_submit");
+    await rec.finish();
+
+    expect(rec.summary()).toMatchObject({
+      status: "unverified",
+      eventCount: 4,
+      actionCount: 0,
+    });
   });
 
   it("attaches explicit semantic-tool evidence", async () => {
@@ -310,11 +368,14 @@ describe("RunRecorder", () => {
     await rec.finish();
 
     const run = await journal.getRun(rec.runId);
+    // before_tool/after_tool are observed only to drive skill hooks and are not
+    // journaled themselves — recordTool (not exercised in this test) is the
+    // sole journal path for tool-call rows, so no tool.started/tool.finished
+    // rows appear here even though recordLifecycle("before_tool"/"after_tool")
+    // was called above.
     expect(run?.events.map((event) => event.kind)).toEqual([
       "lifecycle.session_started",
       "lifecycle.user_prompt_submitted",
-      "tool.started",
-      "tool.finished",
       "lifecycle.finish_verdict",
       "lifecycle.session_finished",
     ]);
@@ -324,7 +385,6 @@ describe("RunRecorder", () => {
     expect(serialized).not.toContain("unfamiliar raw source line");
     expect(serialized).not.toContain("explain auth");
     expect(run?.events[1].boundedPayload?.preview).toContain('"omitted":true');
-    expect(run?.events[3].boundedPayload?.preview).toContain('"omitted":true');
   });
 
   it("waits for queued completion evidence before computing the verdict", async () => {

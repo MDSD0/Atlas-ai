@@ -7,6 +7,7 @@ export type SettingsTab =
   | "models"
   | "agents"
   | "mcp"
+  | "privacy"
   | "about";
 
 export async function openSettingsWindow(tab?: SettingsTab): Promise<void> {

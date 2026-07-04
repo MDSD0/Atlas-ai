@@ -43,14 +43,13 @@ export function buildSkillTools(availableTools: () => readonly string[]) {
 
     skill_install: tool({
       description:
-        "Install one explicit local prompt-only skill package. Skills cannot register tools or policy exceptions.",
+        "Install one explicit local prompt-only skill package. allowed_tools restricts the active toolbelt while this skill is enabled (union with any other enabled skill's restriction, including capability_search itself — omit it and the model can't unlock more tools mid-run to route around the restriction). hooks re-surfaces this skill's prompt as a reminder at the named lifecycle events. Skills still cannot bypass approvals, native authorization, secret guards, or proof recording.",
       inputSchema: z.object({
         name: z.string().min(1),
         description: z.string().min(1),
         prompt: z.string().min(1),
         allowed_tools: z.array(z.string()).max(40).optional(),
         hooks: z.array(lifecycleEvent).max(6).optional(),
-        fixture: z.string().optional(),
         enabled: z.boolean().optional(),
       }),
       needsApproval: true,
@@ -60,7 +59,6 @@ export function buildSkillTools(availableTools: () => readonly string[]) {
         prompt,
         allowed_tools,
         hooks,
-        fixture,
         enabled,
       }) => {
         try {
@@ -70,7 +68,6 @@ export function buildSkillTools(availableTools: () => readonly string[]) {
             prompt,
             allowedTools: allowed_tools,
             hooks: hooks as AtlasLifecycleEvent[] | undefined,
-            fixture,
             enabled,
           });
           return {

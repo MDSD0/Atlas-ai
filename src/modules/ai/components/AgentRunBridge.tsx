@@ -85,12 +85,16 @@ function Bridge({
 
   // Expose the approval responder so the diff tab can resolve approvals.
   // We keep it in a ref-stable closure so identity is stable per render.
+  // Intentionally not cleared on unmount: this session's entry stays valid
+  // (keyed by sessionId, so switching sessions doesn't orphan it) and
+  // switching back to it re-hydrates the mirrored `approvalResponder` field
+  // from the per-session map (F-03) — nulling it here would just reintroduce
+  // that gap for a session with a still-pending approval.
   useEffect(() => {
-    setApprovalResponder((id, approved) =>
+    setApprovalResponder(sessionId, (id, approved) =>
       addToolApprovalResponse({ id, approved }),
     );
-    return () => setApprovalResponder(null);
-  }, [setApprovalResponder, addToolApprovalResponse]);
+  }, [sessionId, setApprovalResponder, addToolApprovalResponse]);
 
   useEffect(() => {
     persistMessages(sessionId, messages);
@@ -128,7 +132,7 @@ function Bridge({
     else if (status === "streaming") runStatus = "streaming";
     else if (status === "error") runStatus = "error";
     else runStatus = "idle";
-    patch({
+    patch(sessionId, {
       status: runStatus,
       approvalsPending,
       ...(runStatus === "idle" || runStatus === "error"
@@ -136,7 +140,7 @@ function Bridge({
         : {}),
       ...(runStatus === "idle" ? { error: null } : {}),
     });
-  }, [status, approvalsPending, patch]);
+  }, [sessionId, status, approvalsPending, patch]);
 
   useEffect(() => {
     if (approvalsPending > 0 && !suppressAutoSurfaces) openMini();

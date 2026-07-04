@@ -27,7 +27,7 @@ const STATUS_META: Record<
   { label: string; className: string; Icon: typeof PassIcon }
 > = {
   running: { label: "Running", className: "text-muted-foreground", Icon: RunningIcon },
-  verified: { label: "Verified", className: "text-emerald-500", Icon: VerifiedIcon },
+  verified: { label: "Checks passed", className: "text-emerald-500", Icon: VerifiedIcon },
   smoke_checked: { label: "Smoke-checked", className: "text-emerald-500/80", Icon: PassIcon },
   completed: { label: "Completed", className: "text-foreground/80", Icon: PassIcon },
   unverified: { label: "Unverified", className: "text-amber-500", Icon: RunningIcon },
@@ -52,11 +52,12 @@ export function shouldShowReceipt(
 ): summary is ReceiptSummary {
   if (!summary) return false;
   return (
-    summary.eventCount > 0 ||
+    summary.actionCount > 0 ||
     summary.changedFiles.length > 0 ||
     summary.checks.length > 0 ||
     summary.diagnostics.length > 0 ||
-    summary.failures.length > 0
+    summary.failures.length > 0 ||
+    summary.status === "failed"
   );
 }
 
@@ -81,11 +82,15 @@ export function ReceiptStrip({ sessionId, onOpenFile }: Props) {
   const summary: ReceiptSummary | undefined = useProofStore((s) =>
     sessionId ? s.latestBySession[sessionId] : undefined,
   );
+  const current = useProofStore((s) =>
+    sessionId ? s.currentBySession[sessionId] : undefined,
+  );
   const [userExpanded, setUserExpanded] = useState(false);
 
   if (!shouldShowReceipt(summary)) return null;
 
   const meta = STATUS_META[summary.status];
+  const historical = Boolean(current && current.runId !== summary.runId);
   const expanded = userExpanded || receiptNeedsAttention(summary);
   const detailCount =
     summary.changedFiles.length + summary.checks.length;
@@ -108,11 +113,14 @@ export function ReceiptStrip({ sessionId, onOpenFile }: Props) {
           )
         ) : null}
         <meta.Icon size={13} strokeWidth={2} className={cn("shrink-0", meta.className)} />
-        <span className={cn("text-[11px] font-medium", meta.className)}>
-          {meta.label}
+        <span
+          className={cn("text-[11px] font-medium", meta.className)}
+          title={historical ? "Result from the last run that performed an action" : undefined}
+        >
+          {historical ? `Last ${meta.label.toLowerCase()}` : meta.label}
         </span>
         <span className="text-[11px] tabular-nums font-mono text-muted-foreground">
-          {summary.eventCount} {summary.eventCount === 1 ? "action" : "actions"}
+          {summary.actionCount} {summary.actionCount === 1 ? "action" : "actions"}
           {!expanded && detailCount > 0
             ? ` · ${detailCount} ${detailCount === 1 ? "item" : "items"}`
             : ""}

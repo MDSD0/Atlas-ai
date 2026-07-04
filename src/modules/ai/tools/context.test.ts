@@ -106,37 +106,49 @@ describe("Atlas workspace boundary", () => {
 
   it("allows paths inside workspaceRoot", async () => {
     await expect(
-      validateWithinWorkspace("/repo/src/app.ts", ctx(), canonicalize),
+      validateWithinWorkspace("/repo/src/app.ts", ctx(), canonicalize, "default"),
     ).resolves.toEqual({ ok: true });
   });
 
   it("rejects paths outside workspaceRoot", async () => {
     await expect(
-      validateWithinWorkspace("/tmp/notes.md", ctx(), canonicalize),
+      validateWithinWorkspace("/tmp/notes.md", ctx(), canonicalize, "default"),
     ).resolves.toMatchObject({ ok: false });
   });
 
   it("allows new nested paths when an ancestor is inside workspaceRoot", async () => {
     await expect(
-      validateWithinWorkspace("/repo/new/deep/notes.md", ctx(), canonicalize),
+      validateWithinWorkspace("/repo/new/deep/notes.md", ctx(), canonicalize, "default"),
     ).resolves.toEqual({ ok: true });
   });
 
   it("rejects case-variant siblings when native canonicalization keeps them distinct", async () => {
     await expect(
-      validateWithinWorkspace("/Repo/src/app.ts", ctx(), async (path) => path),
+      validateWithinWorkspace("/Repo/src/app.ts", ctx(), async (path) => path, "default"),
     ).resolves.toMatchObject({ ok: false });
   });
 
   it("rejects a Unix sibling whose filename contains a backslash", async () => {
     await expect(
-      validateWithinWorkspace("/repo\\escape/file.ts", ctx(), async (path) => path),
+      validateWithinWorkspace("/repo\\escape/file.ts", ctx(), async (path) => path, "default"),
     ).resolves.toMatchObject({ ok: false });
   });
 
   it("rejects a sibling that only shares the root prefix", async () => {
     await expect(
-      validateWithinWorkspace("/repository/file.ts", ctx(), async (path) => path),
+      validateWithinWorkspace("/repository/file.ts", ctx(), async (path) => path, "default"),
+    ).resolves.toMatchObject({ ok: false });
+  });
+
+  it("keeps the boundary in the legacy full mode", async () => {
+    await expect(
+      validateWithinWorkspace("/tmp/notes.md", ctx(), canonicalize, "full"),
+    ).resolves.toMatchObject({ ok: false });
+  });
+
+  it("still enforces the boundary in acceptEdits mode", async () => {
+    await expect(
+      validateWithinWorkspace("/tmp/notes.md", ctx(), canonicalize, "acceptEdits"),
     ).resolves.toMatchObject({ ok: false });
   });
 
@@ -152,6 +164,7 @@ describe("Atlas workspace boundary", () => {
         "/users/me/repo/src/app.ts",
         ctx({ workspaceRoot: "/Users/me/Repo" }),
         canonicalizeMacPath,
+        "default",
       ),
     ).resolves.toEqual({ ok: true });
   });
@@ -168,6 +181,7 @@ describe("Atlas workspace boundary", () => {
         "c:\\repo\\src\\app.ts",
         ctx({ workspaceRoot: "C:\\Repo" }),
         canonicalizeWindowsPath,
+        "default",
       ),
     ).resolves.toEqual({ ok: true });
   });
@@ -186,6 +200,7 @@ describe("Atlas workspace boundary", () => {
         "\\\\server\\share\\Repo\\src\\app.ts",
         ctx({ workspaceRoot: "\\\\server\\share\\Repo" }),
         canonicalizeUncPath,
+        "default",
       ),
     ).resolves.toEqual({ ok: true });
   });
@@ -201,6 +216,7 @@ describe("Atlas workspace boundary", () => {
         "C:\\Repo\\new\\deep\\file.ts",
         ctx({ workspaceRoot: "C:\\Repo" }),
         canonicalizeWindowsAncestor,
+        "default",
       ),
     ).resolves.toEqual({ ok: true });
   });
@@ -217,6 +233,7 @@ describe("Atlas workspace boundary", () => {
         "/repo/../tmp/notes.md",
         ctx(),
         canonicalizeTraversal,
+        "default",
       ),
     ).resolves.toMatchObject({ ok: false });
   });

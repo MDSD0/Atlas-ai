@@ -85,7 +85,8 @@ pub fn agent_fs_grep(
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<GrepResponse, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root_path = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    let root_path =
+        authorize_agent_existing_path(&registry, &root, &project_root, &workspace, false)?;
     fs_grep_at(
         pattern,
         root,
@@ -261,7 +262,8 @@ pub fn agent_fs_glob(
     registry: tauri::State<'_, WorkspaceRegistry>,
 ) -> Result<GlobResponse, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root_path = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    let root_path =
+        authorize_agent_existing_path(&registry, &root, &project_root, &workspace, false)?;
     fs_glob_at(pattern, root, root_path, max_results, workspace, true)
 }
 

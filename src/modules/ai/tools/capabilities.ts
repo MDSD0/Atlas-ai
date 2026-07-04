@@ -97,7 +97,8 @@ export const CAPABILITIES: readonly CapabilityDescriptor[] = [
       "mcp", "connector", "connectors", "external", "integration", "tool server",
     ],
     toolNames: [
-      "mcp_status", "mcp_list", "mcp_connector_studies", "mcp_configure",
+      "mcp_status", "mcp_list", "mcp_connector_studies", "mcp_discover_tools",
+      "mcp_configure", "mcp_configure_playwright",
       "mcp_enable", "mcp_disable", "mcp_remove", "mcp_call",
     ],
   },
@@ -118,7 +119,7 @@ export const CAPABILITIES: readonly CapabilityDescriptor[] = [
       "subagent", "agent", "delegate", "parallel", "explore", "spawn", "background agent",
     ],
     toolNames: [
-      "run_subagent", "spawn_coding_agent", "send_to_agent", "read_agent_output",
+      "run_subagent", "run_subagents", "spawn_coding_agent", "send_to_agent", "read_agent_output",
     ],
   },
   {
@@ -131,6 +132,18 @@ export const CAPABILITIES: readonly CapabilityDescriptor[] = [
     toolNames: [
       "work_packet_generate", "work_packet_list", "work_packet_inspect",
       "work_packet_resume", "work_packet_delete",
+    ],
+  },
+  {
+    id: "worktrees",
+    summary:
+      "Git worktree isolation: list, create, remove, and merge Atlas-managed worktrees.",
+    keywords: [
+      "worktree", "worktrees", "branch", "isolate", "isolated", "parallel", "merge",
+    ],
+    toolNames: [
+      "worktree_list", "worktree_create", "worktree_run", "worktree_inspect", "worktree_stage",
+      "worktree_unstage", "worktree_commit", "worktree_remove", "worktree_merge",
     ],
   },
   {
@@ -206,16 +219,25 @@ export function getPromotedCapabilities(sessionId: string): string[] {
   return [...(promotedBySession.get(sessionId) ?? [])];
 }
 
-/** Active tool names for a run = core + promoted capability tools, minus blocked families. */
+/** Active tool names for a run = core + promoted capability tools, minus
+ * blocked families, further narrowed to `skillToolRestriction` when a
+ * currently-enabled skill declares one (see `skills/index.ts`'s
+ * `getEnabledSkillToolRestriction`). The restriction can only narrow what the
+ * gateway already exposes — including `capability_search` itself, so a skill
+ * can't be routed around mid-run by unlocking more capabilities. */
 export function activeToolNames(
   sessionId: string,
   blockedCapabilityIds: Iterable<string> = [],
+  skillToolRestriction?: readonly string[] | null,
 ): string[] {
   const blocked = new Set(capabilityToolNames(blockedCapabilityIds));
-  return [
+  const names = [
     ...CORE_TOOL_NAMES,
     ...capabilityToolNames(getPromotedCapabilities(sessionId)),
   ].filter((name) => !blocked.has(name));
+  if (!skillToolRestriction || skillToolRestriction.length === 0) return names;
+  const allowed = new Set(skillToolRestriction);
+  return names.filter((name) => allowed.has(name));
 }
 
 export function clearPromotedCapabilities(sessionId: string): void {

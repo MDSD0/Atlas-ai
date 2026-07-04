@@ -18,7 +18,11 @@ import {
   mirrorProofRunToMemorySurface,
   SimpleMemRunObserver,
 } from "../memory";
-import { buildLocalSkillsContext, lifecycleHookRunner } from "../skills";
+import {
+  buildLocalSkillsContext,
+  getEnabledSkillToolRestriction,
+  lifecycleHookRunner,
+} from "../skills";
 import { buildActiveWorkPacketContext } from "../workPackets";
 import { contextLedger, type PackedContextSource } from "../contextLedger";
 import { selectAgentRunPolicy } from "./lanePolicy";
@@ -105,6 +109,15 @@ export function createContextAwareTransport(deps: Deps) {
   const run = async (options: SendOptions) => {
     const uiMessages = normalizeMessageHistory(options.messages);
     const live = deps.getLive();
+    // Freeze this run's project/path resolution to the snapshot taken above.
+    // Everything else on toolContext (approval mode, terminal/preview/spawn
+    // interaction) stays live so mid-run mode changes still apply — only file
+    // and shell path resolution must not drift if the user switches the
+    // active project/session while this run is still executing (F-02).
+    const runToolContext: ToolContext = {
+      ...deps.toolContext,
+      getProjectContext: () => live.project,
+    };
     const prompt = lastUserText(uiMessages);
     const sessionId = deps.toolContext.getSessionId() ?? "unknown";
     beginRunResources(sessionId, options.abortSignal);
@@ -113,6 +126,7 @@ export function createContextAwareTransport(deps: Deps) {
       prompt: recentUserText(uiMessages),
       planMode,
       activeFile: live.activeFile,
+      hasWorkspace: live.workspaceRoot !== null,
     });
     const modelId = deps.getModelId();
     const model = getModel(modelId);
@@ -136,7 +150,7 @@ export function createContextAwareTransport(deps: Deps) {
     }
     // Start the SimpleMem observer concurrently with the other context builders
     // instead of blocking the model call on its session round-trip first.
-    const [atlasMd, fileMemory, localMemory, activeWorkPacket, localSkills, simpleMem] =
+    const [atlasMd, fileMemory, localMemory, activeWorkPacket, localSkills, skillToolRestriction, simpleMem] =
       await Promise.all([
         runPolicy.includeAtlasMd
           ? readAtlasMd(live.workspaceRoot)
@@ -153,6 +167,9 @@ export function createContextAwareTransport(deps: Deps) {
         runPolicy.includeSkills
           ? buildLocalSkillsContext()
           : Promise.resolve(null),
+        runPolicy.includeSkills
+          ? getEnabledSkillToolRestriction()
+          : Promise.resolve(null),
         runPolicy.includeSimpleMem
           ? SimpleMemRunObserver.start({
               workspaceRoot: live.workspaceRoot,
@@ -161,30 +178,45 @@ export function createContextAwareTransport(deps: Deps) {
             }).catch(() => null)
           : Promise.resolve(null),
       ]);
+    // Manifest, don't preload: ATLAS.md/memory/work-packet content used to be
+    // injected in full on every single turn (ATLAS.md alone can be 32KB), which
+    // is the direct cause of the audit's 20k+ token-per-turn measurements. Each
+    // of these is reachable in exactly one extra tool call (read_file,
+    // memory_recall/memory_status, work_packet_resume) already gated behind the
+    // capability gateway, so nothing becomes unreachable — it just stops being
+    // force-fed on tasks that never needed it.
     const projectSources: PackedContextSource[] = [
       {
         id: "atlas_md",
         label: "ATLAS.md",
         source: "workspace ATLAS.md",
-        content: atlasMd,
+        content: atlasMd
+          ? `ATLAS.md is available (${atlasMd.length} chars). Call read_file("ATLAS.md") if it's relevant to this task.`
+          : null,
       },
       {
         id: "memory_index",
         label: "MEMORY.md",
         source: ".atlas/memory/MEMORY.md",
-        content: fileMemory,
+        content: fileMemory
+          ? `A project memory index is available (${fileMemory.length} chars). Call memory_status or memory_recall if project memory is relevant.`
+          : null,
       },
       {
         id: "local_memory",
         label: "Pinned memory",
         source: "app-local typed memory (top-confidence snapshot)",
-        content: localMemory,
+        content: localMemory
+          ? `Pinned project memory is available (${localMemory.length} chars). Call memory_recall if relevant.`
+          : null,
       },
       {
         id: "active_work_packet",
         label: "Active work packet",
         source: "app-local resumable packet",
-        content: activeWorkPacket,
+        content: activeWorkPacket
+          ? "An active work packet exists. Call work_packet_resume to load it if resuming prior work is relevant."
+          : null,
       },
       {
         id: "simplemem_context",
@@ -284,9 +316,10 @@ export function createContextAwareTransport(deps: Deps) {
         modelId: deps.getModelId(),
         customInstructions: deps.getCustomInstructions(),
         agentPersona: deps.getAgentPersona(),
-        toolContext: deps.toolContext,
+        toolContext: runToolContext,
         toolMode: runPolicy.toolMode,
         laneMaxSteps: runPolicy.maxSteps,
+        skillToolRestriction,
         onStep: (step) => {
           deps.onStep?.(step);
           recordSessionTraceEvent(trace, "agent.step", { step });

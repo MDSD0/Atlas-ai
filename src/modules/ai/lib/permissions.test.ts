@@ -59,10 +59,11 @@ describe("editNeedsApproval", () => {
 });
 
 describe("shellNeedsApproval", () => {
-  it("prompts for non-trivial commands except in full access", () => {
+  it("prompts for non-trivial commands in every product mode", () => {
     expect(shellNeedsApproval("npm install", "default")).toBe(true);
     expect(shellNeedsApproval("npm install", "acceptEdits")).toBe(true);
-    expect(shellNeedsApproval("npm install", "full")).toBe(false);
+    expect(shellNeedsApproval("npm install", "full")).toBe(true);
+    expect(shellNeedsApproval("npm install", "benchmark")).toBe(false);
   });
 
   it("auto-runs safe read-only / open commands in every mode", () => {
@@ -71,10 +72,7 @@ describe("shellNeedsApproval", () => {
     expect(shellNeedsApproval("git status", "default")).toBe(false);
   });
 
-  it("does not let full-access mode auto-skip a compounded command's prompt path via the allow-list", () => {
-    // A compounded command is not auto-run; full access still skips the prompt,
-    // but the execute-time circuit breaker (checkShellCommand) is the guard
-    // that blocks it. The allow-list itself must never classify it as safe.
+  it("never classifies a compounded command as safe", () => {
     expect(isAutoRunShell("open x && rm -rf /")).toBe(false);
   });
 });

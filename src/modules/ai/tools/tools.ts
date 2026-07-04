@@ -15,6 +15,7 @@ import { buildTerminalTools } from "./terminal";
 import { buildTodoTools } from "./todo";
 import { buildVerificationTools } from "./verification";
 import { buildWorkPacketTools } from "./workPackets";
+import { buildWorktreeTools } from "./worktrees";
 
 export {
   atlasContextBlock,
@@ -70,7 +71,7 @@ function buildFullTools(ctx: import("./context").ToolContext) {
     ...buildEditTools(ctx),
     ...buildMemoryTools(ctx),
     ...buildMetricsTools(ctx),
-    ...buildMcpTools(),
+    ...buildMcpTools(ctx),
     ...buildSearchTools(ctx),
     ...buildRealityTools(ctx),
     ...buildSemanticTools(ctx),
@@ -81,6 +82,7 @@ function buildFullTools(ctx: import("./context").ToolContext) {
     ...buildTerminalTools(ctx),
     ...buildTodoTools(ctx),
     ...buildManagedAgentTools(ctx),
+    ...buildWorktreeTools(ctx),
     ...buildCapabilityTools(ctx),
   } as const;
   return {

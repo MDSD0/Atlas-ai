@@ -277,3 +277,80 @@ Left intentionally:
 
 - Native-app worktree UX: run agent in isolated worktree, review diff, merge on
   accept. This needs real desktop interaction evidence, not headless pretending.
+
+## Corrective slice: truthful receipts and composer attachments
+
+Done:
+
+- Lifecycle journal rows no longer count as user-visible agent actions.
+- Chat-only turns keep the last meaningful receipt instead of replacing it
+  with `Unverified`.
+- Successful read-only runs finish as completed.
+- Verification recognizes actual test, lint, build, and type-check runners;
+  printed words such as `echo test` do not qualify.
+- Composer files can be selected, pasted, or dropped.
+- Images and PDFs are bounded file parts; text/code files are bounded inline
+  context. Duplicate, oversized, unsupported, and `.env` inputs are rejected
+  with visible feedback.
+- Sent image/PDF parts remain visible in conversation history.
+
+Verification receipts:
+
+- Focused Vitest: `32 passed`.
+- Full Vitest: `408 passed / 4 paid suites intentionally skipped`.
+- TypeScript: `RC=0`.
+
+Not claimed:
+
+- DOCX parsing is not present. It remains explicitly unsupported rather than
+  being decoded as corrupt text.
+- Live UI inspection was excluded by request.
+
+## Corrective slice: concurrency, boundaries, and graph truth
+
+Done:
+
+- MCP no longer serializes unrelated servers behind one global call lock.
+- Persistent shell output is bounded on success, timeout, and process-exit
+  paths while retaining completion markers.
+- Legacy full-access IPC cannot escape the bound project root. Product
+  autonomy is workspace-scoped; arbitrary shell execution still requires an
+  explicit approval except in the internal benchmark mode.
+- Session persistence is byte-bounded and inactive streams flush completion.
+- Code Reality omits ambiguous duplicate-symbol edges and synthetic self-links
+  instead of presenting them as repository relationships.
+- The agent can list, create, remove, and merge Atlas-managed Git worktrees
+  through progressive disclosure. Mutating operations require approval.
+- Unbound chats skip project-only persistence context without using prompt or
+  active-editor heuristics.
+
+Verification receipts:
+
+- Full Vitest: `415 passed / 4 paid suites intentionally skipped`.
+- Full Rust library tests: `199 passed / 0 failed / 3 intentional ignores`.
+- TypeScript: `RC=0`.
+- Live UI inspection remains excluded by request.
+
+## Corrective slice: parallel workers, browser behavior, worktree handoff
+
+Done:
+
+- Subagents inherit cancellation and can run in bounded parallel batches.
+- MCP tool discovery is real, server processes are project-cwd bound, Windows
+  npm shims launch through `cmd.exe`, and browser-length calls have a realistic
+  timeout.
+- The pinned official Playwright MCP preset runs isolated and headless. A real
+  Edge host test discovered tools, navigated to a local fixture, and verified
+  the expected button in the accessibility snapshot.
+- Worktrees now provide an isolated file-editing worker plus inspect, stage,
+  unstage, commit, merge, and removal. Parent verification is explicit because
+  the child does not receive an unsandboxed shell.
+- `.atlas` artifacts are hidden through repository-local Git exclusion.
+- Known text-only models reject binary attachments before submission.
+
+Verification receipts:
+
+- Full Vitest: `423 passed / 4 paid suites intentionally skipped`.
+- Full Rust: `201 passed / 0 failed / 4 intentional ignores`.
+- Official Playwright host smoke: `1 passed`.
+- Production build, TypeScript, Rust formatting, and diff hygiene: passed.

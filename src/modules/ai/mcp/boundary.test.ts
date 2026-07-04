@@ -86,4 +86,65 @@ describe("McpBoundary", () => {
     })).rejects.toThrow("exceeds");
     expect(calls).toBe(0);
   });
+
+  it("rejects immediately when the abort signal fires, without waiting the timeout (F-11)", async () => {
+    const registry = await configured();
+    const controller = new AbortController();
+    const boundary = new McpBoundary(
+      registry,
+      async () => new Promise(() => {}), // never resolves — only abort/timeout can end this
+      60_000, // deliberately much longer than the abort delay below
+    );
+
+    const promise = boundary.callTool(
+      { serverId: "fixture", toolName: "inspect", input: {} },
+      controller.signal,
+    );
+    setTimeout(() => controller.abort(), 10);
+
+    const started = Date.now();
+    await expect(promise).rejects.toThrow("cancelled");
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+
+  it("rejects immediately if the abort signal is already aborted before the call starts", async () => {
+    const registry = await configured();
+    const controller = new AbortController();
+    controller.abort();
+    const boundary = new McpBoundary(registry, async () => "should not run");
+    await expect(
+      boundary.callTool({ serverId: "fixture", toolName: "inspect", input: {} }, controller.signal),
+    ).rejects.toThrow("cancelled");
+  });
+
+  it("calls the canceller with the request id on timeout, not on success (F-11)", async () => {
+    const cancelled: string[] = [];
+    const registry = await configured();
+
+    // Timeout path: canceller must fire.
+    const timingOutBoundary = new McpBoundary(
+      registry,
+      async () => new Promise(() => {}),
+      5,
+      async (requestId) => {
+        cancelled.push(requestId);
+      },
+    );
+    await expect(
+      timingOutBoundary.callTool({ serverId: "fixture", toolName: "inspect", input: {} }),
+    ).rejects.toThrow("timed out");
+    expect(cancelled).toHaveLength(1);
+
+    // Success path: canceller must NOT fire.
+    const successBoundary = new McpBoundary(
+      registry,
+      async () => "ok",
+      5000,
+      async (requestId) => {
+        cancelled.push(requestId);
+      },
+    );
+    await successBoundary.callTool({ serverId: "fixture", toolName: "inspect", input: {} });
+    expect(cancelled).toHaveLength(1); // unchanged — still just the timeout one
+  });
 });

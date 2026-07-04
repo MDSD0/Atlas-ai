@@ -102,10 +102,11 @@ export async function applyEdits(
   kind: "edit" | "multi_edit",
   readCache: Map<string, ReadFingerprint>,
   sessionId?: string | null,
+  fullAccess = false,
 ): Promise<EditResult> {
-  const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
+  const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot, fullAccess);
   return withFileMutationQueue(abs, () =>
-    applyEditsUnlocked(abs, projectRoot, edits, kind, readCache, sessionId),
+    applyEditsUnlocked(abs, projectRoot, edits, kind, readCache, sessionId, fullAccess),
     canonicalize,
   );
 }
@@ -117,8 +118,9 @@ async function applyEditsUnlocked(
   kind: "edit" | "multi_edit",
   readCache: Map<string, ReadFingerprint>,
   sessionId?: string | null,
+  fullAccess = false,
 ): Promise<EditResult> {
-  const r = await agentNative.readFile(abs, projectRoot);
+  const r = await agentNative.readFile(abs, projectRoot, fullAccess);
   if (r.kind === "binary")
     return { error: "binary file refused", path: abs };
   if (r.kind === "toolarge")
@@ -208,7 +210,7 @@ async function applyEditsUnlocked(
   }
 
   try {
-    await agentNative.writeFile(abs, content, projectRoot);
+    await agentNative.writeFile(abs, content, projectRoot, fullAccess);
     readCache.set(abs, fingerprintText(content));
     return {
       ok: true,
@@ -226,7 +228,7 @@ export function buildEditTools(ctx: ToolContext) {
   return {
     edit: tool({
       description:
-        "Replace an exact string in a file. Requires read_file on this path first in the current session — this prevents blind edits. `old_string` must be unique in the file unless `replace_all: true`. Approval follows the current Access mode: Ask prompts first; Accept edits and Full access auto-apply after native guards.",
+        "Replace an exact string in a file. Requires read_file on this path first in the current session. `old_string` must be unique unless `replace_all: true`. Ask mode prompts first; edit-accepting modes auto-apply inside the bound workspace.",
       inputSchema: z.object({
         path: z.string(),
         old_string: z
@@ -243,12 +245,13 @@ export function buildEditTools(ctx: ToolContext) {
         const blocked = checkMutationAllowed(project);
         if (blocked) return { ...blocked, path };
         const projectRoot = project.workspaceRoot as string;
-        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
+        const fullAccess = false;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot, fullAccess);
         const reqPath = resolvePath(path, project);
         const safety = await checkWritableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize, ctx.getApprovalMode());
         if (!boundary.ok) return { error: boundary.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {
@@ -264,13 +267,14 @@ export function buildEditTools(ctx: ToolContext) {
           "edit",
           ctx.readCache,
           ctx.getSessionId(),
+          fullAccess,
         );
       },
     }),
 
     multi_edit: tool({
       description:
-        "Apply several exact-string replacements to a single file atomically. Each edit is applied in order to the running buffer; if any edit's old_string is missing or non-unique, the whole batch aborts before writing. Requires prior read_file on the path. Approval follows the current Access mode: Ask prompts first; Accept edits and Full access auto-apply after native guards.",
+        "Apply several exact-string replacements to one file atomically. Each edit is applied in order; any missing or non-unique old_string aborts the batch before writing. Requires prior read_file. Ask mode prompts first; edit-accepting modes auto-apply inside the bound workspace.",
       inputSchema: z.object({
         path: z.string(),
         edits: z
@@ -291,12 +295,13 @@ export function buildEditTools(ctx: ToolContext) {
         const blocked = checkMutationAllowed(project);
         if (blocked) return { ...blocked, path };
         const projectRoot = project.workspaceRoot as string;
-        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot);
+        const fullAccess = false;
+        const canonicalize = (p: string) => agentNative.canonicalize(p, projectRoot, fullAccess);
         const reqPath = resolvePath(path, project);
         const safety = await checkWritableCanonical(reqPath, canonicalize);
         if (!safety.ok) return { error: safety.reason, path: reqPath };
         const abs = safety.canonical;
-        const boundary = await validateWithinWorkspace(abs, project, canonicalize);
+        const boundary = await validateWithinWorkspace(abs, project, canonicalize, ctx.getApprovalMode());
         if (!boundary.ok) return { error: boundary.reason, path: abs };
         if (!ctx.readCache.has(abs)) {
           return {
@@ -312,6 +317,7 @@ export function buildEditTools(ctx: ToolContext) {
           "multi_edit",
           ctx.readCache,
           ctx.getSessionId(),
+          fullAccess,
         );
       },
     }),

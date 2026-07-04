@@ -178,13 +178,14 @@ pub fn agent_lsp_status(
     registry: State<'_, WorkspaceRegistry>,
 ) -> Result<Vec<LspProviderInfo>, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace, false)?;
     if !root.is_dir() {
         return Err("LSP root is not a directory".into());
     }
     let extension = match file {
         Some(file) => {
-            let file = authorize_agent_existing_path(&registry, &file, &project_root, &workspace)?;
+            let file =
+                authorize_agent_existing_path(&registry, &file, &project_root, &workspace, false)?;
             file.extension()
                 .and_then(|extension| extension.to_str())
                 .map(str::to_ascii_lowercase)
@@ -209,11 +210,11 @@ pub fn agent_lsp_diagnostics(
     registry: State<'_, WorkspaceRegistry>,
 ) -> Result<LspDiagnosticsResponse, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace, false)?;
     if !root.is_dir() {
         return Err("LSP root is not a directory".into());
     }
-    let file = authorize_agent_existing_path(&registry, &file, &project_root, &workspace)?;
+    let file = authorize_agent_existing_path(&registry, &file, &project_root, &workspace, false)?;
     if !file.is_file() {
         return Err("semantic target is not a file".into());
     }
@@ -308,11 +309,11 @@ pub fn agent_lsp_semantic(
     registry: State<'_, WorkspaceRegistry>,
 ) -> Result<LspSemanticResponse, String> {
     let workspace = WorkspaceEnv::from_option(workspace);
-    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace)?;
+    let root = authorize_agent_existing_path(&registry, &root, &project_root, &workspace, false)?;
     if !root.is_dir() {
         return Err("LSP root is not a directory".into());
     }
-    let file = authorize_agent_existing_path(&registry, &file, &project_root, &workspace)?;
+    let file = authorize_agent_existing_path(&registry, &file, &project_root, &workspace, false)?;
     if !file.is_file() {
         return Err("semantic target is not a file".into());
     }
@@ -425,19 +426,15 @@ fn provider_statuses(
             let key = root.map(|root| client_key(root, provider));
             let broken = key.as_ref().and_then(|key| {
                 state.and_then(|state| {
-                    state
-                        .broken
-                        .lock()
-                        .ok()
-                        .and_then(|mut broken| {
-                            let entry = broken.get(key)?;
-                            if entry.failed_at.elapsed() >= BROKEN_RETRY_AFTER {
-                                broken.remove(key);
-                                None
-                            } else {
-                                Some(entry.detail.clone())
-                            }
-                        })
+                    state.broken.lock().ok().and_then(|mut broken| {
+                        let entry = broken.get(key)?;
+                        if entry.failed_at.elapsed() >= BROKEN_RETRY_AFTER {
+                            broken.remove(key);
+                            None
+                        } else {
+                            Some(entry.detail.clone())
+                        }
+                    })
                 })
             });
             let connected = key.as_ref().is_some_and(|key| {
@@ -777,17 +774,13 @@ mod tests {
         let root = tempfile::tempdir().expect("root");
         let state = LspState::default();
         let key = client_key(root.path(), &PROVIDERS[0]);
-        state
-            .broken
-            .lock()
-            .expect("broken state")
-            .insert(
-                key,
-                BrokenProvider {
-                    detail: "initialize failed".into(),
-                    failed_at: Instant::now(),
-                },
-            );
+        state.broken.lock().expect("broken state").insert(
+            key,
+            BrokenProvider {
+                detail: "initialize failed".into(),
+                failed_at: Instant::now(),
+            },
+        );
         let infos = provider_statuses(Some("ts"), None, Some(root.path()), Some(&state));
 
         assert_eq!(infos[0].status, LspProviderStatus::Broken);
@@ -808,17 +801,13 @@ mod tests {
         }
         let state = LspState::default();
         let key = client_key(root.path(), &PROVIDERS[0]);
-        state
-            .broken
-            .lock()
-            .expect("broken state")
-            .insert(
-                key,
-                BrokenProvider {
-                    detail: "initialize failed".into(),
-                    failed_at: Instant::now() - BROKEN_RETRY_AFTER - Duration::from_secs(1),
-                },
-            );
+        state.broken.lock().expect("broken state").insert(
+            key,
+            BrokenProvider {
+                detail: "initialize failed".into(),
+                failed_at: Instant::now() - BROKEN_RETRY_AFTER - Duration::from_secs(1),
+            },
+        );
 
         let infos = provider_statuses(
             Some("ts"),

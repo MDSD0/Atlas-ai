@@ -1,12 +1,10 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc;
 use std::sync::Mutex;
-use std::thread;
 use std::time::Duration;
 
 use serde::Serialize;
 
-use super::run_blocking_inner;
+use super::persistent::{wrap_persistent, PersistentShell, ReadOutcome};
 use crate::modules::workspace::{resolve_path, WorkspaceEnv};
 
 pub struct ShellSession {
@@ -16,6 +14,13 @@ pub struct ShellSession {
     #[allow(dead_code)]
     pub started_at_ms: u64,
     sentinel: String,
+    /// The real long-lived child shell. `None` until first use; also reset
+    /// to `None` after a timeout or an unexpected exit (e.g. the command ran
+    /// `exit`, or the shell crashed) so the next call transparently spawns a
+    /// fresh one rather than leaving the session stuck. Held for the whole
+    /// duration of `run()`, which both serializes commands (a real shell can
+    /// only run one at a time) and protects the spawn-or-reuse decision.
+    proc: Mutex<Option<PersistentShell>>,
 }
 
 #[derive(Serialize)]
@@ -55,6 +60,7 @@ impl ShellSession {
             pristine: AtomicBool::new(true),
             started_at_ms,
             sentinel: generate_sentinel(),
+            proc: Mutex::new(None),
         }
     }
 
@@ -82,74 +88,98 @@ impl ShellSession {
                 }
             }
         }
-        let cwd = self.current_cwd();
         let effective_workspace = workspace_hint.unwrap_or_else(|| self.workspace.clone());
-        let wrapped = wrap_with_sentinel(&trimmed, &effective_workspace, &self.sentinel);
+        let wrapped = wrap_persistent(&trimmed, &effective_workspace, &self.sentinel);
 
-        let (tx, rx) = mpsc::channel::<Result<super::CommandOutput, String>>();
-        let cwd_for_thread = cwd.clone();
-        thread::spawn(move || {
-            let _ = tx.send(run_blocking_inner(
-                wrapped,
-                Some(cwd_for_thread),
-                effective_workspace,
-                timeout,
-            ));
-        });
-        let raw = rx.recv().map_err(|e| e.to_string())??;
-        self.pristine.store(false, Ordering::Release);
+        // Held for the whole call: this is both the spawn-or-reuse decision
+        // and the serialization a single real shell process requires (only
+        // one command can be in flight on its stdin at a time).
+        let mut proc_slot = self.proc.lock().unwrap();
+        let needs_spawn = match proc_slot.as_ref() {
+            Some(p) => !p.is_alive(),
+            None => true,
+        };
+        if needs_spawn {
+            let cwd = self.current_cwd();
+            *proc_slot = Some(PersistentShell::spawn(&effective_workspace, &cwd)?);
+        }
+        let proc = proc_slot.as_mut().expect("just ensured Some");
 
-        let (stdout_clean, cwd_after) = strip_cwd_sentinel(&raw.stdout, &cwd, &self.sentinel);
-        if let Some(ref new_cwd) = cwd_after {
-            let p = resolve_path(new_cwd, &self.workspace);
-            if p.is_dir() {
-                *self.cwd.lock().unwrap() = new_cwd.clone();
+        if let Err(e) = proc.write_command(&wrapped) {
+            // Stdin write failed — the shell is dead even though our EOF
+            // detection hasn't caught up yet. Drop it now so the *next* call
+            // spawns fresh instead of repeating this error.
+            *proc_slot = None;
+            return Err(format!("persistent shell write failed: {e}"));
+        }
+
+        match proc.read_until_sentinel(&self.sentinel, timeout) {
+            ReadOutcome::Completed {
+                stdout,
+                stderr,
+                exit_code,
+                cwd_after,
+                truncated,
+            } => {
+                self.pristine.store(false, Ordering::Release);
+                if let Some(new_cwd) = cwd_after {
+                    let p = resolve_path(&new_cwd, &self.workspace);
+                    if p.is_dir() {
+                        *self.cwd.lock().unwrap() = new_cwd;
+                    }
+                }
+                let resolved_cwd = self.current_cwd().replace('\\', "/");
+                Ok(SessionRunOutput {
+                    stdout,
+                    stderr,
+                    exit_code: Some(exit_code),
+                    timed_out: false,
+                    truncated,
+                    cwd_after: resolved_cwd,
+                })
+            }
+            ReadOutcome::TimedOut {
+                partial_stdout,
+                partial_stderr,
+                truncated,
+            } => {
+                // A hung foreground command can't be safely interrupted
+                // in-place through a plain pipe (no PTY, no real Ctrl+C
+                // semantics) — kill the whole shell and let the next call
+                // transparently respawn. Only this in-flight command's
+                // env-var/cwd state (if it changed anything before hanging)
+                // is lost; earlier commands' state was already captured.
+                *proc_slot = None;
+                self.pristine.store(false, Ordering::Release);
+                Ok(SessionRunOutput {
+                    stdout: partial_stdout,
+                    stderr: partial_stderr,
+                    exit_code: None,
+                    timed_out: true,
+                    truncated,
+                    cwd_after: self.current_cwd().replace('\\', "/"),
+                })
+            }
+            ReadOutcome::ProcessExited {
+                partial_stdout,
+                partial_stderr,
+                truncated,
+            } => {
+                // The command itself ran `exit`, or the shell crashed. Same
+                // recovery as a timeout: drop it, next call gets a fresh one.
+                *proc_slot = None;
+                self.pristine.store(false, Ordering::Release);
+                Ok(SessionRunOutput {
+                    stdout: partial_stdout,
+                    stderr: partial_stderr,
+                    exit_code: None,
+                    timed_out: false,
+                    truncated,
+                    cwd_after: self.current_cwd().replace('\\', "/"),
+                })
             }
         }
-        let resolved_cwd = self.current_cwd().replace('\\', "/");
-
-        Ok(SessionRunOutput {
-            stdout: stdout_clean,
-            stderr: raw.stderr,
-            exit_code: raw.exit_code,
-            timed_out: raw.timed_out,
-            truncated: raw.truncated,
-            cwd_after: resolved_cwd,
-        })
     }
-}
-
-fn wrap_posix_with_sentinel(command: &str, sentinel: &str) -> String {
-    format!(
-        "{command}\n__atlas_rc=$?\nprintf '\\n%s%s\\n' '{sentinel}' \"$(pwd)\"\nexit $__atlas_rc\n",
-    )
-}
-
-fn wrap_with_sentinel(command: &str, workspace: &WorkspaceEnv, sentinel: &str) -> String {
-    if workspace.is_wsl() {
-        return wrap_posix_with_sentinel(command, sentinel);
-    }
-    #[cfg(unix)]
-    {
-        wrap_posix_with_sentinel(command, sentinel)
-    }
-    #[cfg(windows)]
-    {
-        format!(
-        "{command}\n$__atlas_rc = if ($null -ne $LASTEXITCODE) {{ $LASTEXITCODE }} elseif ($?) {{ 0 }} else {{ 1 }}\n\"`n{sentinel}$($PWD.Path)\"\nexit $__atlas_rc\n",
-    )
-    }
-}
-
-fn strip_cwd_sentinel(stdout: &str, _fallback: &str, sentinel: &str) -> (String, Option<String>) {
-    if let Some(idx) = stdout.rfind(sentinel) {
-        let before = &stdout[..idx];
-        let after = &stdout[idx + sentinel.len()..];
-        let cwd_line = after.lines().next().unwrap_or("").trim();
-        let cleaned = before.trim_end_matches('\n').to_string();
-        return (cleaned, Some(cwd_line.to_string()));
-    }
-    (stdout.to_string(), None)
 }
 
 #[cfg(test)]
@@ -167,31 +197,9 @@ mod tests {
     }
 
     #[test]
-    fn strip_uses_session_sentinel_only() {
+    fn new_session_is_pristine_with_no_process_yet() {
         let s = ShellSession::new("/tmp".into(), WorkspaceEnv::Local);
-        let attacker = "__ATLAS_CWD_0000000000000000_0000000000000000__/evil";
-        let trailer = format!("\n{}/real\n", s.sentinel);
-        let stdout = format!("{attacker}{trailer}");
-        let (clean, cwd) = strip_cwd_sentinel(&stdout, "/fallback", &s.sentinel);
-        assert_eq!(cwd.as_deref(), Some("/real"));
-        assert!(
-            clean.contains(attacker),
-            "attacker payload survives in stdout"
-        );
-    }
-
-    #[test]
-    fn strip_returns_none_when_session_sentinel_absent() {
-        let s = ShellSession::new("/tmp".into(), WorkspaceEnv::Local);
-        let stdout = "some output\n__ATLAS_CWD_aaaa_bbbb__/spoof\nmore\n";
-        let (_, cwd) = strip_cwd_sentinel(stdout, "/fallback", &s.sentinel);
-        assert!(cwd.is_none(), "foreign sentinel must not match");
-    }
-
-    #[test]
-    fn wrap_embeds_session_sentinel() {
-        let s = ShellSession::new("/tmp".into(), WorkspaceEnv::Local);
-        let wrapped = wrap_with_sentinel("echo hi", &WorkspaceEnv::Local, &s.sentinel);
-        assert!(wrapped.contains(&s.sentinel));
+        assert!(s.pristine.load(Ordering::Acquire));
+        assert!(s.proc.lock().unwrap().is_none());
     }
 }

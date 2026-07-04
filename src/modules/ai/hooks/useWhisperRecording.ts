@@ -1,7 +1,14 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { experimental_transcribe as transcribe } from "ai";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { useChatStore } from "../store/chatStore";
+import { createProxyFetch } from "../lib/proxyFetch";
+
+// Mirrors agent.ts's singleton: raw webview fetch to api.openai.com fails
+// CORS, so transcription must go through the same Tauri-proxied fetch every
+// other cloud provider call uses.
+const cloudProxyFetch = createProxyFetch({ allowPrivateNetwork: false });
 
 const MIME_CANDIDATES = [
   "audio/webm;codecs=opus",
@@ -18,8 +25,25 @@ function pickMime(): string | undefined {
   return undefined;
 }
 
+/** Pure — extracted so it's directly testable without a hook-rendering
+ * harness (this codebase has none) or mocking `DOMException`/`MediaRecorder`. */
+export function micErrorMessage(e: unknown): string {
+  const name = e instanceof DOMException ? e.name : "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "Microphone access was denied. Allow it in your browser/OS settings and try again.";
+  }
+  if (name === "NotFoundError") return "No microphone was found.";
+  return "Couldn't access the microphone.";
+}
+
+/** Pure — see {@link micErrorMessage}. */
+export function transcriptionErrorMessage(e: unknown): string {
+  const detail = e instanceof Error ? e.message : String(e);
+  return detail.slice(0, 200);
+}
+
 async function transcribeBlob(blob: Blob, apiKey: string): Promise<string> {
-  const openai = createOpenAI({ apiKey });
+  const openai = createOpenAI({ apiKey, fetch: cloudProxyFetch });
   const buf = new Uint8Array(await blob.arrayBuffer());
   const { text } = await transcribe({
     model: openai.transcription("whisper-1"),
@@ -83,6 +107,9 @@ export function useWhisperRecording({
           if (text.trim()) onResult(text.trim());
         } catch (e) {
           console.error("whisper.transcribe", e);
+          toast.error("Voice transcription failed", {
+            description: transcriptionErrorMessage(e),
+          });
         } finally {
           setState("idle");
         }
@@ -92,6 +119,7 @@ export function useWhisperRecording({
       setState("recording");
     } catch (e) {
       console.error("whisper.getUserMedia", e);
+      toast.error("Voice input unavailable", { description: micErrorMessage(e) });
       teardownStream();
       setState("idle");
     }

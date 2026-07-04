@@ -205,6 +205,7 @@ export async function validateWithinWorkspace(
   path: string,
   ctx: AtlasToolProjectContext,
   canonicalize: (p: string) => Promise<string>,
+  _mode: ApprovalMode,
 ): Promise<{ ok: true } | { ok: false; reason: string }> {
   if (!ctx.workspaceRoot) return { ok: true };
   let root: string;

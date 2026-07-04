@@ -9,7 +9,8 @@ export type Snippet = {
   content: string;
 };
 
-const STORE_PATH = "atlas-ai-snippets.json";
+export const SNIPPETS_STORE_PATH = "atlas-ai-snippets.json";
+const STORE_PATH = SNIPPETS_STORE_PATH;
 const KEY_LIST = "snippets";
 
 export const BUILTIN_SKILLS: readonly Snippet[] = [

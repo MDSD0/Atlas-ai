@@ -7,7 +7,7 @@ export const MCP_ARGS_LIMIT = 20;
 export const MCP_ARG_BYTES = 512;
 export const MCP_INPUT_BYTES = 32 * 1024;
 export const MCP_OUTPUT_BYTES = 8192;
-export const MCP_TIMEOUT_MS = 5000;
+export const MCP_TIMEOUT_MS = 60_000;
 export const MCP_MAX_CONCURRENT_CALLS = 2;
 
 export type McpToolPolicy = "allow" | "ask" | "deny";
@@ -40,6 +40,7 @@ export type McpCallInput = {
   toolName: string;
   input: Record<string, unknown>;
   approved?: boolean;
+  projectRoot?: string;
 };
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9._-]{0,63}$/;

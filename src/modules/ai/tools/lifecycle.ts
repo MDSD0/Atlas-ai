@@ -21,17 +21,19 @@ export function wrapToolsWithLifecycle<T extends Record<string, Tool>>(
           ...definition,
           execute: async (...args: Parameters<typeof execute>) => {
             const input = (args[0] ?? {}) as Record<string, unknown>;
-            await observe("before_tool", { toolName, input });
+            // Fire-and-forget: journal writes and skill hooks must never delay
+            // or fail the tool itself.
+            void observe("before_tool", { toolName, input }).catch(() => {});
             try {
               const output = await execute(...args);
-              await observe("after_tool", { toolName, input, output });
+              void observe("after_tool", { toolName, input, output }).catch(() => {});
               return output;
             } catch (error) {
-              await observe("after_tool", {
+              void observe("after_tool", {
                 toolName,
                 input,
                 error: String(error),
-              });
+              }).catch(() => {});
               throw error;
             }
           },

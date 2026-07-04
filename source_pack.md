@@ -1493,3 +1493,177 @@ Verification:
 - Full 15-instance Gemini 2.5 Flash localization campaign returned `0` for
   `map`, `off`, and `minimal`. OpenRouter key usage after the campaign was
   `2.5897409`.
+
+## Corrective Slice C23: truthful receipts and durable attachments
+
+Source-parity packet:
+
+- Slice: keep the last meaningful proof receipt stable across chat-only turns,
+  classify verification from real check invocations, and restore complete
+  composer attachment behavior.
+- Atlas files inspected: `src/modules/ai/proof/recorder.ts`,
+  `src/modules/ai/store/proofStore.ts`,
+  `src/modules/ai/components/{ReceiptStrip,AiInputBar,AiChat}.tsx`, and
+  `src/modules/ai/lib/composer.tsx`.
+- opensrc hook: `bash scripts/consult-opensrc.sh agent-loop evidence frontend`
+  was attempted. GitHub refresh failed because the Git Bash pnpm shim could not
+  find Node, so package source was resolved through Windows pnpm instead.
+- Exact upstream files inspected:
+  `vercel/ai@6.0.168/packages/ai/src/ui/ui-messages.ts`,
+  `vercel/ai@6.0.168/packages/ai/src/ui/convert-file-list-to-file-ui-parts.ts`,
+  `vercel/ai@6.0.168/examples/next-langchain/components/chat-message.tsx`, and
+  `vercel/ai@6.0.168/examples/ai-e2e-next/app/chat/upload-file/page.tsx`.
+- Finding: AI SDK owns the `FileUIPart` data URL contract but deliberately does
+  not impose product size/count policy. Its examples render file parts
+  explicitly. Atlas already generated valid file parts but ignored them in the
+  user transcript, had no drop target, and conflated lifecycle rows with user
+  actions in the receipt strip.
+- Disposition: `WRAP` the AI SDK file-part contract. `ADAPT` explicit file-part
+  rendering and pre-ingestion policy into Atlas's existing chip/message
+  components. `PRESERVE` the durable proof journal. `REJECT` treating lifecycle
+  bookkeeping or a command-name substring as verification evidence.
+- Parity tests: file classification, size/count/deduplication policy, real
+  lifecycle receipt visibility, stable meaningful receipt selection, and
+  strict verification-command recognition.
+- Freshness: cached package source resolved by `opensrc path`; package versions
+  `ai@6.0.168` and `@ai-sdk/react@3.0.170`.
+
+Applied:
+
+- Receipt summaries now separate durable journal events from user-visible tool
+  and approval actions.
+- Lifecycle-only turns do not replace the last meaningful session receipt.
+- Successful read-only tool runs finish as completed instead of unverified.
+- Verification requires a recognized runner invocation; words printed by
+  `echo`, `printf`, comments, or unrelated programs do not qualify.
+- Composer drop, paste, and picker paths share one bounded attachment policy.
+- Images and PDFs use AI SDK file parts, text/code remains bounded inline
+  context, and sent file parts remain visible in user transcript history.
+- Attachment count, byte limits, duplicate identity, unsupported formats, and
+  secret-prone `.env` inputs produce explicit user feedback.
+
+Verification:
+
+- Focused receipt and attachment Vitest returned `0` with `31 passed`.
+- Full Vitest returned `0` with `408 passed / 4 intentionally skipped paid
+  benchmark suites`.
+- `pnpm exec tsc --noEmit` returned `0`.
+- Targeted `git diff --check` returned `0`.
+- Per request, the live UI and Cargo checks were not used as evidence for this
+  frontend/proof slice.
+
+## Corrective Slice C24: concurrency, boundaries, and honest graph edges
+
+Source-parity packet:
+
+- Slice: remove global MCP serialization, bound persistent-shell memory,
+  eliminate the legacy full-access workspace escape, make AI worktrees usable,
+  and stop Code Reality from inventing duplicate-name graph links.
+- Atlas files inspected: `src-tauri/src/modules/{mcp,workspace}.rs`,
+  `src-tauri/src/modules/shell/{persistent,session}.rs`,
+  `src-tauri/src/modules/reality/{index,ranking,projection}.rs`,
+  `src/modules/ai/lib/{permissions,lanePolicy,transport,sessions}.ts`, and
+  `src/modules/ai/tools/{capabilities,tools,worktrees}.ts`.
+- Exact upstream contracts inspected: `rmcp@1.7.0` running-service lifecycle
+  and `call_tool` implementation, plus
+  `ai@6.0.168/packages/ai/src/ui/chat.ts` request error and finish handling.
+- Finding: Atlas held one global MCP mutex across complete tool calls, retained
+  unbounded persistent-shell output, accepted a legacy full-access flag as a
+  native project-boundary bypass, connected every duplicate symbol reference
+  to every same-name definition, and exposed worktrees only as unused frontend
+  wrappers.
+- Disposition: `ADAPT` RMCP clients to per-server locks so independent servers
+  run concurrently. `PRESERVE` same-server serialization and explicit close.
+  `REMOVE` the native full-access bypass rather than presenting local process
+  execution as a sandbox. `ADAPT` conservative graph resolution: local
+  definition, then one same-directory or uniquely module-named definition,
+  otherwise omit the ambiguous edge. `WRAP` existing native worktree commands
+  as approval-gated, progressively disclosed agent tools.
+
+Applied:
+
+- Persistent shell output retains a bounded prefix and marker-bearing rolling
+  tail, including timeout and process-exit paths.
+- MCP calls to different configured servers can overlap; calls to one server
+  remain serialized.
+- Product approval modes never bypass the native project root. The legacy
+  `full` value now means autonomous workspace edits, not unrestricted host IO.
+- Session persistence is bounded by serialized bytes as well as message count,
+  and inactive streams flush on normal, error, and cancel completion.
+- A verification receipt is invalidated when a later mutation occurs, and the
+  strip labels prior proof as `Last checks passed` instead of current proof.
+- Code Reality no longer reports unreferenced self-links or ambiguous
+  duplicate-name fanout. Its strategy identifier is
+  `bounded_symbol_reference_pagerank_v2`.
+- No-workspace chats skip project memory, work-packet, and SimpleMem context
+  sources through a deterministic unbound lane. Workspace runs remain full.
+- Worktree list/create/remove/merge are now agent-callable through the
+  capability gateway; every mutating operation requires user approval and the
+  native layer restricts paths and branches to Atlas-managed scopes.
+
+Verification:
+
+- Full frontend Vitest: `415 passed / 4 paid suites intentionally skipped`.
+- Full Rust library tests: `199 passed / 0 failed / 3 intentional ignores`.
+- Focused Code Reality tests: `15 passed`.
+- Focused worktree and capability tests: `15 passed`.
+- TypeScript: `pnpm exec tsc --noEmit` returned `0`.
+- Live UI inspection remains excluded by user request.
+
+## Corrective Slice C25: real browser path and isolated workers
+
+Source-parity packet:
+
+- Slice: replace synchronous-only delegation, undiscoverable MCP tools, dead-end
+  worktree plumbing, and preview-only browser claims with usable harness paths.
+- Atlas files inspected: `src/modules/ai/agents/{runSubagent,runWorktreeAgent}.ts`,
+  `src/modules/ai/tools/{subagent,worktrees,mcp,capabilities}.ts`,
+  `src/modules/ai/mcp/{boundary,contracts,transport}.ts`, and
+  `src-tauri/src/modules/{mcp,git/operations,git/commands}.rs`.
+- Exact upstream inspected: `@playwright/mcp@0.0.77` README/CLI help and the
+  installed `playwright-core` MCP bundle. Official package source:
+  `https://www.npmjs.com/package/@playwright/mcp` and
+  `https://github.com/microsoft/playwright-mcp`.
+- Finding: Atlas could call only guessed MCP tool names, MCP servers inherited
+  the app process directory, the five-second timeout was shorter than normal
+  navigation, npm command shims were unreliable on Windows, and worktrees had
+  no inspect/stage/commit or bound worker path. Playwright 0.0.77 also emits
+  accessibility snapshots as files even with its documented stdout mode.
+- Disposition: `ADAPT` native MCP tool discovery, per-run project cwd binding,
+  Windows command-shim launch, cancellation, and a 60-second tool window.
+  `PIN` an opt-in isolated/headless Playwright preset. `ADAPT` snapshot output
+  into `.atlas/browser/<session>` and repository-local Git exclusion rather
+  than allowing generated evidence to dirty the patch. `ADAPT` a file-only
+  worktree coding worker so isolation is real without pretending the host shell
+  is sandboxed.
+
+Applied:
+
+- Single subagents inherit abort signals. `run_subagents` starts two or three
+  independent read-only workers concurrently and requires approval.
+- MCP can discover advertised tool schemas, reuses the discovered connection,
+  binds each server process to the frozen project root, and does not hold the
+  global map lock while closing clients.
+- The official Playwright preset is pinned to 0.0.77, isolated, headless,
+  approval-gated, and uses Edge on Windows where the package's Chrome default
+  is absent.
+- A real ignored host qualification starts the official server, discovers
+  `browser_navigate` and `browser_snapshot`, navigates to a local HTTP fixture,
+  and asserts the accessibility snapshot contains the expected button.
+- Managed worktrees support run, inspect, stage, unstage, commit, merge, remove,
+  and a restricted coding worker whose complete tool context is rebound to the
+  linked checkout. The worker returns its patch with verification required.
+- `.atlas` runtime/worktree artifacts are added to `.git/info/exclude` without
+  editing the user's tracked `.gitignore`.
+- Known text-only models reject binary composer attachments before submission;
+  unknown local/custom model capability remains user-selectable.
+
+Verification:
+
+- Full frontend Vitest: `423 passed / 4 paid suites intentionally skipped`.
+- Full Rust library: `201 passed / 0 failed / 4 intentional ignores`.
+- Explicit official Playwright host test: `1 passed`, including real headless
+  Edge navigation and accessibility snapshot assertion.
+- Production build: `3228 modules transformed`, exit `0`.
+- TypeScript, Rust formatting, and `git diff --check`: exit `0`.
+- Live UI inspection remains excluded by user request.

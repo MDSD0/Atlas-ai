@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import {
+  useCallback,
   createContext,
   useContext,
   useEffect,
@@ -12,26 +13,21 @@ import { tryRunSlashCommand, type SlashCommandMeta } from "./slashCommands";
 import { getOrCreateChat, stopSession, useChatStore } from "../store/chatStore";
 import { useSnippetsStore } from "../store/snippetsStore";
 import { currentWorkspaceEnv } from "@/modules/workspace/env";
+import { toast } from "sonner";
+import {
+  binaryAttachmentIssue,
+  MAX_TEXT_INLINE,
+  mergeAttachments,
+  readAttachment,
+  type FileAttachment,
+} from "@/modules/ai/lib/attachments";
+import { getModel } from "@/modules/ai/config";
 
-export type FileAttachment = {
-  id: string;
-  name: string;
-  kind: "image" | "text" | "selection";
-  mediaType: string;
-  url?: string;
-  text?: string;
-  size: number;
-  /** For kind === "selection": which surface it came from. */
-  source?: "terminal" | "editor";
-};
+export { ACCEPTED_FILES, type FileAttachment } from "@/modules/ai/lib/attachments";
 
 type MessagePart =
   | { type: "text"; text: string }
   | { type: "file"; mediaType: string; url: string; filename?: string };
-
-export const MAX_TEXT_INLINE = 200_000;
-export const ACCEPTED_FILES =
-  "image/*,.txt,.md,.json,.yaml,.yml,.toml,.sh,.zsh,.bash,.py,.js,.jsx,.ts,.tsx,.rs,.go,.java,.c,.cpp,.h,.hpp,.html,.css,.csv,.log,.env,.config,.conf,.ini,Dockerfile,.dockerfile";
 
 type Voice = ReturnType<typeof useWhisperRecording>;
 
@@ -77,6 +73,14 @@ export function AiComposerProvider({ children }: ProviderProps) {
 
   const [value, setValue] = useState("");
   const [files, setFiles] = useState<FileAttachment[]>([]);
+  const filesRef = useRef<FileAttachment[]>([]);
+  const updateFiles = useCallback((action: React.SetStateAction<FileAttachment[]>) => {
+    setFiles((previous) => {
+      const next = typeof action === "function" ? action(previous) : action;
+      filesRef.current = next;
+      return next;
+    });
+  }, []);
   const [pickedSnippets, setPickedSnippets] = useState<Snippet[]>([]);
   const [pickedCommands, setPickedCommands] = useState<SlashCommandMeta[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -123,11 +127,16 @@ export function AiComposerProvider({ children }: ProviderProps) {
     if (pendingSelections.length === 0) return;
     const drained = consumeSelections();
     if (drained.length === 0) return;
-    setFiles((prev) => {
-      const existing = new Set(prev.map((f) => f.id));
+    updateFiles((prev) => {
       const next: FileAttachment[] = [];
       for (const sel of drained) {
-        if (existing.has(sel.id)) continue;
+        const size = new Blob([sel.text]).size;
+        if (size > MAX_TEXT_INLINE) {
+          toast.error("Selection was not attached", {
+            description: "Selections cannot exceed 200 KB",
+          });
+          continue;
+        }
         next.push({
           id: sel.id,
           name:
@@ -137,13 +146,19 @@ export function AiComposerProvider({ children }: ProviderProps) {
           kind: "selection",
           mediaType: "text/plain",
           text: sel.text,
-          size: sel.text.length,
+          size,
           source: sel.source,
         });
       }
-      return next.length ? [...prev, ...next] : prev;
+      const merged = mergeAttachments(prev, next);
+      if (merged.overflowCount > 0 || merged.totalBytesExceededCount > 0) {
+        toast.error("Selection was not attached", {
+          description: "Attachment count or total size limit reached",
+        });
+      }
+      return merged.files;
     });
-  }, [pendingSelections, consumeSelections]);
+  }, [pendingSelections, consumeSelections, updateFiles]);
 
   const voice = useWhisperRecording({
     onResult: (transcript: string) => {
@@ -155,15 +170,34 @@ export function AiComposerProvider({ children }: ProviderProps) {
   const addFiles = async (list: FileList | File[] | null) => {
     if (!list) return;
     const next: FileAttachment[] = [];
+    const errors: string[] = [];
     for (const f of Array.from(list)) {
-      const att = await readAttachment(f);
-      if (att) next.push(att);
+      try {
+        const result = await readAttachment(f);
+        if (result.attachment) next.push(result.attachment);
+        if (result.error) errors.push(result.error);
+      } catch {
+        errors.push(`${f.name} could not be read`);
+      }
     }
-    if (next.length) setFiles((prev) => [...prev, ...next]);
+    if (next.length) {
+      const merged = mergeAttachments(filesRef.current, next);
+      updateFiles(merged.files);
+      if (merged.overflowCount > 0) errors.push(`Only 8 attachments can be sent at once`);
+      if (merged.totalBytesExceededCount > 0) errors.push(`Attachments cannot exceed 5 MB in total`);
+      if (merged.duplicateCount > 0 && merged.duplicateCount === next.length) {
+        toast.info("Those files are already attached");
+      }
+      if (errors.length > 0) {
+        toast.error("Some files were not attached", { description: errors.slice(0, 3).join(". ") });
+      }
+    } else if (errors.length > 0) {
+      toast.error("Files were not attached", { description: errors.slice(0, 3).join(". ") });
+    }
   };
 
   const removeFile = (id: string) =>
-    setFiles((prev) => prev.filter((f) => f.id !== id));
+    updateFiles((prev) => prev.filter((f) => f.id !== id));
 
   const addSnippet = (s: Snippet) =>
     setPickedSnippets((prev) =>
@@ -190,14 +224,20 @@ export function AiComposerProvider({ children }: ProviderProps) {
         workspace: currentWorkspaceEnv(),
       });
       if (result.kind !== "text") {
-        // Binary/oversize files: skip (could surface a toast in future).
-        console.warn("attachFileByPath: skipped non-text file", path, result);
+        toast.error("File was not attached", {
+          description: result.kind === "toolarge" ? "File is too large" : "Binary files are not supported here",
+        });
+        return;
+      }
+      if (result.size > MAX_TEXT_INLINE) {
+        toast.error("File was not attached", {
+          description: "Text files cannot exceed 200 KB",
+        });
         return;
       }
       const name = path.split("/").pop() || path;
       const id = `path-${path}`;
-      setFiles((prev) => {
-        if (prev.some((f) => f.id === id)) return prev;
+      updateFiles((prev) => {
         const att: FileAttachment = {
           id,
           name,
@@ -206,7 +246,14 @@ export function AiComposerProvider({ children }: ProviderProps) {
           text: result.content,
           size: result.size,
         };
-        return [...prev, att];
+        const merged = mergeAttachments(prev, [att]);
+        if (merged.duplicateCount > 0) toast.info("That file is already attached");
+        if (merged.overflowCount > 0 || merged.totalBytesExceededCount > 0) {
+          toast.error("File was not attached", {
+            description: "Attachment count or total size limit reached",
+          });
+        }
+        return merged.files;
       });
       // Open the AI panel & focus the input so the user sees the chip.
       useChatStore.getState().focusInput();
@@ -249,6 +296,14 @@ export function AiComposerProvider({ children }: ProviderProps) {
       }
     }
 
+    const selectedModel = getModel(useChatStore.getState().selectedModelId);
+    const attachmentIssue = binaryAttachmentIssue(selectedModel, files);
+    if (attachmentIssue) {
+      toast.error("Attachment not supported", {
+        description: attachmentIssue,
+      });
+      return;
+    }
     const parts: MessagePart[] = [];
     const fileBlocks = files
       .filter((f) => f.kind === "text")
@@ -293,7 +348,7 @@ export function AiComposerProvider({ children }: ProviderProps) {
     if (composed) parts.push({ type: "text", text: composed });
 
     for (const f of files) {
-      if (f.kind === "image" && f.url) {
+      if ((f.kind === "image" || f.kind === "document") && f.url) {
         parts.push({
           type: "file",
           mediaType: f.mediaType,
@@ -309,10 +364,10 @@ export function AiComposerProvider({ children }: ProviderProps) {
       typeof chat.sendMessage
     >[0]);
     const store = useChatStore.getState();
-    store.patchAgentMeta({ hitStepCap: false, compactionNotice: null });
+    store.patchAgentMeta(sessionId, { hitStepCap: false, compactionNotice: null });
     if (!store.mini.open) store.openMini();
     setValue("");
-    setFiles([]);
+    updateFiles([]);
     setPickedSnippets([]);
     setPickedCommands([]);
     // Re-focus immediately after submit so the user can type a follow-up
@@ -353,38 +408,4 @@ export function AiComposerProvider({ children }: ProviderProps) {
   };
 
   return <Ctx.Provider value={ctx}>{children}</Ctx.Provider>;
-}
-
-async function readAttachment(file: File): Promise<FileAttachment | null> {
-  const id = `${file.name}-${file.size}-${file.lastModified}`;
-  if (file.type.startsWith("image/")) {
-    const url = await readAsDataURL(file);
-    return {
-      id,
-      name: file.name,
-      kind: "image",
-      mediaType: file.type || "image/png",
-      url,
-      size: file.size,
-    };
-  }
-  if (file.size > MAX_TEXT_INLINE) return null;
-  const text = await file.text();
-  return {
-    id,
-    name: file.name,
-    kind: "text",
-    mediaType: file.type || "text/plain",
-    text,
-    size: file.size,
-  };
-}
-
-function readAsDataURL(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
 }

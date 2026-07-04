@@ -124,7 +124,7 @@ type StoreState = {
    * approval through the active session's `addToolApprovalResponse`.
    */
   approvalResponder: ApprovalResponder | null;
-  setApprovalResponder: (fn: ApprovalResponder | null) => void;
+  setApprovalResponder: (sessionId: string, fn: ApprovalResponder | null) => void;
   respondToApproval: (approvalId: string, approved: boolean) => void;
 
   apiKeys: ProviderKeys;
@@ -162,8 +162,8 @@ type StoreState = {
   consumeSelections: () => PendingSelection[];
 
   agentMeta: AgentMeta;
-  patchAgentMeta: (patch: Partial<AgentMeta>) => void;
-  resetAgentMeta: () => void;
+  patchAgentMeta: (sessionId: string, patch: Partial<AgentMeta>) => void;
+  resetAgentMeta: (sessionId: string) => void;
 
   // Sessions
   sessionsHydrated: boolean;
@@ -209,6 +209,8 @@ const NOOP_LIVE: Live = {
 };
 
 const CHATS_LRU_CAP = 8;
+// Active sessions checkpoint per token through AgentRunBridge. Background
+// sessions flush from Chat.onFinish, including error and cancellation paths.
 const chats = new Map<string, Chat<UIMessage>>();
 const MINI_DOCK_STORAGE_KEY = "atlas.ai.mini.dock";
 
@@ -244,6 +246,45 @@ function touchChat(id: string, c: Chat<UIMessage>) {
 // Initial messages for a session, populated at hydration time and consumed
 // when the matching Chat is constructed.
 const seedMessages = new Map<string, UIMessage[]>();
+
+// Per-session agent run state, approval mode, and pending-approval responder.
+// Mirrored into the top-level `agentMeta` / `approvalMode` / `approvalResponder`
+// store fields for whichever session is active, so existing
+// `useChatStore(s => s.agentMeta...)` selectors keep working unchanged —
+// writes from a background session's callbacks only touch that session's
+// map entry, never the active session's mirrored field (F-03).
+const agentMetaBySession = new Map<string, AgentMeta>();
+const approvalModeBySession = new Map<string, ApprovalMode>();
+const approvalResponderBySession = new Map<string, ApprovalResponder>();
+
+function getAgentMetaFor(id: string): AgentMeta {
+  return agentMetaBySession.get(id) ?? IDLE_META;
+}
+function setAgentMetaFor(id: string, meta: AgentMeta): void {
+  agentMetaBySession.set(id, meta);
+  if (useChatStore.getState().activeSessionId === id) {
+    useChatStore.setState({ agentMeta: meta });
+  }
+}
+function getApprovalModeFor(id: string): ApprovalMode {
+  return approvalModeBySession.get(id) ?? "default";
+}
+function setApprovalModeFor(id: string, mode: ApprovalMode): void {
+  approvalModeBySession.set(id, mode);
+  if (useChatStore.getState().activeSessionId === id) {
+    useChatStore.setState({ approvalMode: mode });
+  }
+}
+function getApprovalResponderFor(id: string): ApprovalResponder | null {
+  return approvalResponderBySession.get(id) ?? null;
+}
+function setApprovalResponderFor(id: string, fn: ApprovalResponder | null): void {
+  if (fn) approvalResponderBySession.set(id, fn);
+  else approvalResponderBySession.delete(id);
+  if (useChatStore.getState().activeSessionId === id) {
+    useChatStore.setState({ approvalResponder: fn });
+  }
+}
 
 // Trailing debounce for per-token message persistence. Streaming fires
 // `persistMessages` on every token; without this we'd JSON-serialize the
@@ -304,7 +345,7 @@ function makeChat(sessionId: string): Chat<UIMessage> {
       useChatStore.getState().live.readLeafBuffer(leafId),
     readCache,
     getSessionId: () => sessionId,
-    getApprovalMode: () => useChatStore.getState().approvalMode,
+    getApprovalMode: () => getApprovalModeFor(sessionId),
   };
 
   const transport = createContextAwareTransport({
@@ -345,15 +386,15 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     getOpenrouterModelId: () =>
       usePreferencesStore.getState().openrouterModelId,
     onStep: (step) => {
-      useChatStore.getState().patchAgentMeta({ step });
+      useChatStore.getState().patchAgentMeta(sessionId, { step });
     },
     onCompact: (info) => {
-      useChatStore.getState().patchAgentMeta({
+      useChatStore.getState().patchAgentMeta(sessionId, {
         compactionNotice: { droppedCount: info.droppedCount, at: Date.now() },
       });
     },
     onFinishMeta: (info) => {
-      useChatStore.getState().patchAgentMeta({ hitStepCap: info.hitStepCap });
+      useChatStore.getState().patchAgentMeta(sessionId, { hitStepCap: info.hitStepCap });
       if (!info.hitStepCap) {
         useTodosStore
           .getState()
@@ -364,8 +405,8 @@ function makeChat(sessionId: string): Chat<UIMessage> {
       useTodosStore.getState().pauseInProgressTodo(sessionId);
     },
     onUsage: (delta) => {
-      const cur = useChatStore.getState().agentMeta.tokens;
-      useChatStore.getState().patchAgentMeta({
+      const cur = getAgentMetaFor(sessionId).tokens;
+      useChatStore.getState().patchAgentMeta(sessionId, {
         tokens: {
           inputTokens: cur.inputTokens + delta.inputTokens,
           outputTokens: cur.outputTokens + delta.outputTokens,
@@ -385,9 +426,13 @@ function makeChat(sessionId: string): Chat<UIMessage> {
     transport,
     messages: initialMessages,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    onFinish: ({ messages }) => {
+      useChatStore.getState().persistMessages(sessionId, messages);
+      flushPersist(sessionId);
+    },
     onError: (e) => {
       if (tryAutoResume(sessionId, chat, e)) return;
-      useChatStore.getState().patchAgentMeta({
+      useChatStore.getState().patchAgentMeta(sessionId, {
         status: "error",
         error: formatAgentError(e),
       });
@@ -426,7 +471,7 @@ function tryAutoResume(
     return false;
   }
   autoResumeBudget.set(sessionId, 0);
-  useChatStore.getState().patchAgentMeta({
+  useChatStore.getState().patchAgentMeta(sessionId, {
     status: "thinking",
     error: null,
     step: "Stream dropped, resuming",
@@ -440,7 +485,7 @@ export const useChatStore = create<StoreState>((set, get) => ({
   setLive: (live) => set({ live }),
 
   approvalResponder: null,
-  setApprovalResponder: (fn) => set({ approvalResponder: fn }),
+  setApprovalResponder: (sessionId, fn) => setApprovalResponderFor(sessionId, fn),
   respondToApproval: (approvalId, approved) => {
     const fn = get().approvalResponder;
     if (fn) fn(approvalId, approved);
@@ -462,7 +507,11 @@ export const useChatStore = create<StoreState>((set, get) => ({
   setExecutionCwdMode: (mode) => set({ executionCwdMode: mode }),
 
   approvalMode: "default",
-  setApprovalMode: (mode) => set({ approvalMode: mode }),
+  setApprovalMode: (mode) => {
+    const id = get().activeSessionId;
+    if (!id) return;
+    setApprovalModeFor(id, mode);
+  },
 
   mini: { open: false, dock: readMiniDock() },
   openMini: () => set((s) => ({ mini: { ...s.mini, open: true } })),
@@ -511,9 +560,10 @@ export const useChatStore = create<StoreState>((set, get) => ({
   },
 
   agentMeta: IDLE_META,
-  patchAgentMeta: (patch) =>
-    set((s) => ({ agentMeta: { ...s.agentMeta, ...patch } })),
-  resetAgentMeta: () => set({ agentMeta: IDLE_META }),
+  patchAgentMeta: (sessionId, patch) => {
+    setAgentMetaFor(sessionId, { ...getAgentMetaFor(sessionId), ...patch });
+  },
+  resetAgentMeta: (sessionId) => setAgentMetaFor(sessionId, IDLE_META),
 
   sessionsHydrated: false,
   sessions: [],
@@ -609,11 +659,14 @@ export const useChatStore = create<StoreState>((set, get) => ({
       workspaceRoot,
     );
     const next = [meta, ...get().sessions];
+    agentMetaBySession.set(id, IDLE_META);
+    approvalModeBySession.set(id, "default");
     set({
       sessions: next,
       activeSessionId: id,
       agentMeta: IDLE_META,
       approvalMode: "default",
+      approvalResponder: null,
     });
     void saveSessionsList(next);
     void saveActiveId(id);
@@ -631,7 +684,16 @@ export const useChatStore = create<StoreState>((set, get) => ({
       try {
         const restored = await restoreWorkspaceForSession(meta);
         if (!restored) return;
-        set({ activeSessionId: id, agentMeta: IDLE_META, approvalMode: "default" });
+        // Restore the target session's own run state instead of stomping it
+        // with IDLE_META/"default" — a still-running outgoing session's state
+        // lives independently in the *BySession maps and is unaffected by
+        // this switch (F-03).
+        set({
+          activeSessionId: id,
+          agentMeta: getAgentMetaFor(id),
+          approvalMode: getApprovalModeFor(id),
+          approvalResponder: getApprovalResponderFor(id),
+        });
         void saveActiveId(id);
       } catch (error) {
         console.error("Unable to restore session workspace", error);
@@ -652,6 +714,9 @@ export const useChatStore = create<StoreState>((set, get) => ({
     chats.get(id)?.stop();
     chats.delete(id);
     seedMessages.delete(id);
+    agentMetaBySession.delete(id);
+    approvalModeBySession.delete(id);
+    approvalResponderBySession.delete(id);
     const pend = pendingPersist.get(id);
     if (pend) {
       clearTimeout(pend.timer);
@@ -670,7 +735,15 @@ export const useChatStore = create<StoreState>((set, get) => ({
         },
         useWorkspaceStore.getState().workspaceRoot,
       );
-      set({ sessions: [fresh], activeSessionId: fresh.id });
+      agentMetaBySession.set(fresh.id, IDLE_META);
+      approvalModeBySession.set(fresh.id, "default");
+      set({
+        sessions: [fresh],
+        activeSessionId: fresh.id,
+        agentMeta: IDLE_META,
+        approvalMode: "default",
+        approvalResponder: null,
+      });
       void saveSessionsList([fresh]);
       void saveActiveId(fresh.id);
       return;
@@ -678,7 +751,17 @@ export const useChatStore = create<StoreState>((set, get) => ({
 
     const wasActive = get().activeSessionId === id;
     const nextActive = wasActive ? remaining[0].id : get().activeSessionId;
-    set({ sessions: remaining, activeSessionId: nextActive });
+    set({
+      sessions: remaining,
+      activeSessionId: nextActive,
+      ...(wasActive && nextActive
+        ? {
+            agentMeta: getAgentMetaFor(nextActive),
+            approvalMode: getApprovalModeFor(nextActive),
+            approvalResponder: getApprovalResponderFor(nextActive),
+          }
+        : {}),
+    });
     void saveSessionsList(remaining);
     if (wasActive) void saveActiveId(nextActive);
   },
@@ -775,7 +858,7 @@ export function stopSession(id: string): void {
   void chats.get(id)?.stop();
   killRunResourcesForSession(id);
   useTodosStore.getState().pauseInProgressTodo(id);
-  useChatStore.getState().patchAgentMeta({
+  useChatStore.getState().patchAgentMeta(id, {
     status: "idle",
     step: null,
     approvalsPending: 0,
