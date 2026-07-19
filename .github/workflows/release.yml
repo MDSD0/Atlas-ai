@@ -175,6 +175,23 @@ jobs:
             "$metadata_dir/latest.json" \
             --repo "$GITHUB_REPOSITORY" \
             --clobber
+
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            > "$metadata_dir/release-final.json"
+          jq -r '
+            .assets[]
+            | select(.name != "SHA256SUMS.txt")
+            | select(.digest | startswith("sha256:"))
+            | "\(.digest | ltrimstr("sha256:"))  \(.name)"
+          ' "$metadata_dir/release-final.json" \
+            | LC_ALL=C sort \
+            > "$metadata_dir/SHA256SUMS.txt"
+          test -s "$metadata_dir/SHA256SUMS.txt"
+          gh release upload "$RELEASE_TAG" \
+            "$metadata_dir/SHA256SUMS.txt" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
           gh release edit "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --latest
