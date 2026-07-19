@@ -10,8 +10,10 @@ assert.ok(expectedTag, "expected release tag is required");
 
 const metadataPath = resolve(metadataArg);
 const releasePath = resolve(releaseArg);
-const metadata = JSON.parse(readFileSync(metadataPath, "utf8"));
-const release = JSON.parse(readFileSync(releasePath, "utf8"));
+const parseJsonFile = (path) =>
+  JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
+const metadata = parseJsonFile(metadataPath);
+const release = parseJsonFile(releasePath);
 
 assert.equal(release.tag_name, expectedTag, "release tag does not match");
 assert.equal(release.draft, false, "release must be public before rewriting metadata");
