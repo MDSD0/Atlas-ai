@@ -34,9 +34,6 @@ jobs:
       - name: Build frontend
         run: pnpm build
 
-      - name: V1 golden eval
-        run: bash scripts/verify-atlas.sh --eval
-
       - name: Desktop contract smoke
         run: bash scripts/verify-atlas.sh --desktop
 
@@ -95,6 +92,9 @@ jobs:
       - name: cargo test
         working-directory: src-tauri
         run: cargo test --locked
+
+      - name: V1 golden eval
+        run: bash scripts/verify-atlas.sh --eval
 
   rust-platforms:
     name: rust-check (${{ matrix.os }})
