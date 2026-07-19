@@ -135,8 +135,46 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Publish verified release
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - name: Publish verified release and finalize updater metadata
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
-        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+        run: |
+          release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases" \
+            --paginate \
+            --jq ".[] | select(.tag_name == \"$RELEASE_TAG\") | .id" \
+            | head -n 1)"
+          test -n "$release_id"
+
+          gh api --method PATCH \
+            "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            -F draft=false \
+            -f make_latest=false \
+            > /dev/null
+
+          metadata_dir="$RUNNER_TEMP/atlas-release-metadata"
+          mkdir -p "$metadata_dir"
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern latest.json \
+            --dir "$metadata_dir" \
+            --clobber
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" \
+            > "$metadata_dir/release.json"
+
+          node scripts/finalize-release-metadata.mjs \
+            "$metadata_dir/latest.json" \
+            "$metadata_dir/release.json" \
+            "$RELEASE_TAG"
+
+          gh release upload "$RELEASE_TAG" \
+            "$metadata_dir/latest.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+          gh release edit "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --latest

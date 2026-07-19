@@ -26,6 +26,8 @@ assert.match(updater, /useUpdater\(\{ autoCheck = false \}/);
 assert.match(workflow, /tauri-apps\/tauri-action@action-v1\.0\.0/);
 assert.match(workflow, /uploadUpdaterJson: true/);
 assert.match(workflow, /publish-release:/);
+assert.match(workflow, /finalize-release-metadata\.mjs/);
+assert.match(workflow, /make_latest=false/);
 assert.match(
   workflow,
   /verify-updater-assets:[\s\S]*?permissions:\n\s+contents: write/,
