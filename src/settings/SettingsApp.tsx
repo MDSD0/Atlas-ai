@@ -22,7 +22,7 @@ const TABS: { id: SettingsTab; label: string; icon: any, component: () => JSX.El
     { id: "shortcuts", label: "Shortcuts", icon: Keyboard, component: ShortcutsSection },
     { id: "models", label: "Models", icon: Bot, component: ModelsSection },
     { id: "agents", label: "Skills", icon: BookOpen, component: SkillsSection },
-    { id: "mcp", label: "MCP", icon: Plug, component: McpSection },
+    { id: "mcp", label: "Integrations", icon: Plug, component: McpSection },
     { id: "privacy", label: "Privacy & Data", icon: ShieldAlert, component: PrivacyDataSection },
     { id: "about", label: "About", icon: Info, component: AboutSection },
   ];
@@ -103,7 +103,7 @@ export function SettingsApp() {
             ))}
           </TabsList>
         </Tabs>
-        {USE_CUSTOM_WINDOW_CONTROLS && <WindowControls closeOnly />}
+        {USE_CUSTOM_WINDOW_CONTROLS && <WindowControls />}
       </header>
 
       <main className="min-h-0 flex-1 overflow-y-auto px-8 pt-6 pb-7 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

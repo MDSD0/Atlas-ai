@@ -26,6 +26,7 @@ import {
 import { buildActiveWorkPacketContext } from "../workPackets";
 import { contextLedger, type PackedContextSource } from "../contextLedger";
 import { selectAgentRunPolicy } from "./lanePolicy";
+import { beginCheckpointTurn } from "../checkpoints/checkpointStore";
 import { normalizeMessageHistory } from "./sessions";
 import {
   beginRunResources,
@@ -121,6 +122,7 @@ export function createContextAwareTransport(deps: Deps) {
     const prompt = lastUserText(uiMessages);
     const sessionId = deps.toolContext.getSessionId() ?? "unknown";
     beginRunResources(sessionId, options.abortSignal);
+    beginCheckpointTurn(sessionId, lastUserMessageId(uiMessages), live.workspaceRoot);
     const planMode = deps.getPlanMode?.() ?? false;
     const runPolicy = selectAgentRunPolicy({
       prompt: recentUserText(uiMessages),
@@ -270,42 +272,56 @@ export function createContextAwareTransport(deps: Deps) {
       reason: runPolicy.reason,
     });
 
-    const finishObservers = async (
+    let finishPromise: Promise<void> | null = null;
+    let abortHandler: (() => void) | null = null;
+    const finishObservers = (
       outcome: { cancelled?: boolean; errored?: boolean } = {},
-    ) => {
-      if (outcome.cancelled) {
-        killRunResourcesForSignal(sessionId, options.abortSignal);
-      } else {
-        releaseRunResources(sessionId, options.abortSignal);
+    ): Promise<void> => {
+      if (finishPromise) return finishPromise;
+      if (abortHandler && options.abortSignal) {
+        options.abortSignal.removeEventListener("abort", abortHandler);
       }
-      await finishSessionTrace(
-        trace,
-        outcome.cancelled ? "cancelled" : outcome.errored ? "errored" : "finished",
-        {
-          proofRunId: recorder?.runId ?? null,
-          sessionId,
-        },
-      );
-      await Promise.all([
-        (async () => {
-          await recorder?.finish(outcome).catch(() => {});
-          if (!recorder) return;
-          const run = await proofJournal.getRun(recorder.runId).catch(() => null);
-          await mirrorProofRunToMemorySurface(live.workspaceRoot, run).catch(
-            () => {},
-          );
-        })(),
-        simpleMem?.finish().catch(() => {}),
-      ]);
+      finishPromise = (async () => {
+        if (outcome.cancelled) {
+          killRunResourcesForSignal(sessionId, options.abortSignal);
+        } else {
+          releaseRunResources(sessionId, options.abortSignal);
+        }
+        await finishSessionTrace(
+          trace,
+          outcome.cancelled
+            ? "cancelled"
+            : outcome.errored
+              ? "errored"
+              : "finished",
+          {
+            proofRunId: recorder?.runId ?? null,
+            sessionId,
+          },
+        );
+        await Promise.all([
+          (async () => {
+            await recorder?.finish(outcome).catch(() => {});
+            if (!recorder) return;
+            const run = await proofJournal.getRun(recorder.runId).catch(() => null);
+            await mirrorProofRunToMemorySurface(live.workspaceRoot, run).catch(
+              () => {},
+            );
+          })(),
+          simpleMem?.finish().catch(() => {}),
+        ]);
+      })();
+      return finishPromise;
     };
 
     if (options.abortSignal) {
+      abortHandler = () => {
+        deps.onCancel?.();
+        void finishObservers({ cancelled: true });
+      };
       options.abortSignal.addEventListener(
         "abort",
-        () => {
-          deps.onCancel?.();
-          void finishObservers({ cancelled: true });
-        },
+        abortHandler,
         { once: true },
       );
     }
@@ -397,6 +413,13 @@ export function createContextAwareTransport(deps: Deps) {
       return null;
     },
   };
+}
+
+function lastUserMessageId(messages: UIMessage[]): string | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") return messages[i].id ?? null;
+  }
+  return null;
 }
 
 function lastUserText(messages: UIMessage[]): string {

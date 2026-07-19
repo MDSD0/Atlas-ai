@@ -22,7 +22,7 @@ export function AgentIcon({
   if (agent.toLowerCase().includes("atlas")) {
     return (
       <img
-        src="/logo.png"
+        src="/atlas-mark.png"
         alt=""
         width={size}
         height={size}

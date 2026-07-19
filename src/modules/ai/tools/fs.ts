@@ -17,6 +17,11 @@ import { editNeedsApproval } from "../lib/permissions";
 import { withFileMutationQueue } from "./fileMutationQueue";
 import { observePostEdit } from "./postEdit";
 import { fingerprintText, type ReadFingerprint } from "./fingerprint";
+import {
+  captureFileSnapshot,
+  hasActiveCheckpointTurn,
+} from "../checkpoints/checkpointStore";
+import { consumePartialOverride, USER_AMENDED_NOTE } from "./partialAccept";
 
 const READ_BYTE_CAP = 25 * 1024;
 const READ_LINE_CAP = 2000;
@@ -214,16 +219,38 @@ export function buildFsTools(ctx: ToolContext) {
         }
 
         try {
+          const override = consumePartialOverride(sessionId, abs);
+          const finalContent = override ?? content;
           await withFileMutationQueue(
             abs,
-            () => agentNative.writeFile(abs, content, projectRoot, fullAccess),
+            async () => {
+              // Checkpoint pre-image, read inside the per-path queue so it is
+              // the exact content this write replaces. Skipped when no
+              // checkpoint turn is open (scoped agents) — the snapshot would
+              // be discarded and the read wasted. Binary/oversized pre-images
+              // are skipped (no restore for those).
+              let preImage: { value: string | null } | null = null;
+              if (hasActiveCheckpointTurn(sessionId)) {
+                try {
+                  const prior = await agentNative.readFile(abs, projectRoot, fullAccess);
+                  if (prior.kind === "text") preImage = { value: prior.content };
+                } catch {
+                  preImage = { value: null }; // new file — restore deletes it
+                }
+              }
+              await agentNative.writeFile(abs, finalContent, projectRoot, fullAccess);
+              // Capture only after the write succeeds — a failed write must
+              // not leave a phantom pre-image for restore to "revert".
+              if (preImage) captureFileSnapshot(sessionId, abs, preImage.value);
+            },
             canonicalize,
           );
-          ctx.readCache.set(abs, fingerprintText(content));
+          ctx.readCache.set(abs, fingerprintText(finalContent));
           return {
             path: abs,
-            bytesWritten: content.length,
+            bytesWritten: finalContent.length,
             ok: true,
+            ...(override !== null ? { user_amended: true, note: USER_AMENDED_NOTE } : {}),
             ...(await observePostEdit(projectRoot, abs)),
           };
         } catch (e) {

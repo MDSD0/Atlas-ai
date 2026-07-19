@@ -75,18 +75,17 @@ export const CAPABILITIES: readonly CapabilityDescriptor[] = [
   {
     id: "memory",
     summary:
-      "Long-term memory: recall/remember project facts, search past sessions, SimpleMem semantic retrieval.",
+      "Long-term memory governor: recall (records + sessions + semantic in one call), remember, list, forget, status.",
     keywords: [
       "memory", "remember", "recall", "forget", "past", "history",
       "session", "sessions", "note", "fact", "facts", "simplemem", "context",
     ],
+    // One governor surface. The wider memory_surface_*/memory_simplemem_*
+    // admin tools still exist in code (memory.ts) but are deliberately not
+    // model-visible: memory_recall federates across all engines itself.
     toolNames: [
-      "memory_recall", "memory_remember", "memory_list", "memory_delete",
-      "memory_clear_project", "memory_status", "memory_lab",
-      "memory_surface_status", "memory_surface_enable", "memory_surface_disable",
-      "memory_surface_read_index", "memory_surface_search_sessions",
-      "memory_surface_export_work_packet", "memory_simplemem_configure",
-      "memory_simplemem_search", "memory_simplemem_stats", "memory_simplemem_probe",
+      "memory_recall", "memory_remember", "memory_list", "memory_forget",
+      "memory_status", "memory_surface_enable",
     ],
   },
   {
@@ -153,6 +152,28 @@ export const CAPABILITIES: readonly CapabilityDescriptor[] = [
     toolNames: ["verification_plan"],
   },
   {
+    id: "web",
+    summary:
+      "Web search and page fetch: look up docs, errors, packages, current information.",
+    keywords: [
+      "web", "search", "internet", "online", "docs", "documentation",
+      "lookup", "google", "error message", "package", "version", "url", "fetch",
+    ],
+    toolNames: ["web_search", "web_fetch"],
+  },
+  {
+    id: "browser_verification",
+    summary:
+      "Behavioral browser verification through the optional Playwright MCP: navigate, inspect accessibility state, interact, and capture screenshots.",
+    keywords: [
+      "browser", "playwright", "screenshot", "visual", "ui", "preview",
+      "click", "form", "interaction", "e2e", "responsive", "accessibility",
+    ],
+    toolNames: [
+      "mcp_status", "mcp_configure_playwright", "mcp_discover_tools", "mcp_call",
+    ],
+  },
+  {
     id: "background_jobs",
     summary:
       "Long-running background processes: start, tail logs, list, and kill jobs.",
@@ -187,7 +208,10 @@ export function searchCapabilities(query: string): CapabilityDescriptor[] {
   })
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score);
-  return scored.slice(0, 5).map((s) => s.cap);
+  // Top-2, not top-5: each promoted family adds its tool schemas to every
+  // remaining step of the run, so a vague query unlocking five families
+  // costs thousands of tokens. The model can always search again.
+  return scored.slice(0, 2).map((s) => s.cap);
 }
 
 export function capabilityToolNames(ids: Iterable<string>): string[] {

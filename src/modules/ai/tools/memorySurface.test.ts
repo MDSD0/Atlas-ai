@@ -31,21 +31,32 @@ const context: ToolContext = {
   getApprovalMode: () => "default",
 };
 
-describe("memory filesystem tools", () => {
-  it("keeps repository artifact mutations approval gated", () => {
+describe("memory governor tools", () => {
+  it("exposes exactly the consolidated governor surface", () => {
     const tools = buildMemoryTools(context);
-    expect(tools.memory_surface_enable.needsApproval).toBe(true);
-    expect(tools.memory_surface_disable.needsApproval).toBe(true);
-    expect(tools.memory_surface_export_work_packet.needsApproval).toBe(true);
+    expect(Object.keys(tools).sort()).toEqual([
+      "memory_forget",
+      "memory_list",
+      "memory_recall",
+      "memory_remember",
+      "memory_status",
+      "memory_surface_enable",
+    ]);
   });
 
-  it("gives read-only subagents only inspectable surface operations", () => {
+  it("keeps mutations approval gated", () => {
+    const tools = buildMemoryTools(context);
+    expect(tools.memory_surface_enable.needsApproval).toBe(true);
+    expect(tools.memory_remember.needsApproval).toBe(true);
+    expect(tools.memory_forget.needsApproval).toBe(true);
+  });
+
+  it("gives read-only subagents only inspection operations", () => {
     const tools = buildReadOnlyMemoryTools(context);
-    expect(tools).toHaveProperty("memory_surface_status");
-    expect(tools).toHaveProperty("memory_surface_read_index");
-    expect(tools).toHaveProperty("memory_surface_search_sessions");
-    expect(tools).not.toHaveProperty("memory_surface_enable");
-    expect(tools).not.toHaveProperty("memory_surface_disable");
-    expect(tools).not.toHaveProperty("memory_surface_export_work_packet");
+    expect(Object.keys(tools).sort()).toEqual([
+      "memory_list",
+      "memory_recall",
+      "memory_status",
+    ]);
   });
 });

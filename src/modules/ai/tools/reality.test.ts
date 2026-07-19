@@ -5,6 +5,7 @@ import {
   impactCandidateFiles,
   summarizeRepoStatus,
 } from "./reality";
+import { buildRepoMapHealth } from "@/modules/ai/lib/repoMapInsights";
 
 const RESPONSE: RepoContextResponse = {
   root: "/repo",
@@ -74,6 +75,36 @@ describe("repo reality helpers", () => {
     expect(summary.watch_status).toBe("snapshot_ttl");
     expect(summary.degraded_files).toHaveLength(1);
     expect(summary.ranking_strategy).toBe("aider_weighted_pagerank");
+    expect(summary.map_health.visible_relation_count).toBe(1);
     expect(summary).not.toHaveProperty("context");
+  });
+
+  it("gives the agent bounded coupling and coverage signals", () => {
+    const health = buildRepoMapHealth({
+      ...RESPONSE,
+      graph_edge_count: 4,
+      included_files: [
+        "src/modules/ai/tool.ts",
+        "src/app/pane.ts",
+        "src/app/isolated.ts",
+      ],
+      graph_relations: [
+        {
+          source: "src/modules/ai/tool.ts",
+          target: "src/app/pane.ts",
+          symbol: "openPane",
+          weight: 10,
+        },
+      ],
+    });
+
+    expect(health.cross_module_relation_count).toBe(1);
+    expect(health.cross_module_hotspots.map((entry) => entry.module)).toEqual([
+      "src/app",
+      "src/modules/ai",
+    ]);
+    expect(health.isolated_in_projection).toEqual(["src/app/isolated.ts"]);
+    expect(health.relationship_list_truncated).toBe(true);
+    expect(health.interpretation).toContain("not proof");
   });
 });

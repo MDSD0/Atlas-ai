@@ -128,4 +128,29 @@ describe("LocalRecordsProvider", () => {
       }),
     ).rejects.toThrow("possible secret material");
   });
+
+  it("refreshes identical durable facts instead of accumulating duplicates", async () => {
+    const { records } = provider();
+    const first = await records.remember({
+      projectId: "/repo",
+      kind: "decision",
+      content: "Use pnpm for project scripts.",
+      sourceArtifacts: ["/repo/package.json"],
+      tags: ["package-manager"],
+      confidence: 0.7,
+    });
+    const refreshed = await records.remember({
+      projectId: "/repo",
+      kind: "decision",
+      content: "Use pnpm for project scripts.",
+      sourceArtifacts: ["/repo/package.json"],
+      tags: ["tooling"],
+      confidence: 0.9,
+    });
+
+    expect(refreshed.id).toBe(first.id);
+    expect(refreshed.confidence).toBe(0.9);
+    expect(refreshed.tags).toEqual(["package-manager", "tooling"]);
+    await expect(records.list("/repo")).resolves.toHaveLength(1);
+  });
 });

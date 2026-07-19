@@ -94,6 +94,13 @@ export type GitHistoryTab = {
   repoRoot: string;
 };
 
+/** Obsidian-style repository graph. One per workspace. */
+export type RepoGraphTab = {
+  id: number;
+  kind: "repo-graph";
+  title: string;
+};
+
 export type GitCommitFileDiffTab = {
   id: number;
   kind: "git-commit-file";
@@ -115,6 +122,7 @@ export type Tab =
   | AiDiffTab
   | GitDiffTab
   | GitHistoryTab
+  | RepoGraphTab
   | GitCommitFileDiffTab;
 
 export type TabPatch = Partial<{
@@ -497,6 +505,24 @@ export function useTabs() {
     [],
   );
 
+  const openRepoGraphTab = useCallback(() => {
+    const curr = tabsRef.current;
+    const existing = curr.find((t) => t.kind === "repo-graph");
+    if (existing) {
+      setActiveId(existing.id);
+      return existing.id;
+    }
+    const id = nextIdRef.current++;
+    const nextTabs = [
+      ...curr,
+      { id, kind: "repo-graph", title: "Map" } satisfies RepoGraphTab,
+    ];
+    tabsRef.current = nextTabs;
+    setTabs(nextTabs);
+    setActiveId(id);
+    return id;
+  }, []);
+
   const openCommitFileDiffTab = useCallback(
     (input: {
       repoRoot: string;
@@ -834,6 +860,7 @@ export function useTabs() {
     openAiDiffTab,
     openGitDiffTab,
     openCommitHistoryTab,
+    openRepoGraphTab,
     openCommitFileDiffTab,
     setAiDiffStatus,
     closeAiDiffTab,

@@ -97,19 +97,44 @@ export class LocalRecordsProvider implements AtlasMemoryProvider {
     return this.mutate(async () => {
       const projectId = normalizeProjectId(input.projectId);
       const timestamp = this.clock();
+      const content = normalizeText(input.content);
+      const sourceArtifacts = normalizeArtifacts(input.sourceArtifacts);
+      const tags = normalizeTags(input.tags);
+      const duplicate = (await this.listUnlocked(projectId)).find(
+        (record) =>
+          record.status === "active" &&
+          record.kind === input.kind &&
+          record.content === content &&
+          record.sourceArtifacts.length === sourceArtifacts.length &&
+          record.sourceArtifacts.every(
+            (artifact, index) => artifact === sourceArtifacts[index],
+          ),
+      );
+      if (duplicate) {
+        duplicate.updatedAt = timestamp;
+        duplicate.confidence = Math.max(
+          duplicate.confidence,
+          Math.max(0, Math.min(1, input.confidence ?? 1)),
+        );
+        duplicate.tags = normalizeTags([...duplicate.tags, ...tags]);
+        duplicate.sourceRunId = input.sourceRunId ?? duplicate.sourceRunId;
+        await this.persistence.set(recordKey(duplicate.id), duplicate);
+        await this.persistence.save();
+        return duplicate;
+      }
       const record: MemoryRecord = {
         id: this.idFactory(),
         projectId,
         kind: input.kind,
-        content: normalizeText(input.content),
+        content,
         sourceRunId: input.sourceRunId ?? null,
-        sourceArtifacts: normalizeArtifacts(input.sourceArtifacts),
+        sourceArtifacts,
         createdAt: timestamp,
         updatedAt: timestamp,
         confidence: Math.max(0, Math.min(1, input.confidence ?? 1)),
         status: "active",
         staleReason: null,
-        tags: normalizeTags(input.tags),
+        tags,
       };
       const previous = (await this.persistence.get<string[]>(projectKey(projectId))) ?? [];
       const ids = [record.id, ...previous.filter((id) => id !== record.id)];

@@ -34,7 +34,12 @@ import {
 } from "../lib/sessions";
 import { pushRecentModel } from "../lib/modelPrefs";
 import type { ApprovalMode } from "../lib/permissions";
-import { createContextAwareTransport } from "../lib/transport";
+import { createContextAwareTransport, stripContextBlock } from "../lib/transport";
+import {
+  deleteCheckpoints,
+  ensureCheckpointsLoaded,
+  restoreToMessage,
+} from "../checkpoints/checkpointStore";
 import { formatAgentError, isTransientStreamError } from "../lib/errors";
 import { killRunResourcesForSession } from "../lib/runResources";
 import type {
@@ -43,6 +48,8 @@ import type {
   ToolContext,
 } from "../tools/tools";
 import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
+import { useSubagentActivityStore } from "../agents/subagentActivityStore";
+import { recoverInterruptedSessionTraces } from "../traces/sessionTrace";
 
 type Live = {
   getCwd: () => string | null;
@@ -571,7 +578,10 @@ export const useChatStore = create<StoreState>((set, get) => ({
 
   hydrateSessions: async () => {
     if (get().sessionsHydrated) return;
-    const { sessions, activeId } = await loadAll();
+    const [{ sessions }] = await Promise.all([
+      loadAll(),
+      recoverInterruptedSessionTraces(),
+    ]);
     // Migrate legacy metas: missing project fields, or backslash workspace
     // roots from before path normalization (those split one project into
     // duplicate groups and break watcher-keyed lookups).
@@ -584,36 +594,8 @@ export const useChatStore = create<StoreState>((set, get) => ({
         : s;
     });
 
-    // Restore the previously-active session if it still exists and has history,
-    // so a restart returns the user to their conversation instead of a blank
-    // "New chat". Seed its messages so the chat view renders them immediately.
-    const restorable = activeId
-      ? normalized.find((s) => s.id === activeId)
-      : null;
-    if (restorable) {
-      const msgs = await loadMessages(restorable.id).catch(() => null);
-      if (msgs && msgs.length > 0) {
-        seedMessages.set(restorable.id, msgs);
-        if (restorable.workspaceRoot) {
-          await useWorkspaceStore
-            .getState()
-            .setWorkspaceRoot(restorable.workspaceRoot)
-            .catch(() => useWorkspaceStore.getState().clearWorkspace());
-        } else {
-          useWorkspaceStore.getState().clearWorkspace();
-        }
-        set({
-          sessions: normalized,
-          activeSessionId: restorable.id,
-          sessionsHydrated: true,
-        });
-        return;
-      }
-    }
-
-    // Reuse the most recent untitled "New chat" session if one exists from
-    // the previous run — no point stacking empty placeholder sessions every
-    // launch. Otherwise prepend a fresh one.
+    // Start every launch on a blank Home chat. Previous conversations remain
+    // available in session history instead of taking over the startup view.
     const reusable =
       normalized.find((s) => s.title === "New chat" && !s.workspaceRoot) ??
       null;
@@ -724,6 +706,8 @@ export const useChatStore = create<StoreState>((set, get) => ({
     }
     void deleteSessionData(id);
     void useTodosStore.getState().clearSession(id);
+    deleteCheckpoints(id);
+    useSubagentActivityStore.getState().clearSession(id);
 
     if (remaining.length === 0) {
       const fresh: SessionMeta = bindSessionToWorkspace(
@@ -852,6 +836,56 @@ export function stop(): void {
   const id = useChatStore.getState().activeSessionId;
   if (!id) return;
   stopSession(id);
+}
+
+export type CheckpointRestoreOutcome = {
+  restored: number;
+  deleted: number;
+  failed: number;
+  prompt: string;
+};
+
+/**
+ * "Return arrow" restore: rewind workspace files to their state before the
+ * turn triggered by `messageId`, truncate the conversation to just before
+ * that user message, and hand the prompt text back to the composer.
+ */
+export async function restoreCheckpoint(
+  sessionId: string,
+  messageId: string,
+): Promise<CheckpointRestoreOutcome | null> {
+  const chat = getOrCreateChat(sessionId);
+  stopSession(sessionId);
+
+  const idx = chat.messages.findIndex((m) => m.id === messageId);
+  if (idx === -1) return null;
+  const target = chat.messages[idx];
+  const prompt = stripContextBlock(
+    (target.parts as ReadonlyArray<{ type: string; text?: string }>)
+      .filter((p) => p.type === "text")
+      .map((p) => p.text ?? "")
+      .join("\n"),
+  ).trim();
+
+  await ensureCheckpointsLoaded(
+    sessionId,
+    useWorkspaceStore.getState().workspaceRoot,
+  );
+  const fileResult = await restoreToMessage(sessionId, messageId);
+
+  const remaining = chat.messages.slice(0, idx);
+  chat.messages = remaining;
+  useChatStore.getState().persistMessages(sessionId, remaining);
+  flushPersist(sessionId);
+  useChatStore.getState().resetAgentMeta(sessionId);
+  useChatStore.getState().focusInput(prompt || null);
+
+  return {
+    restored: fileResult?.restored.length ?? 0,
+    deleted: fileResult?.deleted.length ?? 0,
+    failed: fileResult?.failed.length ?? 0,
+    prompt,
+  };
 }
 
 export function stopSession(id: string): void {

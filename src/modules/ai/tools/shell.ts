@@ -8,12 +8,54 @@ import { registerRunBackgroundHandle } from "../lib/runResources";
 import { commandFailureRecovery, interactiveEofHint, verificationRecovery } from "../lib/verificationLoop";
 import { resolvePath, type ToolContext } from "./context";
 import { currentWorkspaceEnv, workspaceScopeKey } from "@/modules/workspace/env";
+import { createProxyFetch } from "../lib/proxyFetch";
 
 /**
  * Per-session lazy shell-session id. The agent gets one persistent shell per
  * chat session, so cwd survives across tool calls (cd, mkdir+cd, etc).
  */
 const sessionShells = new Map<string, Promise<number>>();
+const previewFetch = createProxyFetch({ allowPrivateNetwork: true });
+
+async function waitForPreviewReady(
+  url: string,
+  waitMs: number,
+  signal?: AbortSignal,
+): Promise<boolean> {
+  if (waitMs <= 0) return true;
+  const deadline = Date.now() + waitMs;
+  while (Date.now() < deadline) {
+    if (signal?.aborted) throw new DOMException("Preview cancelled", "AbortError");
+    try {
+      const response = await previewFetch(url, {
+        method: "GET",
+        signal: signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(1200)])
+          : AbortSignal.timeout(1200),
+      });
+      void response.body?.cancel().catch(() => {});
+      if (response.status < 500) return true;
+    } catch (error) {
+      if (signal?.aborted) throw error;
+    }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => signal?.removeEventListener("abort", onAbort);
+      const timer = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, Math.min(250, remaining));
+      const onAbort = () => {
+        clearTimeout(timer);
+        cleanup();
+        reject(new DOMException("Preview cancelled", "AbortError"));
+      };
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+  return false;
+}
 
 async function getSessionShell(
   sessionId: string,
@@ -211,7 +253,7 @@ export function buildShellTools(ctx: ToolContext) {
         command: z.string(),
         url: z.string().optional(),
         cwd: z.string().nullable().optional(),
-        wait_ms: z.number().int().min(0).max(5000).optional(),
+        wait_ms: z.number().int().min(0).max(15_000).optional(),
       }),
       needsApproval: ({ command }) =>
         shellNeedsApproval(command, ctx.getApprovalMode()),
@@ -252,10 +294,12 @@ export function buildShellTools(ctx: ToolContext) {
               registerRunBackgroundHandle(sid, options.abortSignal, handle);
             }
           }
-          const wait = wait_ms ?? 1200;
-          if (wait > 0 && !existing) {
-            await new Promise((resolve) => setTimeout(resolve, wait));
-          }
+          const wait = wait_ms ?? 5000;
+          const ready = await waitForPreviewReady(
+            previewUrl,
+            wait,
+            options.abortSignal,
+          );
           const logs = await native.shellBgLogs(handle, 0).catch(() => null);
           const exitedBadly =
             !!logs?.exited &&
@@ -283,6 +327,27 @@ export function buildShellTools(ctx: ToolContext) {
                 logs.exit_code,
                 logs.bytes,
               ),
+            };
+          }
+          if (!ready) {
+            if (spawned) await native.shellBgKill(handle).catch(() => {});
+            return {
+              ok: false,
+              reused: !!existing,
+              handle,
+              command,
+              cwd: effectiveCwd,
+              url: previewUrl,
+              logs: logs
+                ? {
+                    bytes: redactShellOutput(logs.bytes.slice(-4000)),
+                    exited: logs.exited,
+                    exit_code: logs.exit_code,
+                    dropped: logs.dropped,
+                    next_offset: logs.next_offset,
+                  }
+                : null,
+              error: `preview server did not become reachable within ${wait}ms`,
             };
           }
           const opened = ctx.openPreview(previewUrl);

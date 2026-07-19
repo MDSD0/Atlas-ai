@@ -83,7 +83,7 @@ export function McpSection() {
     <div className="flex flex-col gap-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-foreground">MCP servers</h2>
+          <h2 className="text-sm font-semibold text-foreground">Integrations</h2>
           <p className="mt-1 text-xs text-muted-foreground">
             Connect Model Context Protocol servers (stdio). New servers start
             disabled and their tools are deny-first — you approve each tool call.

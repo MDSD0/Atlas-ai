@@ -8,6 +8,7 @@ import {
 } from "../tools/fingerprint";
 import { withFileMutationQueue } from "../tools/fileMutationQueue";
 import { observePostEdit } from "../tools/postEdit";
+import { captureFileSnapshot } from "../checkpoints/checkpointStore";
 
 export type QueuedEdit = {
   id: string;
@@ -192,7 +193,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
 }));
 
-async function applyOne(q: QueuedEdit): Promise<void> {
+async function applyOne(q: QueuedEdit, sessionId?: string | null): Promise<void> {
   if (q.kind === "create_directory") {
     await agentNative.createDir(q.path, q.projectRoot);
     return;
@@ -201,6 +202,11 @@ async function applyOne(q: QueuedEdit): Promise<void> {
     q.path,
     async () => {
       await assertQueuedEditFresh(q);
+      captureFileSnapshot(
+        sessionId,
+        q.path,
+        q.isNewFile ? null : q.originalContent,
+      );
       await agentNative.writeFile(q.path, q.proposedContent, q.projectRoot);
       await observePostEdit(q.projectRoot, q.path);
     },
@@ -222,7 +228,7 @@ async function applyQueued(
   const appliedOk = new Set<string>();
   for (const q of items) {
     try {
-      await applyOne(q);
+      await applyOne(q, sessionId);
       results.push({ id: q.id, ok: true });
       appliedOk.add(q.id);
     } catch (e) {

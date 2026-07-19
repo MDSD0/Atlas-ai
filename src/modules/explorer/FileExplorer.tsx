@@ -1,3 +1,4 @@
+import { notifyError } from "@/lib/notify";
 import { FilePlus as FileAddIcon, Folder as Folder01Icon, FolderOpen as FolderOpenIcon, FolderPlus as FolderAddIcon, Search as Search01Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -261,7 +262,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
         try {
           await openProjectFromDialog();
         } catch (error) {
-          window.alert(workspaceBindingErrorMessage(error));
+          notifyError(workspaceBindingErrorMessage(error));
         }
       };
 
@@ -331,7 +332,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
                   const selected = await openProjectFromDialog();
                   if (selected) tree.refresh(rootPath);
                 } catch (error) {
-                  window.alert(workspaceBindingErrorMessage(error));
+                  notifyError(workspaceBindingErrorMessage(error));
                 }
               }}
             >
@@ -506,7 +507,7 @@ export const FileExplorer = forwardRef<FileExplorerHandle, Props>(
               try {
                 await openProjectFromDialog();
               } catch (error) {
-                window.alert(workspaceBindingErrorMessage(error));
+                notifyError(workspaceBindingErrorMessage(error));
               }
             }}
             title="Open project"

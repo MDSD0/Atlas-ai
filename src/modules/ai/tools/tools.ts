@@ -14,6 +14,7 @@ import { buildSubagentTools } from "./subagent";
 import { buildTerminalTools } from "./terminal";
 import { buildTodoTools } from "./todo";
 import { buildVerificationTools } from "./verification";
+import { buildWebTools } from "./web";
 import { buildWorkPacketTools } from "./workPackets";
 import { buildWorktreeTools } from "./worktrees";
 
@@ -76,6 +77,7 @@ function buildFullTools(ctx: import("./context").ToolContext) {
     ...buildRealityTools(ctx),
     ...buildSemanticTools(ctx),
     ...buildVerificationTools(),
+    ...buildWebTools(),
     ...buildWorkPacketTools(ctx),
     ...buildShellTools(ctx),
     ...buildSubagentTools(ctx),

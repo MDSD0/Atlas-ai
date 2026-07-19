@@ -78,7 +78,10 @@ export const PendingApprovals = memo(function PendingApprovals({
       data-testid="atlas-pending-approvals"
       className="relative z-30 mb-2 shrink-0 overflow-hidden rounded-xl border border-brand/25 bg-background/98 shadow-2xl shadow-black/25 backdrop-blur-xl"
     >
-      <CollapsibleTrigger className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+      <CollapsibleTrigger
+        data-testid="atlas-pending-approvals-toggle"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/55 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      >
         <span className="size-1.5 shrink-0 rounded-full bg-brand" />
         <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground">
           {pending.length === 1

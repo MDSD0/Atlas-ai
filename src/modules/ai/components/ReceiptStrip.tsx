@@ -22,15 +22,18 @@ type Props = {
   onOpenFile?: (path: string) => void;
 };
 
+// Neutral language for absent evidence: "no checks run" is a fact, not a
+// warning. Amber is reserved for diagnostics/failures — an agent turn that
+// edited files without running tests is normal, not alarming.
 const STATUS_META: Record<
   ProofRunStatus,
   { label: string; className: string; Icon: typeof PassIcon }
 > = {
   running: { label: "Running", className: "text-muted-foreground", Icon: RunningIcon },
   verified: { label: "Checks passed", className: "text-emerald-500", Icon: VerifiedIcon },
-  smoke_checked: { label: "Smoke-checked", className: "text-emerald-500/80", Icon: PassIcon },
-  completed: { label: "Completed", className: "text-foreground/80", Icon: PassIcon },
-  unverified: { label: "Unverified", className: "text-amber-500", Icon: RunningIcon },
+  smoke_checked: { label: "Ran commands · no real check", className: "text-foreground/70", Icon: PassIcon },
+  completed: { label: "Edited · no checks run", className: "text-foreground/70", Icon: PassIcon },
+  unverified: { label: "No checks run", className: "text-muted-foreground", Icon: RunningIcon },
   failed: { label: "Failed", className: "text-destructive", Icon: FailIcon },
   cancelled: { label: "Cancelled", className: "text-muted-foreground", Icon: CancelIcon },
 };
@@ -41,18 +44,18 @@ function basename(p: string): string {
 }
 
 /**
- * Whether a receipt is worth showing. A receipt is evidence of actions, so it
- * appears only when the agent actually did something — ran a tool, changed a
- * file, ran a check, hit a diagnostic, or failed. A pure-chat turn (no tools)
- * has nothing to prove and must not render "Incomplete · 0 actions" noise. This
- * holds regardless of status: an empty finished run is still nothing to show.
+ * Whether a receipt is worth showing. A receipt answers "what did the agent
+ * change and was it checked?" — so it appears only when something changed or
+ * went wrong: edited files, executed checks, diagnostics, or failures.
+ * Read-only turns (research, Q&A, exploration) produce no receipt at all;
+ * rendering "N actions · no checks" for a turn that only read code was the
+ * noise that made the whole system feel like failure theater.
  */
 export function shouldShowReceipt(
   summary: ReceiptSummary | undefined,
 ): summary is ReceiptSummary {
   if (!summary) return false;
   return (
-    summary.actionCount > 0 ||
     summary.changedFiles.length > 0 ||
     summary.checks.length > 0 ||
     summary.diagnostics.length > 0 ||

@@ -1,8 +1,22 @@
 {
   "name": "atlas",
   "private": true,
-  "version": "0.7.5",
+  "version": "0.8.0",
+  "description": "A local-first AI coding workspace with bounded agents, repository intelligence, terminal, editor, source control, and live previews.",
   "license": "Apache-2.0",
+  "homepage": "https://github.com/MDSD0/Atlas-ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MDSD0/Atlas-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MDSD0/Atlas-ai/issues"
+  },
+  "packageManager": "pnpm@10.28.2",
+  "engines": {
+    "node": ">=22.13.0",
+    "pnpm": ">=10.0.0"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

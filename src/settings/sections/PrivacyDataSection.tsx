@@ -16,6 +16,7 @@ import {
 import { native } from "@/modules/ai/lib/native";
 import { clearAllAppData, exportAllAppData } from "@/modules/ai/lib/dataManagement";
 import { SectionHeader } from "../components/SectionHeader";
+import { MemoryDataManager } from "../components/MemoryDataManager";
 
 const CLEARED_STORES_LABEL =
   "chat sessions, todos, memory, skills, MCP configuration, work packets, metrics, and traces";
@@ -100,6 +101,8 @@ export function PrivacyDataSection() {
           </Button>
         </div>
       </div>
+
+      <MemoryDataManager />
 
       <div className="flex flex-col gap-2 rounded-xl border border-destructive/30 bg-destructive/5 p-5">
         <span className="text-[13px] font-medium text-destructive">Clear all data</span>

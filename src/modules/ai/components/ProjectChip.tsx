@@ -1,3 +1,4 @@
+import { notifyError } from "@/lib/notify";
 import { Folder as FolderIcon, FolderOpen as FolderOpenIcon, Plus as PlusIcon, Check as CheckIcon } from "lucide-react";
 import { useState } from "react";
 import {
@@ -33,7 +34,7 @@ export function ProjectChip() {
     try {
       await openProjectFromDialog();
     } catch (error) {
-      window.alert(workspaceBindingErrorMessage(error));
+      notifyError(workspaceBindingErrorMessage(error));
     }
     setOpen(false);
   };
@@ -42,7 +43,7 @@ export function ProjectChip() {
     try {
       await switchToProject(root);
     } catch (error) {
-      window.alert(workspaceBindingErrorMessage(error));
+      notifyError(workspaceBindingErrorMessage(error));
     }
     setOpen(false);
   };

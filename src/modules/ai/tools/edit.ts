@@ -17,6 +17,8 @@ import {
   type ReadFingerprint,
 } from "./fingerprint";
 import { withFileMutationQueue } from "./fileMutationQueue";
+import { captureFileSnapshot } from "../checkpoints/checkpointStore";
+import { consumePartialOverride, USER_AMENDED_NOTE } from "./partialAccept";
 import { observePostEdit } from "./postEdit";
 import type { PostEditDiagnostics } from "./postEditDiagnostics";
 import type { MemoryInvalidation } from "../memory";
@@ -210,13 +212,19 @@ async function applyEditsUnlocked(
   }
 
   try {
-    await agentNative.writeFile(abs, content, projectRoot, fullAccess);
-    readCache.set(abs, fingerprintText(content));
+    const override = consumePartialOverride(sessionId, abs);
+    const finalContent = override ?? content;
+    await agentNative.writeFile(abs, finalContent, projectRoot, fullAccess);
+    // Capture only after the write succeeds — a failed write must not leave a
+    // phantom pre-image that restore would later "revert".
+    captureFileSnapshot(sessionId, abs, original);
+    readCache.set(abs, fingerprintText(finalContent));
     return {
       ok: true,
       replacements: totalReplacements,
-      bytesWritten: content.length,
+      bytesWritten: finalContent.length,
       path: abs,
+      ...(override !== null ? { user_amended: true, note: USER_AMENDED_NOTE } : {}),
       ...(await observePostEdit(projectRoot, abs)),
     };
   } catch (err) {

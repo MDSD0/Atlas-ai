@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { AnimatePresence, motion } from "motion/react";
 import { appleSpring } from "@/styles/motion";
-import { useEffect, useMemo, useState, useRef } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, useRef } from "react";
 import { useComposer, type FileAttachment } from "../lib/composer";
 import { useWorkspaceFiles } from "../hooks/useWorkspaceFiles";
 import { SLASH_COMMANDS } from "../lib/slashCommands";
@@ -160,7 +160,7 @@ export function AiInputBar() {
     return () => window.clearTimeout(t);
   }, [fileTrigger]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     autoresize(localRef.current);
   }, [c.value]);
 
@@ -345,6 +345,7 @@ export function AiInputBar() {
                   localRef.current = node;
                   if (node) {
                     c.textareaRef.current = node;
+                    autoresize(node);
                   }
                 }}
                 value={c.value}
@@ -411,7 +412,7 @@ export function AiInputBar() {
                 placeholder="Ask Atlas anything   ·   # skills   @ files"
                 rows={1}
                 className={cn(
-                  "w-full resize-none bg-transparent text-[13px] leading-relaxed outline-none",
+                  "h-[22px] min-h-[22px] w-full resize-none bg-transparent text-[13px] leading-relaxed outline-none",
                   "placeholder:text-muted-foreground/50",
                   "max-h-44",
                 )}

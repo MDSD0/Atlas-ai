@@ -1,4 +1,4 @@
-import { Folder as FolderGitTwoIcon, FolderTree as FolderTreeIcon, MessageSquare as MessageMultiple01Icon, Boxes as RealityIcon } from "lucide-react";
+import { Folder as FolderGitTwoIcon, FolderTree as FolderTreeIcon, MessageSquare as MessageMultiple01Icon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 
@@ -22,10 +22,14 @@ type Props = {
   workspaceRoot: string | null;
 };
 
-export function SidebarRail({ activeView, onSelectView, changedCount, workspaceRoot }: Props) {
+export function SidebarRail({
+  activeView,
+  onSelectView,
+  changedCount,
+  workspaceRoot,
+}: Props) {
   const items: RailItem[] = [
     { id: "explorer", label: "Files", icon: FolderTreeIcon, requiresWorkspace: true },
-    { id: "reality", label: "Reality", icon: RealityIcon, requiresWorkspace: true },
     {
       id: "source-control",
       label: "Source Control",
@@ -40,7 +44,7 @@ export function SidebarRail({ activeView, onSelectView, changedCount, workspaceR
   return (
     <div
       style={{ height: SIDEBAR_RAIL_HEIGHT }}
-      className="flex shrink-0 items-stretch gap-1 border-t border-border/60 bg-card/85 px-1.5 py-1 backdrop-blur"
+      className="flex shrink-0 items-stretch gap-1 border-t border-border/60 bg-background px-1.5 py-1"
     >
       {items.map((item) => {
         const isActive = item.id === activeView;

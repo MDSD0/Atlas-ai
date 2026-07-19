@@ -2,6 +2,8 @@ import { tool, type ToolExecutionOptions } from "ai";
 import { z } from "zod";
 import { runSubagent } from "../agents/runSubagent";
 import { SUBAGENTS, type SubagentType } from "../agents/registry";
+import { scheduleSubagent } from "../agents/subagentScheduler";
+import { useSubagentActivityStore } from "../agents/subagentActivityStore";
 import { useChatStore } from "../store/chatStore";
 import type { ToolContext } from "./context";
 
@@ -13,23 +15,41 @@ export function buildSubagentTools(ctx: ToolContext) {
     prompt: string,
     description: string | undefined,
     options: ToolExecutionOptions,
+    suffix = "0",
   ) => {
     const { apiKeys, selectedModelId, patchAgentMeta } =
       useChatStore.getState();
+    const sessionId = ctx.getSessionId() ?? "unknown";
+    const runId = `${options.toolCallId}:${suffix}`;
+    const activity = useSubagentActivityStore.getState();
+    activity.begin({
+      id: runId,
+      parentCallId: options.toolCallId,
+      sessionId,
+      kind: type,
+      description: description?.trim() || SUBAGENTS[type].label,
+    });
     try {
-      const r = await runSubagent({
-        type,
-        prompt,
-        keys: apiKeys,
-        modelId: selectedModelId,
-        toolContext: ctx,
-        abortSignal: options.abortSignal,
-        onStep: (label) => {
-          const sessionId = ctx.getSessionId();
-          if (sessionId) patchAgentMeta(sessionId, { step: label });
-        },
+      const r = await scheduleSubagent({
+        sessionId,
+        signal: options.abortSignal,
+        onStart: () => useSubagentActivityStore.getState().markRunning(runId),
+        run: () => runSubagent({
+          type,
+          prompt,
+          keys: apiKeys,
+          modelId: selectedModelId,
+          toolContext: ctx,
+          abortSignal: options.abortSignal,
+          onStep: (label) => {
+            useSubagentActivityStore.getState().setStep(runId, label);
+            if (sessionId !== "unknown") patchAgentMeta(sessionId, { step: label });
+          },
+        }),
       });
+      useSubagentActivityStore.getState().finish(runId, { summary: r.summary });
       return {
+        runId,
         type,
         description,
         summary: r.summary,
@@ -37,9 +57,15 @@ export function buildSubagentTools(ctx: ToolContext) {
         durationMs: r.durationMs,
       };
     } catch (error) {
+      const cancelled = options.abortSignal?.aborted === true;
+      useSubagentActivityStore.getState().finish(runId, {
+        cancelled,
+        error: cancelled ? undefined : String(error),
+      });
       return {
+        runId,
         error:
-          options.abortSignal?.aborted
+          cancelled
             ? "subagent cancelled"
             : String(error),
         type,
@@ -89,8 +115,8 @@ Auto-executes (no approval) — subagents are read-only by design.`,
       execute: async ({ jobs }, options) => {
         const startedAt = Date.now();
         const results = await Promise.all(
-          jobs.map((job) =>
-            runOne(job.type, job.prompt, job.description, options),
+          jobs.map((job, index) =>
+            runOne(job.type, job.prompt, job.description, options, String(index)),
           ),
         );
         return {

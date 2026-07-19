@@ -1,3 +1,4 @@
+import { notifyError } from "@/lib/notify";
 import { ChevronRight as ChevronRightIcon, Trash2 as Delete02Icon, Folder as FolderIcon, FolderOpen as FolderOpenIcon, MoreVertical as MoreVerticalIcon, Pencil as PencilEdit01Icon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -109,10 +110,10 @@ function SessionRow({
   return (
     <div
       className={cn(
-        "group relative flex w-full min-w-0 items-center gap-2 overflow-hidden rounded-md px-2 py-1 text-[12px] transition-colors",
+        "group relative flex min-h-7 w-full min-w-0 items-center gap-2 border-l-2 px-2 py-1 text-[12px] transition-colors",
         isActive
-          ? "bg-accent font-medium text-foreground"
-          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          ? "border-brand bg-accent font-medium text-foreground"
+          : "border-transparent text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
     >
       {renaming ? (
@@ -219,7 +220,7 @@ function WorkspaceGroupSection({
   const label = workspaceLabel(group.workspaceRoot);
 
   return (
-    <div className="flex min-w-0 flex-col overflow-hidden">
+    <div className="flex min-w-0 flex-col">
       <div className="flex items-center gap-0.5 px-1.5 py-0.5">
         <button
           type="button"
@@ -281,7 +282,7 @@ function WorkspaceGroupSection({
       </div>
 
       {!collapsed && (
-        <div className="mb-1 ml-[18px] mr-1.5 flex min-w-0 flex-col gap-px overflow-hidden border-l border-border/50 pl-1.5">
+        <div className="mb-1 ml-[18px] flex min-w-0 flex-col overflow-hidden border-l border-border/50">
           {group.sessions.map((s) => (
             <SessionRow
               key={s.id}
@@ -382,7 +383,7 @@ export function SessionsList({
         // old conversation pointing at a different workspace.
         await switchToProject(path);
       } catch (error) {
-        window.alert(workspaceBindingErrorMessage(error));
+        notifyError(workspaceBindingErrorMessage(error));
       }
     },
     [],
@@ -416,7 +417,7 @@ export function SessionsList({
       data-testid="atlas-sessions-panel"
       className={cn(
         "flex h-full min-h-0 min-w-0 flex-col overflow-y-auto overflow-x-hidden px-2 py-1",
-        compact && "max-h-[min(70vh,620px)] w-[min(92vw,400px)] py-2",
+        compact && "h-auto max-h-[min(70vh,620px)] w-full pb-2 pt-1",
       )}
     >
       <div className="px-3 pb-1.5 pt-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/60">

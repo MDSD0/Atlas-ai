@@ -1,6 +1,8 @@
 import { tool, type ToolExecutionOptions } from "ai";
 import { z } from "zod";
 import { runWorktreeAgent } from "../agents/runWorktreeAgent";
+import { scheduleSubagent } from "../agents/subagentScheduler";
+import { useSubagentActivityStore } from "../agents/subagentActivityStore";
 import { native } from "../lib/native";
 import { useChatStore } from "../store/chatStore";
 import {
@@ -127,23 +129,44 @@ export function buildWorktreeTools(ctx: ToolContext) {
       execute: async ({ path, prompt }, options: ToolExecutionOptions) => {
         const root = workspaceRoot(ctx, true);
         if (typeof root !== "string") return root;
+        const sessionId = ctx.getSessionId?.() ?? "unknown";
+        const runId = `${options.toolCallId}:worktree`;
+        useSubagentActivityStore.getState().begin({
+          id: runId,
+          parentCallId: options.toolCallId,
+          sessionId,
+          kind: "worktree",
+          description: `Worker · ${path.replace(/\\/g, "/").split("/").pop() ?? path}`,
+        });
         try {
           const worktree = await managedWorktree(root, path);
-          if (typeof worktree !== "string") return worktree;
+          if (typeof worktree !== "string") {
+            useSubagentActivityStore.getState().finish(runId, worktree);
+            return { ...worktree, runId };
+          }
           await native.workspaceAuthorizeAgentProject(worktree);
           const { apiKeys, selectedModelId, patchAgentMeta } =
             useChatStore.getState();
-          const result = await runWorktreeAgent({
-            prompt,
-            worktreePath: worktree,
-            keys: apiKeys,
-            modelId: selectedModelId,
-            parentContext: ctx,
-            abortSignal: options.abortSignal,
-            onStep: (step) => {
-              const sessionId = ctx.getSessionId();
-              if (sessionId) patchAgentMeta(sessionId, { step });
-            },
+          const result = await scheduleSubagent({
+            sessionId,
+            signal: options.abortSignal,
+            onStart: () =>
+              useSubagentActivityStore.getState().markRunning(runId),
+            run: () => runWorktreeAgent({
+              prompt,
+              worktreePath: worktree,
+              keys: apiKeys,
+              modelId: selectedModelId,
+              parentContext: ctx,
+              abortSignal: options.abortSignal,
+              onStep: (step) => {
+                useSubagentActivityStore.getState().setStep(runId, step);
+                if (sessionId !== "unknown") patchAgentMeta(sessionId, { step });
+              },
+            }),
+          });
+          useSubagentActivityStore.getState().finish(runId, {
+            summary: result.summary,
           });
           const [status, unstaged, staged] = await Promise.all([
             native.gitStatus(worktree),
@@ -152,6 +175,7 @@ export function buildWorktreeTools(ctx: ToolContext) {
           ]);
           return {
             ...result,
+            runId,
             path: worktree,
             status,
             unstaged,
@@ -159,8 +183,14 @@ export function buildWorktreeTools(ctx: ToolContext) {
             verificationRequired: true,
           };
         } catch (error) {
+          const cancelled = options.abortSignal?.aborted === true;
+          useSubagentActivityStore.getState().finish(runId, {
+            cancelled,
+            error: cancelled ? undefined : String(error),
+          });
           return {
-            error: options.abortSignal?.aborted
+            runId,
+            error: cancelled
               ? "worktree worker cancelled"
               : String(error),
             path,

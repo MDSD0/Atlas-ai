@@ -79,9 +79,12 @@ async function proxyFetchImpl(
     let streamController: ReadableStreamDefaultController<Uint8Array> | null =
       null;
     let cancelled = false;
+    let onAbort: () => void = () => {};
+    const cleanup = () => signal?.removeEventListener("abort", onAbort);
 
-    const onAbort = () => {
+    onAbort = () => {
       cancelled = true;
+      cleanup();
       if (!resolved) {
         reject(makeAbortError());
       } else if (streamController) {
@@ -105,6 +108,7 @@ async function proxyFetchImpl(
             },
             cancel() {
               cancelled = true;
+              cleanup();
             },
           });
           resolved = true;
@@ -121,10 +125,12 @@ async function proxyFetchImpl(
           break;
         }
         case "end": {
+          cleanup();
           streamController?.close();
           break;
         }
         case "error": {
+          cleanup();
           if (!resolved) {
             reject(new Error(event.message));
           } else {
@@ -143,6 +149,7 @@ async function proxyFetchImpl(
       allowPrivateNetwork,
       onEvent: channel,
     }).catch((e) => {
+      cleanup();
       if (resolved) return; // headers already arrived; chunk-side error wins
       reject(e instanceof Error ? e : new Error(String(e)));
     });

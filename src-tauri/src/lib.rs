@@ -77,12 +77,9 @@ async fn open_settings_window(app: tauri::AppHandle, tab: Option<String>) -> Res
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .hidden_title(true);
 
-    // On Linux/Windows we render our own titlebar, so drop native chrome.
-    // On Windows, setting transparent(true) with visible(false) breaks .show()
+    // Linux renders its own transparent titlebar. Windows keeps native chrome.
     #[cfg(target_os = "linux")]
     let builder = builder.decorations(false).transparent(true);
-    #[cfg(target_os = "windows")]
-    let builder = builder.decorations(false).transparent(false);
 
     let window = builder.build().map_err(|e| e.to_string())?;
 

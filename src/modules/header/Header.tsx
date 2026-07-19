@@ -1,11 +1,5 @@
-import { LayoutGrid as GridViewIcon, Columns as LayoutTwoColumnIcon, Rows as LayoutTwoRowIcon, Settings as Settings01Icon, Sidebar as SidebarLeftIcon } from "lucide-react";
+import { Columns as LayoutTwoColumnIcon, Rows as LayoutTwoRowIcon, Settings as Settings01Icon, Sidebar as SidebarLeftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { WindowControls } from "@/components/WindowControls";
 import { IS_MAC, KEY_SEP, USE_CUSTOM_WINDOW_CONTROLS } from "@/lib/platform";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -35,6 +29,7 @@ type Props = {
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewGitGraph: () => void;
+  onNewRepoMap: () => void;
   onClose: (id: number) => void;
   /** Promote a preview (transient) tab to persistent. */
   onPin: (id: number) => void;
@@ -61,6 +56,7 @@ export function Header({
   onNewPreview,
   onNewEditor,
   onNewGitGraph,
+  onNewRepoMap,
   onClose,
   onPin,
   onToggleSidebar,
@@ -115,7 +111,7 @@ export function Header({
     <div
       ref={rootRef}
       data-tauri-drag-region
-      className={`flex h-10 shrink-0 items-center gap-2 border-b border-border/60 bg-card/75 shadow-[inset_0_-1px_0_rgba(255,255,255,0.025)] backdrop-blur-xl backdrop-saturate-150 select-none ${
+      className={`flex h-10 shrink-0 items-center gap-2 border-b border-border/60 bg-background shadow-[inset_0_-1px_0_rgba(255,255,255,0.025)] select-none ${
         IS_MAC ? "pr-2 pl-20" : "pr-0 pl-2"
       }`}
     >
@@ -133,38 +129,28 @@ export function Header({
         {/* Split is terminal-only; hide it entirely on other tabs rather than
             showing a permanently-dead disabled button. */}
         {canSplit && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-                title="Split terminal"
-              >
-                <GridViewIcon size={16} strokeWidth={1.5} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-44">
-              <DropdownMenuItem onSelect={() => onSplit("row")}>
-                <LayoutTwoColumnIcon size={14} strokeWidth={1.5} />
-                <span className="flex-1">Split right</span>
-                {splitRightTokens && (
-                  <span className="text-xs text-muted-foreground">
-                    {splitRightTokens}
-                  </span>
-                )}
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => onSplit("col")}>
-                <LayoutTwoRowIcon size={14} strokeWidth={1.5} />
-                <span className="flex-1">Split down</span>
-                {splitDownTokens && (
-                  <span className="text-xs text-muted-foreground">
-                    {splitDownTokens}
-                  </span>
-                )}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onSplit("row")}
+              className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+              title={`Split right${splitRightTokens ? ` (${splitRightTokens})` : ""}`}
+              aria-label="Split terminal right"
+            >
+              <LayoutTwoColumnIcon size={16} strokeWidth={1.5} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => onSplit("col")}
+              className="shrink-0 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+              title={`Split down${splitDownTokens ? ` (${splitDownTokens})` : ""}`}
+              aria-label="Split terminal down"
+            >
+              <LayoutTwoRowIcon size={16} strokeWidth={1.5} />
+            </Button>
+          </>
         )}
 
         {!IS_MAC && <NotificationBell
@@ -190,6 +176,7 @@ export function Header({
           onNewPreview={onNewPreview}
           onNewEditor={onNewEditor}
           onNewGitGraph={onNewGitGraph}
+          onNewRepoMap={onNewRepoMap}
           onClose={onClose}
           onPin={onPin}
           onGoHome={onGoHome}

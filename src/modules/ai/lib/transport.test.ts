@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     includeSkills: false,
     includeSimpleMem: false,
   }),
+  finishSessionTrace: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("./agent", () => ({
@@ -58,6 +59,9 @@ vi.mock("../workPackets", () => ({
 vi.mock("../contextLedger", () => ({
   contextLedger: { capture: vi.fn() },
 }));
+vi.mock("../checkpoints/checkpointStore", () => ({
+  beginCheckpointTurn: vi.fn(),
+}));
 vi.mock("./lanePolicy", () => ({
   selectAgentRunPolicy: mocks.selectAgentRunPolicy,
 }));
@@ -71,7 +75,7 @@ vi.mock("./runResources", () => ({
 }));
 vi.mock("../traces/sessionTrace", () => ({
   startSessionTrace: vi.fn().mockResolvedValue({}),
-  finishSessionTrace: vi.fn().mockResolvedValue(undefined),
+  finishSessionTrace: mocks.finishSessionTrace,
   recordSessionTraceEvent: vi.fn(),
   recordSessionTraceUsage: vi.fn(),
 }));
@@ -155,6 +159,85 @@ describe("createContextAwareTransport — per-run frozen project context (F-02)"
     });
 
     expect(mocks.runAgentStream).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("createContextAwareTransport terminal run lifecycle", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.selectAgentRunPolicy.mockReturnValue({
+      lane: "full",
+      toolMode: "full",
+      maxSteps: 10,
+      reason: "test",
+      includeAtlasMd: false,
+      includeMemoryIndex: false,
+      includeLocalMemory: false,
+      includeWorkPacket: false,
+      includeSkills: false,
+      includeSimpleMem: false,
+    });
+  });
+
+  it("finalizes an aborted run once when the provider settles later", async () => {
+    let settle!: (reason: string) => void;
+    const finishReason = new Promise<string>((resolve) => {
+      settle = resolve;
+    });
+    mocks.runAgentStream.mockResolvedValue({
+      finishReason,
+      toUIMessageStream: () => "stream",
+    });
+    const controller = new AbortController();
+    const onCancel = vi.fn();
+    const root = "/project-lifecycle";
+    const toolContext: ToolContext = {
+      getCwd: () => root,
+      getWorkspaceRoot: () => root,
+      getProjectContext: () => project(root),
+      getTerminalContext: () => null,
+      isActiveTerminalPrivate: () => false,
+      injectIntoActivePty: () => false,
+      openPreview: () => false,
+      spawnAgent: () => null,
+      readAgentOutput: () => null,
+      readCache: new Map(),
+      getSessionId: () => "session-lifecycle",
+      getApprovalMode: () => "default",
+    };
+    const transport = createContextAwareTransport({
+      getKeys: () => ({}) as never,
+      toolContext,
+      getModelId: () => "test-model" as never,
+      getCustomInstructions: () => "",
+      getAgentPersona: () => null,
+      getLive: () => ({
+        cwd: root,
+        terminalPrivate: false,
+        workspaceRoot: root,
+        activeFile: null,
+        project: project(root),
+      }),
+      onCancel,
+    });
+
+    await transport.sendMessages({
+      messages: [
+        { id: "1", role: "user", parts: [{ type: "text", text: "hello" }] } as never,
+      ],
+      abortSignal: controller.signal,
+    });
+    controller.abort();
+    await vi.waitFor(() =>
+      expect(mocks.finishSessionTrace).toHaveBeenCalledTimes(1),
+    );
+    settle("stop");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(mocks.finishSessionTrace).toHaveBeenCalledTimes(1);
+    expect(mocks.finishSessionTrace.mock.calls[0][1]).toBe("cancelled");
   });
 });
 

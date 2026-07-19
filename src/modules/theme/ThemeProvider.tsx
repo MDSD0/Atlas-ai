@@ -18,7 +18,7 @@ import {
   type EditorThemeId,
   type ThemePref,
 } from "@/modules/settings/store";
-import { applyTheme, clearTheme } from "./applyTheme";
+import { applyTheme } from "./applyTheme";
 import {
   listCustomThemes,
   onCustomThemesChange,
@@ -48,9 +48,21 @@ const ThemeProviderContext = createContext<ThemeProviderState | null>(null);
 
 const FAST_PATH_KEY = "atlas-ui-theme-shadow";
 const FAST_PATH_THEME_ID = "atlas-ui-theme-id-shadow";
+const VISUAL_VERSION_KEY = "atlas-ui-visual-version";
+const VISUAL_VERSION = "2";
+
+function needsVisualMigration(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(VISUAL_VERSION_KEY) !== VISUAL_VERSION;
+}
+
+function completeVisualMigration(): void {
+  try { window.localStorage.setItem(VISUAL_VERSION_KEY, VISUAL_VERSION); } catch { /* ignore */ }
+}
 
 function readFastMode(fallback: ThemePref): ThemePref {
   if (typeof window === "undefined") return fallback;
+  if (needsVisualMigration()) return "dark";
   const v = window.localStorage.getItem(FAST_PATH_KEY);
   return v === "dark" || v === "light" || v === "system" ? v : fallback;
 }
@@ -61,6 +73,7 @@ function writeFastMode(t: ThemePref): void {
 
 function readFastThemeId(): string {
   if (typeof window === "undefined") return DEFAULT_THEME_ID;
+  if (needsVisualMigration()) return DEFAULT_THEME_ID;
   return window.localStorage.getItem(FAST_PATH_THEME_ID) ?? DEFAULT_THEME_ID;
 }
 
@@ -86,6 +99,16 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
     let alive = true;
     void loadPreferences().then((p) => {
       if (!alive) return;
+      if (needsVisualMigration()) {
+        setModeState("dark");
+        setThemeIdState(DEFAULT_THEME_ID);
+        writeFastMode("dark");
+        writeFastThemeId(DEFAULT_THEME_ID);
+        completeVisualMigration();
+        void persistTheme("dark");
+        void persistThemeId(DEFAULT_THEME_ID);
+        return;
+      }
       setModeState(p.theme);
       setThemeIdState(p.themeId);
       writeFastMode(p.theme);
@@ -136,11 +159,6 @@ export function ThemeProvider({ children, defaultMode = "system" }: ThemeProvide
 
   const lastEditorPairRef = useRef<string | null>(null);
   useEffect(() => {
-    if (themeId === DEFAULT_THEME_ID) {
-      clearTheme();
-      lastEditorPairRef.current = null;
-      return;
-    }
     const theme = resolveTheme(themeId, customThemes);
     applyTheme(theme, resolvedMode);
     const editorPair = theme.editorTheme?.[resolvedMode];

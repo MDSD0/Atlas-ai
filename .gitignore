@@ -14,6 +14,7 @@ dist-ssr
 .env
 .env.*
 tauri-updater.key
+tauri-updater.password.dpapi
 *.key
 *.pem
 *.p8
@@ -35,3 +36,10 @@ __pycache__/
 
 # Atlas qualification evidence
 runs/
+
+# Local release and benchmark artifacts
+.drivers/
+.vs/
+projects/
+sweb_*
+atlas-*.atlas-*.json

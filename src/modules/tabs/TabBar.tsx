@@ -1,4 +1,4 @@
-import { X as Cancel01Icon, Clock as Clock01Icon, Terminal as ComputerTerminal02Icon, GitBranch as GitBranchIcon, GitCompare as GitCompareIcon, Globe as Globe02Icon, Bot as AgentIcon, EyeOff as IncognitoIcon, Pencil as PencilEdit02Icon, Plus as PlusSignIcon } from "lucide-react";
+import { X as Cancel01Icon, Clock as Clock01Icon, Terminal as ComputerTerminal02Icon, GitBranch as GitBranchIcon, GitCompare as GitCompareIcon, Globe as Globe02Icon, Bot as AgentIcon, EyeOff as IncognitoIcon, Network as NetworkIcon, Pencil as PencilEdit02Icon, Plus as PlusSignIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ type Props = {
   onNewPreview: () => void;
   onNewEditor: () => void;
   onNewGitGraph: () => void;
+  onNewRepoMap: () => void;
   onClose: (id: number) => void;
   /** Pin (promote) a preview tab to persistent on double-click. */
   onPin: (id: number) => void;
@@ -41,6 +42,7 @@ export function TabBar({
   onNewPreview,
   onNewEditor,
   onNewGitGraph,
+  onNewRepoMap,
   onClose,
   onPin,
   onGoHome,
@@ -201,6 +203,10 @@ export function TabBar({
               <GitBranchIcon size={14} strokeWidth={1.5} />
               <span className="flex-1">Git Graph</span>
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onNewRepoMap()}>
+              <NetworkIcon size={14} strokeWidth={1.5} />
+              <span className="flex-1">Map</span>
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
           </DropdownMenuContent>
         </DropdownMenu>
@@ -259,6 +265,15 @@ function TabIcon({ tab }: { tab: Tab }) {
       />
     );
   }
+  if (tab.kind === "repo-graph") {
+    return (
+      <NetworkIcon
+        size={14}
+        strokeWidth={1.5}
+        className="shrink-0"
+      />
+    );
+  }
   if (tab.kind === "welcome") {
     return (
       <AgentIcon
@@ -284,6 +299,7 @@ function labelFor(t: Tab): string {
   if (t.kind === "ai-diff") return t.title;
   if (t.kind === "git-diff") return t.title;
   if (t.kind === "git-history") return t.title;
+  if (t.kind === "repo-graph") return t.title;
   if (t.kind === "git-commit-file") return t.title;
   if (t.kind === "welcome") return "Agent";
   if (t.kind === "terminal") {

@@ -9,7 +9,7 @@ const native = read("src-tauri/src/lib.rs");
 const tools = read("src/modules/ai/tools/tools.ts");
 const memoryTools = read("src/modules/ai/tools/memory.ts");
 const transport = read("src/modules/ai/lib/transport.ts");
-const harnessInspector = read("src/modules/ai/components/HarnessInspector.tsx");
+const repoGraphPane = read("src/modules/ai/components/RepoGraphPane.tsx");
 const proofRecorder = read("src/modules/ai/proof/recorder.ts");
 const proofRuntime = read("src/modules/ai/proof/runtime.ts");
 const miniWindow = read("src/modules/ai/components/AiMiniWindow.tsx");
@@ -44,22 +44,27 @@ for (const toolBuilder of [
 ]) {
   assert.match(tools, new RegExp(toolBuilder));
 }
-for (const memorySurfaceTool of [
-  "memory_surface_status",
+// Consolidated memory governor surface (recall federates records/sessions/
+// semantic; forget covers delete + clear; surface_enable is the one admin op).
+for (const memoryGovernorTool of [
+  "memory_recall",
+  "memory_remember",
+  "memory_list",
+  "memory_forget",
+  "memory_status",
   "memory_surface_enable",
-  "memory_surface_disable",
-  "memory_surface_read_index",
-  "memory_surface_search_sessions",
-  "memory_surface_export_work_packet",
 ]) {
-  assert.match(memoryTools, new RegExp(memorySurfaceTool));
+  assert.match(memoryTools, new RegExp(memoryGovernorTool));
 }
 assert.match(transport, /onContextPacked/);
-assert.match(harnessInspector, /Last packed model input/);
-assert.match(harnessInspector, /Task subgraph preview/);
-assert.match(harnessInspector, /onOpenPath=\{onOpenFile\}/);
-assert.match(harnessInspector, /onClick=\{\(\) => onOpenFile\(selectedPath\)\}/);
-assert.match(harnessInspector, /Flight recorder timeline/);
+// The Impact Map is a full graph tab; the contract is that the graph can
+// open files, attach context, and hand a task focus to the same native
+// projection the agent's repo_context tool queries.
+assert.match(repoGraphPane, /const onDoubleClick =/);
+assert.match(repoGraphPane, /if \(node\) openPath\(node\.id\)/);
+assert.match(repoGraphPane, /onDoubleClick=\{onDoubleClick\}/);
+assert.match(repoGraphPane, /atlas:ai-attach-file/);
+assert.match(repoGraphPane, /refresh\(workspaceRoot, nextTask\)/);
 assert.match(proofRecorder, /lifecycle\.session_started/);
 assert.match(proofRecorder, /approval\.\$\{stage\}/);
 assert.match(proofRuntime, /latestBySession/);

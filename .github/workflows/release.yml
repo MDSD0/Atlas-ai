@@ -5,9 +5,39 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Existing version tag to build, for example v0.8.0"
+        required: true
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.28.2
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+      - run: node scripts/release-preflight.mjs
+
   publish-tauri:
+    needs: validate
     permissions:
       contents: write
     strategy:
@@ -15,10 +45,10 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: --target aarch64-apple-darwin --no-sign
+            args: --target aarch64-apple-darwin
             rust-target: aarch64-apple-darwin
           - platform: macos-latest
-            args: --target x86_64-apple-darwin --no-sign
+            args: --target x86_64-apple-darwin
             rust-target: x86_64-apple-darwin
           - platform: ubuntu-22.04
             args: ""
@@ -29,7 +59,9 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
 
       - name: Install Linux build dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -44,9 +76,9 @@ jobs:
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10
+          version: 10.28.2
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -64,36 +96,22 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Write Apple API key to disk
-        if: startsWith(matrix.platform, 'macos')
-        shell: bash
-        env:
-          KEY_CONTENT: ${{ secrets.APPLE_API_KEY_PATH }}
-        run: |
-          mkdir -p "$HOME/private_keys"
-          printf '%s' "$KEY_CONTENT" > "$HOME/private_keys/AuthKey.p8"
-          echo "APPLE_API_KEY_PATH=$HOME/private_keys/AuthKey.p8" >> "$GITHUB_ENV"
-
-      - uses: tauri-apps/tauri-action@v0.6.2
+      - uses: tauri-apps/tauri-action@action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "Atlas ${{ github.ref_name }}"
-          releaseBody: "See the assets to download and install. Auto-update is built in."
+          tagName: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          releaseName: "Atlas ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}"
+          releaseBody: |
+            Atlas is a local-first AI coding workspace with bounded agents, repository intelligence, terminal, editor, source control, web search, and live previews.
+
+            Choose the installer for your platform below. Windows is not publisher-signed and macOS uses an ad-hoc signature without notarization, so SmartScreen or Gatekeeper may show a warning. Updater metadata and update payloads are cryptographically signed.
           releaseDraft: true
           prerelease: false
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
 
   verify-updater-assets:
@@ -105,11 +123,24 @@ jobs:
       - name: Require signed updater metadata
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
         run: |
-          assets="$(gh release view "$GITHUB_REF_NAME" \
+          assets="$(gh release view "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
             --json assets \
             --jq '.assets[].name')"
           printf '%s\n' "$assets"
           printf '%s\n' "$assets" | grep -q '^latest\.json$'
           printf '%s\n' "$assets" | grep -q '\.sig$'
+
+  publish-release:
+    needs: verify-updater-assets
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+        run: gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest

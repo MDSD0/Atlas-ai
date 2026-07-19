@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
+  KEYRING_SERVICE,
   MODELS,
   PROVIDERS,
   getAutocompleteEligibleModels,
@@ -304,6 +305,115 @@ export function ModelsSection() {
           </div>
         )}
       </div>
+
+      <WebSearchKeysBlock />
+    </div>
+  );
+}
+
+/**
+ * Optional web-search provider keys for the agent's `web_search` tool.
+ * Without a key Atlas falls back to a keyless DuckDuckGo search.
+ */
+function WebSearchKeysBlock() {
+  return (
+    <div className="flex flex-col gap-3">
+      <div>
+        <Label>Web search</Label>
+        <p className="mt-0.5 text-[10.5px] text-muted-foreground/70">
+          Optional keys for the agent's web_search tool. Without one, Atlas
+          uses a keyless DuckDuckGo fallback.
+        </p>
+      </div>
+      <WebSearchKeyRow
+        label="Brave Search"
+        account="websearch.brave"
+        consoleUrl="https://api-dashboard.search.brave.com/app/keys"
+      />
+      <WebSearchKeyRow
+        label="Tavily"
+        account="websearch.tavily"
+        consoleUrl="https://app.tavily.com/home"
+      />
+    </div>
+  );
+}
+
+function WebSearchKeyRow({
+  label,
+  account,
+  consoleUrl,
+}: {
+  label: string;
+  account: string;
+  consoleUrl: string;
+}) {
+  const [saved, setSaved] = useState(false);
+  const [value, setValue] = useState("");
+  useEffect(() => {
+    void invoke<string | null>("secrets_get", {
+      service: KEYRING_SERVICE,
+      account,
+    })
+      .then((v) => setSaved(!!v && v.length > 0))
+      .catch(() => {});
+  }, [account]);
+  const save = async () => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    await invoke("secrets_set", {
+      service: KEYRING_SERVICE,
+      account,
+      password: trimmed,
+    });
+    setSaved(true);
+    setValue("");
+  };
+  const clear = async () => {
+    await invoke("secrets_delete", {
+      service: KEYRING_SERVICE,
+      account,
+    }).catch(() => {});
+    setSaved(false);
+  };
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-card/40 px-3 py-2">
+      <button
+        type="button"
+        onClick={() => void openUrl(consoleUrl)}
+        className="w-28 shrink-0 text-left text-[12px] font-medium hover:underline"
+        title={consoleUrl}
+      >
+        {label}
+      </button>
+      {saved ? (
+        <>
+          <Badge variant="secondary" className="text-[10.5px]">
+            <CheckmarkCircle02Icon size={12} className="mr-1" />
+            Key saved
+          </Badge>
+          <div className="flex-1" />
+          <Button size="sm" variant="ghost" className="h-7" onClick={() => void clear()}>
+            Remove
+          </Button>
+        </>
+      ) : (
+        <>
+          <Input
+            type="password"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void save();
+            }}
+            placeholder="API key"
+            className="h-7 flex-1 text-[12px]"
+          />
+          <Button size="sm" className="h-7" onClick={() => void save()} disabled={!value.trim()}>
+            Save
+          </Button>
+        </>
+      )}
     </div>
   );
 }

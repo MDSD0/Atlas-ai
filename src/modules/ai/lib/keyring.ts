@@ -25,17 +25,24 @@ export const EMPTY_PROVIDER_KEYS: ProviderKeys = {
   ollama: null,
 };
 
-export async function getKey(provider: ProviderId): Promise<string | null> {
-  if (!providerSupportsKey(provider)) return null;
+/** Read one secret from the OS keychain by account name. Shared by provider
+ * keys and auxiliary keys (e.g. web-search) so the secrets_get contract lives
+ * in exactly one place. */
+export async function getSecret(account: string): Promise<string | null> {
   try {
     const v = await invoke<string | null>("secrets_get", {
       service: KEYRING_SERVICE,
-      account: getProvider(provider).keyringAccount,
+      account,
     });
     return v && v.length > 0 ? v : null;
   } catch {
     return null;
   }
+}
+
+export async function getKey(provider: ProviderId): Promise<string | null> {
+  if (!providerSupportsKey(provider)) return null;
+  return getSecret(getProvider(provider).keyringAccount);
 }
 
 export async function setKey(provider: ProviderId, key: string): Promise<void> {

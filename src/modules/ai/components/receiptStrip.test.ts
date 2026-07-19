@@ -25,12 +25,15 @@ describe("shouldShowReceipt", () => {
     expect(shouldShowReceipt(undefined)).toBe(false);
   });
 
-  it("shows a running run once it has a real action", () => {
-    expect(shouldShowReceipt(summary({ eventCount: 3, actionCount: 1 }))).toBe(true);
+  it("shows a running run once something changed or was checked", () => {
     expect(shouldShowReceipt(summary({ changedFiles: ["/a.ts"] }))).toBe(true);
+    expect(shouldShowReceipt(summary({ checks: ["npm test (exit 0)"] }))).toBe(true);
   });
 
-  it("hides a pure-chat run even though lifecycle events were journaled", () => {
+  it("hides read-only turns — research/Q&A produces no receipt at all", () => {
+    // Read-only tool calls (read_file, grep) count as actions but change
+    // nothing; rendering a receipt for them was pure noise.
+    expect(shouldShowReceipt(summary({ eventCount: 3, actionCount: 1 }))).toBe(false);
     expect(shouldShowReceipt(summary({ status: "unverified", eventCount: 4 }))).toBe(false);
     expect(shouldShowReceipt(summary({ status: "cancelled", eventCount: 4 }))).toBe(false);
   });

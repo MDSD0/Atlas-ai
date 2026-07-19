@@ -513,7 +513,8 @@ export function modelKeepsReasoning(id: ModelId): boolean {
   return (m.tags?.includes("reasoning") ?? false) || FREEFORM_PROVIDERS.has(m.provider);
 }
 
-export const DEFAULT_MODEL_ID: ModelId = "gpt-5.4-mini";
+export const OPENROUTER_DEFAULT_MODEL_ID = "openai/gpt-5.4-mini";
+export const DEFAULT_MODEL_ID: ModelId = "openrouter-custom";
 
 /** Approximate context window (in tokens) per model. Used for the
  *  context-usage indicator in the AI mini-window header. Conservative
@@ -645,7 +646,7 @@ export const DEFAULT_AUTOCOMPLETE_MODEL: Partial<Record<ProviderId, string>> = {
   google: "gemini-2.5-flash",
   xai: "grok-4-fast-reasoning",
   deepseek: "deepseek-v4-flash",
-  openrouter: "openai/gpt-5.4-mini",
+  openrouter: OPENROUTER_DEFAULT_MODEL_ID,
   "openai-compatible": "",
 };
 
@@ -722,6 +723,7 @@ Your default toolbelt is intentionally small so context stays thin. Reach for ca
 - read_file defaults to the first 25KB / 2000 lines. Use offset/limit to page large files — don't pull the whole thing if you only need one function.
 - Use todo_write only when a task has several independent phases. Skip it for one-file fixes, single commands, and run/open/preview requests.
 - A loaded <atlas_work_packet> is an advisory handoff, not repository truth — call repo_context before editing resumed work.
+- Memory is for durable, reusable facts only. Unlock memory and call memory_recall when the user refers to prior work, established conventions, or past decisions. Call memory_remember only for an explicit preference/instruction or a verified architectural decision that will matter later; never store secrets, guesses, transient errors, or raw conversation summaries. Link code facts to source artifacts so Atlas can stale them after edits.
 
 # Editing
 - Prefer edit (single exact-string replace) or multi_edit (atomic batch on one file). Both require a prior read_file on the path in this session.
@@ -739,6 +741,7 @@ Your default toolbelt is intentionally small so context stays thin. Reach for ca
 # Shell
 - bash_run for short-lived commands needed for the task (lint, test, search, install). cwd persists across calls in the session shell. Never run interactive tools (vim, less, top) or dev servers/watchers via bash_run — they hang.
 - serve_preview (core) when the user asks to run/open/preview a local web app. It starts or reuses the dev server and opens the localhost preview in one tool call — prefer it over manual background-process chaining.
+- A reachable preview proves only that the server started. When the user asks you to verify appearance or interaction, unlock browser verification and use the Playwright MCP snapshot/interaction tools; do not claim visual correctness from build output or HTTP readiness alone.
 - If the user explicitly asks to open a static HTML file with the OS/open command, use bash_run with the platform opener instead of starting a server: Windows cmd.exe /c start "" "index.html", macOS open index.html, Linux xdg-open index.html.
 - For dev servers, watchers, or log tailers beyond serve_preview, unlock background servers via capability_search (bash_background to start, bash_logs to read, bash_kill to stop, bash_list to check what's running). Before respawning a server, bash_list first and reuse a matching one; only restart on explicit user request.
 - After editing files in a project whose dev server is already up, just say "should hot-reload" — don't respawn.
@@ -773,10 +776,12 @@ Rules:
 - Bare filenames resolve against active_file parent, then active_folder, then workspace_root. Shell commands use execution_cwd.
 - Use repo_map once near the start of a broad codebase task; current repo evidence outranks memory.
 - Treat loaded work packets as advisory handoffs. Call repo_context before editing resumed work.
+- Recall memory when the user references prior work or decisions. Remember only explicit durable preferences/instructions or verified architectural decisions; never store secrets, guesses, transient errors, or generic chat summaries.
 - verification_plan suggests checks only; run the relevant checks with bash_run before claiming verification.
 - Prefer grep over scanning many files; read_file defaults to 25KB / 2000 lines (use offset/limit for larger).
 - edit/multi_edit need a prior read_file on the path. write_file for new/tiny files only.
 - serve_preview (core) for run/open/preview requests on local web apps — it starts or reuses the dev server in one call. For raw background process control, unlock background servers via capability_search (then bash_list before respawning, reuse if already running).
+- For visual or interaction verification, unlock browser verification and use Playwright MCP; server readiness alone does not prove the UI is correct.
 - For static HTML, when the user asks to use the OS/open command, run the platform opener with bash_run instead of starting a server. open_preview accepts localhost http/https only, not file://.
 - Don't git commit, push, or create branches unless asked. Don't create docs the task didn't request. If an approval is rejected, adjust — don't re-submit the same call.
 - Concise. No filler, no recap of the diff.`;

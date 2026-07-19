@@ -1,28 +1,36 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { agentNative, type RepoContextResponse } from "../lib/native";
+import { agentNative, type RepoContextResponse } from "@/modules/ai/lib/native";
+import {
+  buildRepoMapHealth,
+  type RepoMapHealth,
+} from "@/modules/ai/lib/repoMapInsights";
 import { checkFileAccessAllowed, type ToolContext } from "./context";
 
 type RepoContextError = { error: string; root?: string };
+type RepoContextWithMapHealth = RepoContextResponse & {
+  map_health: RepoMapHealth;
+};
 
 async function fetchRepoContext(
   ctx: ToolContext,
   task: string,
   maxTokens?: number,
-): Promise<RepoContextResponse | RepoContextError> {
+): Promise<RepoContextWithMapHealth | RepoContextError> {
   const project = ctx.getProjectContext();
   const blocked = checkFileAccessAllowed(project);
   if (blocked) return blocked;
   const projectRoot = project.workspaceRoot as string;
   try {
-    return await agentNative.repoContext(task, projectRoot, maxTokens);
+    const response = await agentNative.repoContext(task, projectRoot, maxTokens);
+    return { ...response, map_health: buildRepoMapHealth(response) };
   } catch (e) {
     return { error: String(e), root: projectRoot };
   }
 }
 
 function isRepoContextError(
-  response: RepoContextResponse | RepoContextError,
+  response: RepoContextWithMapHealth | RepoContextError,
 ): response is RepoContextError {
   return "error" in response;
 }
@@ -68,6 +76,7 @@ export function summarizeRepoStatus(response: RepoContextResponse) {
     graph_edge_count: response.graph_edge_count,
     rank_iterations: response.rank_iterations,
     degraded_files: response.degraded_files,
+    map_health: buildRepoMapHealth(response),
   };
 }
 
@@ -75,7 +84,7 @@ export function buildRealityTools(ctx: ToolContext) {
   return {
     repo_context: tool({
       description:
-        "Build a fresh, bounded repository map for the current task. Use this before broad code changes or when file ownership is unclear. Returns relevant files and symbol snippets under a strict token budget, plus freshness, omissions, ignored-directory counts, and degraded parse states. Current repository evidence outranks memory.",
+        "Build a fresh, bounded repository map for the current task. Use this before broad code changes or when file ownership is unclear. Returns relevant files and symbol snippets under a strict token budget, plus compact map health for visible cross-module coupling, isolated projection files, freshness, omissions, and degraded parse states. Current repository evidence outranks memory.",
       inputSchema: z.object({
         task: z
           .string()
@@ -88,7 +97,7 @@ export function buildRealityTools(ctx: ToolContext) {
     }),
     repo_status: tool({
       description:
-        "Report repository inventory freshness, omissions, ignored directories, and parse degradation without returning broad file contents.",
+        "Report repository inventory freshness, compact map health, omissions, ignored directories, and parse degradation without returning broad file contents.",
       inputSchema: z.object({}),
       execute: async () => {
         const response = await fetchRepoContext(
@@ -103,7 +112,7 @@ export function buildRealityTools(ctx: ToolContext) {
     }),
     repo_map: tool({
       description:
-        "Build a bounded task-specific repository map. Prefer this before edits when ownership is unclear.",
+        "Build a bounded task-specific repository map with compact coupling and coverage signals. Prefer this before edits when ownership is unclear.",
       inputSchema: z.object({
         task: z.string().min(1),
         max_tokens: z.number().int().min(128).max(4000).optional(),

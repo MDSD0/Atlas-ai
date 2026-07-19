@@ -37,7 +37,7 @@ export function StatusBar({
   isWelcomeTab,
 }: Props) {
   return (
-    <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-card/75 px-3 text-[11px] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)] backdrop-blur-xl backdrop-saturate-150">
+    <footer className="flex h-8 shrink-0 items-center justify-between gap-3 border-t border-border/60 bg-background px-3 text-[11px] shadow-[inset_0_1px_0_rgba(255,255,255,0.025)]">
       <div className="flex min-w-0 flex-1 items-center gap-2">
         <WorkspaceEnvSelector onSelect={onWorkspaceChange} />
         <CwdBreadcrumb

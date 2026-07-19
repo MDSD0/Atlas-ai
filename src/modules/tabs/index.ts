@@ -11,6 +11,7 @@ export {
   type AiDiffTab,
   type GitDiffTab,
   type GitHistoryTab,
+  type RepoGraphTab,
   type GitCommitFileDiffTab,
   type AiDiffStatus,
   type TabPatch,

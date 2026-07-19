@@ -1,8 +1,10 @@
 import { MEMORY_REPO_TRUTH_RULE } from "@/modules/ai/memory/contracts";
 import { LocalRecordsProvider } from "@/modules/ai/memory/localRecords";
 import { TauriMemoryPersistence } from "@/modules/ai/memory/persistence";
+import { isMemoryEnabled } from "@/modules/ai/memory/enabled";
 
 export * from "@/modules/ai/memory/contracts";
+export * from "@/modules/ai/memory/enabled";
 export * from "@/modules/ai/memory/localRecords";
 export * from "@/modules/ai/memory/memoryLab";
 export * from "@/modules/ai/memory/memorySurface";
@@ -55,6 +57,7 @@ export async function buildLocalMemoryContext(
 ): Promise<string | null> {
   if (!projectId) return null;
   try {
+    if (!(await isMemoryEnabled())) return null;
     const result = await localRecords.recall({ projectId, query });
     if (result.records.length === 0) return null;
     return [
@@ -78,7 +81,8 @@ const PINNED_MEMORY_LIMIT = 5;
  * facts. Unlike `buildLocalMemoryContext` (query-based recall that the harness
  * used to inject every turn), this is bounded and query-free — the small
  * "frozen" memory layer. Deeper or query-specific retrieval is on-demand and
- * cited via the memory_recall / memory_simplemem_search tools, not injected.
+ * cited via the memory_recall tool (which federates keyword, session, and
+ * semantic sources), not injected.
  */
 export async function buildPinnedMemoryContext(
   projectId: string | null,
@@ -87,6 +91,7 @@ export async function buildPinnedMemoryContext(
 ): Promise<string | null> {
   if (!projectId) return null;
   try {
+    if (provider === localRecords && !(await isMemoryEnabled())) return null;
     const records = await provider.list(projectId);
     const pinned = records
       .filter((record) => record.status === "active")
@@ -101,7 +106,7 @@ export async function buildPinnedMemoryContext(
     return [
       '<atlas_memory provider="local_records" scope="pinned">',
       MEMORY_REPO_TRUTH_RULE,
-      "Advisory only. For more, call memory_recall (keyword) or memory_simplemem_search (semantic).",
+      "Advisory only. For more, call memory_recall (searches records, sessions, and semantic memory in one call).",
       ...pinned.map(
         (record) =>
           `- [${record.kind}] ${record.content} (id=${record.id}, confidence=${record.confidence.toFixed(2)})`,

@@ -268,6 +268,8 @@ export function ModelDropdown() {
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
+          data-testid="atlas-model-selector"
+          data-model-id={current.id}
           variant="ghost"
           size="sm"
           className={cn(

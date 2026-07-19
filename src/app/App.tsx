@@ -1,3 +1,4 @@
+import { notifyError } from "@/lib/notify";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -33,6 +34,7 @@ import { AiComposerProvider } from "@/modules/ai/lib/composer";
 import { redactSensitive } from "@/modules/ai/lib/redact";
 import { native } from "@/modules/ai/lib/native";
 import { invalidateMemoryForPaths } from "@/modules/ai/memory";
+import { setPartialOverride } from "@/modules/ai/tools/partialAccept";
 import { useAgentsStore } from "@/modules/ai/store/agentsStore";
 import { useSnippetsStore } from "@/modules/ai/store/snippetsStore";
 import {
@@ -110,7 +112,7 @@ import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
 import { WelcomeScreen } from "@/modules/workspace/WelcomeScreen";
 import { workspaceBindingErrorMessage } from "@/modules/workspace/workspaceStore";
 import { SessionsPanel } from "@/modules/ai/components/SessionsPanel";
-import { CodeRealityPanel } from "@/modules/ai/components/CodeRealityPanel";
+import { RepoGraphPane } from "@/modules/ai/components/RepoGraphPane";
 import { invoke } from "@tauri-apps/api/core";
 import { homeDir } from "@tauri-apps/api/path";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -161,7 +163,6 @@ function readSidebarView(): SidebarViewId {
     const stored = window.localStorage.getItem(SIDEBAR_VIEW_STORAGE_KEY);
     if (
       stored === "explorer" ||
-      stored === "reality" ||
       stored === "source-control" ||
       stored === "sessions"
     )
@@ -207,6 +208,7 @@ export default function App() {
     closeAiDiffTab,
     openGitDiffTab,
     openCommitHistoryTab,
+    openRepoGraphTab,
     openCommitFileDiffTab,
     closeTab,
     updateTab,
@@ -391,7 +393,7 @@ export default function App() {
       }
       const dirty = tabsRef.current.some((t) => t.kind === "editor" && t.dirty);
       if (dirty) {
-        window.alert("Save or close unsaved editor tabs before switching workspace.");
+        notifyError("Save or close unsaved editor tabs before switching workspace.");
         return;
       }
 
@@ -403,7 +405,7 @@ export default function App() {
           nextHome = (await homeDir()).replace(/\\/g, "/");
         }
       } catch (e) {
-        window.alert(String(e));
+        notifyError(String(e));
         return;
       }
 
@@ -512,6 +514,8 @@ export default function App() {
   const isGitDiffTab =
     activeTab?.kind === "git-diff" || activeTab?.kind === "git-commit-file";
   const isGitHistoryTab = activeTab?.kind === "git-history";
+  const isRepoGraphTab = activeTab?.kind === "repo-graph";
+  const hasRepoGraphTab = tabs.some((t) => t.kind === "repo-graph");
 
   // When an AI diff is approved (write_file applied to disk), reload any
   // open editor tabs for that path so the user sees the new content. We
@@ -1328,7 +1332,7 @@ export default function App() {
 
       const dirty = tabsRef.current.some((t) => t.kind === "editor" && t.dirty);
       if (dirty) {
-        window.alert("Save or close unsaved editor tabs before switching sessions.");
+        notifyError("Save or close unsaved editor tabs before switching sessions.");
         return false;
       }
 
@@ -1336,7 +1340,7 @@ export default function App() {
         try {
           await useWorkspaceStore.getState().setWorkspaceRoot(nextRoot);
         } catch (error) {
-          window.alert(workspaceBindingErrorMessage(error));
+          notifyError(workspaceBindingErrorMessage(error));
           return false;
         }
       }
@@ -1537,7 +1541,19 @@ export default function App() {
           tabs={tabs}
           activeId={activeId}
           onAccept={(id) => respondToApproval(id, true)}
+          onAcceptAmended={(id, path, merged) => {
+            // Store the user's merged version; the approved tool call writes
+            // it in place of the model's proposal and tells the model.
+            setPartialOverride(activeSessionId, path, merged);
+            respondToApproval(id, true);
+          }}
           onReject={(id) => respondToApproval(id, false)}
+          onRejectWithFeedback={(id, path, note) => {
+            respondToApproval(id, false);
+            focusInput(
+              `I rejected your proposed change to ${path}. ${note}`,
+            );
+          }}
         />
       </div>
       <div
@@ -1563,6 +1579,15 @@ export default function App() {
           onSearchHandle={setGitHistoryHandle}
         />
       </div>
+      <div
+        className={cn(
+          "absolute inset-0 px-3 pt-2 pb-2",
+          !isRepoGraphTab && "invisible pointer-events-none",
+        )}
+        aria-hidden={!isRepoGraphTab}
+      >
+        {hasRepoGraphTab ? <RepoGraphPane onOpenFile={handleOpenFile} /> : null}
+      </div>
     </div>
   );
 
@@ -1579,6 +1604,7 @@ export default function App() {
             onNewPreview={() => openPreviewTab("")}
             onNewEditor={() => setNewEditorOpen(true)}
             onNewGitGraph={openGitGraphFromContext}
+            onNewRepoMap={openRepoGraphTab}
             onClose={handleClose}
             onPin={pinTab}
             onGoHome={openAgentHome}
@@ -1626,8 +1652,6 @@ export default function App() {
                         onOpenMarkdownPreview={openMarkdownPreview}
                         onFolderSelected={setActiveFolder}
                       />
-                    ) : sidebarView === "reality" ? (
-                      <CodeRealityPanel onOpenFile={handleOpenFile} />
                     ) : sidebarView === "sessions" ? (
                       <SessionsPanel />
                     ) : (

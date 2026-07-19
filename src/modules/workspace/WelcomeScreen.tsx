@@ -1,3 +1,4 @@
+import { notifyError } from "@/lib/notify";
 import { FolderOpen as FolderOpenIcon, History as HistoryIcon, X as Cancel01Icon } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -62,7 +63,7 @@ function RecentItem({
       data-testid="atlas-recent-workspace"
       data-path={recent.path}
       className={cn(
-        "group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-colors",
+        "group flex items-center gap-3 px-3 py-2.5 transition-colors",
         stale
           ? "opacity-50"
           : "cursor-pointer hover:bg-accent hover:text-accent-foreground",
@@ -128,7 +129,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
     try {
       await openProjectFromDialog();
     } catch (error) {
-      window.alert(workspaceBindingErrorMessage(error));
+      notifyError(workspaceBindingErrorMessage(error));
     }
   }, []);
 
@@ -136,7 +137,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
     try {
       await openProjectFromPath(path);
     } catch (error) {
-      window.alert(workspaceBindingErrorMessage(error));
+      notifyError(workspaceBindingErrorMessage(error));
     }
   }, []);
 
@@ -160,7 +161,8 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
           <DropdownMenuContent
             align="end"
             sideOffset={8}
-            className="overflow-hidden rounded-xl border-border/60 bg-popover/80 p-0 shadow-xl shadow-black/25 backdrop-blur-2xl backdrop-saturate-150"
+            collisionPadding={12}
+            className="w-[320px] max-w-[calc(100vw-24px)] overflow-hidden rounded-md border-border bg-popover p-0 shadow-md"
           >
             <SessionsList
               compact
@@ -189,7 +191,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
             <div className="flex w-full max-w-2xl flex-col gap-6">
               {/* Wordmark */}
               <div className="flex flex-col gap-1 items-center text-center mb-4">
-                <img src="/logo.png" alt="Atlas Logo" className="w-12 h-12 mb-1 object-contain opacity-95" />
+                <img src="/atlas-mark.png" alt="Atlas Logo" className="h-12 w-12 object-contain" />
                 <h1 
                   className="text-5xl tracking-tighter text-brand drop-shadow-[0_2px_15px_color-mix(in_srgb,var(--brand)_20%,transparent)] pb-1 pr-2"
                   style={{ fontFamily: "'Good Times', sans-serif" }}
@@ -230,7 +232,7 @@ function WelcomeScreenContent({ sessionId }: { sessionId: string }) {
                   <span className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70 text-center">
                     Recent Workspaces
                   </span>
-                  <div className="flex flex-col border border-border/40 bg-card/30 rounded-xl overflow-hidden shadow-sm">
+                  <div className="flex flex-col overflow-hidden rounded-lg border border-border/60 bg-card/30">
                     {recentWorkspaces.map((r) => (
                       <div key={r.path} className={cn("border-b border-border/40 last:border-0")}>
                         <RecentItem

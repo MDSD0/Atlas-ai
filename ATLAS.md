@@ -2,11 +2,9 @@
 
 Atlas loads `ATLAS.md` from the workspace root as agent memory (similar to AGENTS.md / CLAUDE.md). This file is also the project's living architecture doc — read it before making changes.
 
-The canonical phased implementation roadmap is `ATLAS_EXECUTION_PLAN.md`. Read it before starting a non-trivial slice and patch it when refreshed evidence changes a decision.
-
 ## Project
 
-**Atlas** — open-source AI-native terminal emulator. Tauri 2 + Rust (`portable-pty`) backend, React 19 + TypeScript + xterm.js (webgl) client, BYOK AI via Vercel AI SDK v6.
+**Atlas** is an open-source, local-first AI coding workspace. It uses a Tauri 2 + Rust (`portable-pty`) backend and a React 19 + TypeScript + xterm.js client, with BYOK AI through Vercel AI SDK v6.
 
 - Bundle id: `app.atlas`
 - Package manager: **pnpm**
@@ -33,23 +31,6 @@ Verify before claiming done: `pnpm exec tsc --noEmit`, `pnpm test`, `cargo clipp
 - **No emojis** anywhere.
 - **Imports**: always `@/...` on the frontend, never relative across modules.
 - **pnpm only**, never npm/npx/yarn.
-
-## Source-parity hook
-
-Do not design non-trivial Atlas behavior from scratch. Before editing a subsystem:
-
-1. Run `bash scripts/consult-opensrc.sh <topic> [topic...]`.
-2. Inspect the active Atlas path and at least one relevant upstream path returned by `opensrc`.
-3. Record exact inspected files and the copy/adapt/reject decision in `source_pack.md`.
-4. Implement the smallest Atlas-native mutation or adapter that preserves the current architecture.
-
-Use `bash scripts/consult-opensrc.sh --list` to see the curated reference manifest and `bash scripts/consult-opensrc.sh --all` only when refreshing the cache. Do not read every upstream blindly. Select references by the current slice.
-
-For dependency behavior, inspect the package source directly with `opensrc path <package>`. For harness architecture, consult the matching GitHub upstreams in `docs/opensrc-references.tsv`.
-
-The resolver refreshes upstreams in bounded batches and falls back to previously fetched local source when a batch refresh fails. It uses `GITHUB_TOKEN` or `GH_TOKEN` when present and otherwise bridges the active `gh` keyring token at runtime without printing or persisting it. For freshness-sensitive decisions, record whether cached or refreshed source was used.
-
-Tiny local fixes may skip upstream inspection only when they introduce no design decision. Note that exception in `source_pack.md`.
 
 ## Architecture
 
@@ -139,9 +120,11 @@ BYOK. Cloud providers via `@ai-sdk/*`: **OpenAI, Anthropic, Google, xAI, Cerebra
 
 ### Window styling
 
+The Map tab is the only user-facing repository-inspection surface and opens from the tab bar `+` menu. It uses the existing bounded native projection for task focus, a fixed folder-branch spine beneath force-settled module clusters and degree-sized file nodes, cursor-centered pan and semantic zoom, draggable nodes, hover isolation and ancestor-path tracing, search, local depth, live force controls, editor opening, composer attachment, and agent handoff. Dense feature areas split one level deeper for visual grouping without changing agent map-health semantics. Fit and overview zoom show architecture and cross-module bridges; medium zoom adds relationship evidence; file zoom adds collision-managed file labels. Every hierarchy branch ends at a visible module anchor. The simulation stops when stable and adds no visualization dependency. The UI and `repo_context`/`repo_map` tools share `repoMapInsights.ts`; agent results include compact `map_health` coupling and coverage signals. An isolated file means no relationship is visible in the bounded projection, never proof of dead code. Proof stays with agent run receipts. Memory is managed in Privacy & Data, Skills and MCP integrations in Settings, and reliability metrics remain developer diagnostics.
+
 - macOS: `titleBarStyle: Overlay` + `hiddenTitle: true` in `tauri.conf.json` (native traffic lights via overlay).
 - Linux: `decorations: false` + `transparent: true` from `tauri.linux.conf.json`; re-asserted post-realize for GNOME/Mutter CSD.
-- Windows: same as Linux via `tauri.windows.conf.json`. React renders custom `WindowControls`.
+- Windows: native decorated frame for shadow, resize border, and corner treatment, with reliable minimize, maximize, and close controls rendered in the Atlas header for both the main and Settings windows.
 
 ### Tauri capabilities
 
@@ -162,7 +145,7 @@ BYOK. Cloud providers via `@ai-sdk/*`: **OpenAI, Anthropic, Google, xAI, Cerebra
   - **macOS**: `minimumSystemVersion: 10.15`.
   - **Linux**: deb depends `libwebkit2gtk-4.1-0`, `libgtk-3-0`; rpm `webkit2gtk4.1`, `gtk3`; AppImage bundles its media framework.
   - **Windows**: NSIS installer in `currentUser` mode (no admin required), WebView2 via `embedBootstrapper` (offline install).
-- Auto-updater configured with a public minisign key; release artifacts at `https://github.com/MDSD0/atlas/releases/latest/download/latest.json`.
+- Auto-updater configured with a public minisign key; release artifacts at `https://github.com/MDSD0/Atlas-ai/releases/latest/download/latest.json`.
 
 ### Known gotchas
 

@@ -239,6 +239,40 @@ export function finishSessionTrace(
   }).then(() => undefined);
 }
 
+/**
+ * A webview/process restart cannot resume an in-flight provider stream. Close
+ * traces left in `running` so history never presents a ghost agent as active.
+ */
+export async function recoverInterruptedSessionTraces(): Promise<number> {
+  const recovered = await enqueue(async () => {
+    const index =
+      (await store.get<SessionTraceIndexEntry[]>(TRACE_INDEX_KEY)) ?? [];
+    const running = index.filter((entry) => entry.status === "running");
+    if (running.length === 0) return 0;
+    const now = Date.now();
+    for (const entry of running) {
+      const trace = await store.get<SessionTrace>(traceKey(entry.runId));
+      if (!trace || trace.status !== "running") continue;
+      trace.status = "cancelled";
+      trace.durationMs = Math.max(0, now - trace.startedAt);
+      trace.updatedAt = now;
+      trace.events.push({
+        at: now,
+        type: "run.cancelled",
+        payload: { reason: "app_restarted" },
+      });
+      if (trace.events.length > MAX_EVENTS) {
+        trace.events = trace.events.slice(-MAX_EVENTS);
+      }
+      await store.set(traceKey(trace.runId), trace);
+      await updateIndex(trace);
+    }
+    await store.save();
+    return running.length;
+  });
+  return recovered ?? 0;
+}
+
 function enqueue<T>(op: () => Promise<T>): Promise<T | undefined> {
   const next = writeChain.then(op, op);
   writeChain = next.then(

@@ -1,4 +1,4 @@
-import { X as Cancel01Icon, Check as Tick02Icon } from "lucide-react";
+import { X as Cancel01Icon, Check as Tick02Icon, MessageSquare as CommentIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { usePreferencesStore } from "@/modules/settings/preferences";
@@ -9,7 +9,7 @@ import { EditorView } from "@codemirror/view";
 
 
 import CodeMirror, { type ReactCodeMirrorRef } from "@uiw/react-codemirror";
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildSharedExtensions, languageCompartment } from "./lib/extensions";
 import { resolveLanguage, resolveLanguageSync } from "./lib/languageResolver";
 import { EDITOR_THEME_EXT } from "./lib/themes";
@@ -21,48 +21,16 @@ type Props = {
   status: AiDiffStatus;
   isNewFile: boolean;
   onAccept: () => void;
+  /** Accept with user modifications: some hunks rejected or hand-edited. */
+  onAcceptAmended: (mergedContent: string) => void;
   onReject: () => void;
+  /** Reject the whole change and hand a steering note to the composer. */
+  onRejectWithFeedback: (note: string) => void;
 };
 
 const SHARED_EXT: Extension[] = buildSharedExtensions();
-const READONLY_EXT: Extension[] = [
-  EditorState.readOnly.of(true),
-  EditorView.editable.of(false),
-];
 
 const DIFF_THEME = EditorView.theme({
-  // ".cm-changedLine": {
-  //   backgroundColor:
-  //     "color-mix(in srgb, #22c55e 10%, transparent) !important",
-  // },
-  // ".cm-merge-b .cm-changedText, .cm-merge-b ins.cm-insertedLine": {
-  //   background:
-  //     "color-mix(in srgb, #22c55e 28%, transparent) !important",
-  //   textDecoration: "none !important",
-  //   borderRadius: "2px",
-  // },
-  // ".cm-deletedChunk": {
-  //   backgroundColor:
-  //     "color-mix(in srgb, #ef4444 8%, transparent)",
-  //   paddingLeft: "6px",
-  //   paddingTop: "1px",
-  //   paddingBottom: "1px",
-  // },
-  // ".cm-deletedChunk .cm-deletedText, .cm-deletedLine del": {
-  //   background:
-  //     "color-mix(in srgb, #ef4444 26%, transparent) !important",
-  //   textDecoration: "none !important",
-  //   borderRadius: "2px",
-  // },
-  // ".cm-changeGutter": {
-  //   width: "3px",
-  // },
-  // ".cm-changedLineGutter": {
-  //   backgroundColor: "#22c55e",
-  // },
-  // ".cm-deletedLineGutter": {
-  //   backgroundColor: "#ef4444",
-  // },
   ".cm-changedText": {
     background: "#88ff881a !important",
   },
@@ -90,18 +58,26 @@ export function AiDiffPane({
   status,
   isNewFile,
   onAccept,
+  onAcceptAmended,
   onReject,
+  onRejectWithFeedback,
 }: Props) {
   const cmRef = useRef<ReactCodeMirrorRef>(null);
   const editorThemeId = usePreferencesStore((s) => s.editorTheme);
   const themeExt = EDITOR_THEME_EXT[editorThemeId] ?? EDITOR_THEME_EXT.atomone;
+  const pending = status === "pending";
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedback, setFeedback] = useState("");
 
   const initialLang = useMemo(() => resolveLanguageSync(path), [path]);
   const extensions = useMemo(
     () => [
       ...SHARED_EXT,
       languageCompartment.of(initialLang ?? []),
-      ...READONLY_EXT,
+      // Pending diffs stay editable so the user can amend the proposed file.
+      ...(pending
+        ? []
+        : [EditorState.readOnly.of(true), EditorView.editable.of(false)]),
       unifiedMergeView({
         original: originalContent,
         mergeControls: false,
@@ -112,7 +88,7 @@ export function AiDiffPane({
       }),
       DIFF_THEME,
     ],
-    [originalContent, initialLang],
+    [originalContent, initialLang, pending],
   );
 
   useEffect(() => {
@@ -135,6 +111,25 @@ export function AiDiffPane({
     () => computeLineStats(originalContent, proposedContent),
     [originalContent, proposedContent],
   );
+
+  const currentDoc = useCallback(
+    () => cmRef.current?.view?.state.doc.toString() ?? proposedContent,
+    [proposedContent],
+  );
+
+  const onAcceptClick = useCallback(() => {
+    const doc = currentDoc();
+    if (doc === proposedContent) onAccept();
+    else onAcceptAmended(doc);
+  }, [currentDoc, proposedContent, onAccept, onAcceptAmended]);
+
+  const onSendFeedback = useCallback(() => {
+    const note = feedback.trim();
+    setFeedbackOpen(false);
+    setFeedback("");
+    if (note) onRejectWithFeedback(note);
+    else onReject();
+  }, [feedback, onRejectWithFeedback, onReject]);
 
   return (
     <div className="flex h-full min-h-0 flex-col rounded-md border border-border/60 bg-background">
@@ -166,16 +161,29 @@ export function AiDiffPane({
             </span>
           </span>
         </div>
-        {status === "pending" ? (
+        {pending ? (
           <div className="flex shrink-0 items-center gap-1.5">
+            <span className="hidden text-[10px] text-muted-foreground lg:inline">
+              Edit the proposal directly before accepting
+            </span>
             <Button
               size="sm"
               variant="default"
-              onClick={onAccept}
+              onClick={onAcceptClick}
               className="h-7 gap-1.5"
             >
               <Tick02Icon size={13} strokeWidth={1.5} />
               Accept
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setFeedbackOpen((v) => !v)}
+              className="h-7 gap-1.5"
+              title="Reject and tell the agent what to change"
+            >
+              <CommentIcon size={13} strokeWidth={1.5} />
+              Revise…
             </Button>
             <Button
               size="sm"
@@ -190,13 +198,32 @@ export function AiDiffPane({
         ) : null}
       </div>
 
+      {pending && feedbackOpen ? (
+        <div className="flex shrink-0 items-center gap-2 border-b border-border/60 bg-card/60 px-3 py-2">
+          <input
+            autoFocus
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") onSendFeedback();
+              if (e.key === "Escape") setFeedbackOpen(false);
+            }}
+            placeholder="What should the agent change? Rejects this diff and sends your note."
+            className="h-7 flex-1 rounded-md border border-border/60 bg-background px-2 text-[11.5px] outline-none focus:border-ring"
+          />
+          <Button size="sm" className="h-7" onClick={onSendFeedback}>
+            Reject & send
+          </Button>
+        </div>
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-hidden">
         <CodeMirror
           ref={cmRef}
           value={proposedContent}
           theme={themeExt}
           extensions={extensions}
-          editable={false}
+          editable={pending}
           height="100%"
           className="h-full"
           basicSetup={{

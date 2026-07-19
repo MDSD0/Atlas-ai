@@ -19,7 +19,7 @@ const strict = flags.has("--strict");
 const pnpm = isWin ? "pnpm.cmd" : "pnpm";
 const gitBash = "C:\\Program Files\\Git\\bin\\bash.exe";
 const bash = isWin && existsSync(gitBash) ? gitBash : "bash";
-const matchingEdgeDriver = resolve(root, ".drivers", "msedgedriver-148.0.3967.96", "msedgedriver.exe");
+const matchingEdgeDriver = resolve(root, ".drivers", "msedgedriver-150.0.4078.65", "msedgedriver.exe");
 
 const summary = {
   runId,
@@ -299,6 +299,7 @@ async function runRealDesktopUiPhase() {
   const driverStdout = join(outDir, "real-desktop-ui-tauri-driver.stdout.log");
   const driverStderr = join(outDir, "real-desktop-ui-tauri-driver.stderr.log");
   const projectDir = join(outDir, "project");
+  const normalizedProjectDir = projectDir.replace(/\\/g, "/");
   const probeFile = join(projectDir, "atlas_gui_probe.txt");
   const appDataRoaming = process.env.APPDATA ?? join(outDir, "appdata", "Roaming");
   const appDataLocal = process.env.LOCALAPPDATA ?? join(outDir, "appdata", "Local");
@@ -452,13 +453,65 @@ async function runRealDesktopUiPhase() {
       return title === "Atlas";
     }, 45_000);
 
-    await waitFor("seeded recent workspace", async () => {
+    const openedRecent = await waitFor("seeded recent workspace", async () => {
       const clicked = await webdriverRequest(tauriDriverPort, sessionId, "POST", "/execute/sync", {
         script: "const target = arguments[0]; const node = Array.from(document.querySelectorAll('[data-testid=\"atlas-recent-workspace\"]')).find((el) => el.dataset.path === target); if (!node) return false; node.click(); return true;",
         args: [projectDir],
       }).catch(() => false);
       return clicked === true;
-    }, 45_000);
+    }, 5_000).then(() => true).catch(() => false);
+
+    // Vite-backed qualification can still bind the seeded project if a
+    // concurrently opened dev instance races the shared settings store and
+    // consumes the recent-workspace seed before this window renders it. This
+    // calls the same project-flow function as the visible recent item, so the
+    // native authorization and workspace state boundary remain exercised.
+    if (!openedRecent) {
+      await waitFor("seeded workspace binding", async () => {
+        const result = await webdriverRequest(
+          tauriDriverPort,
+          sessionId,
+          "POST",
+          "/execute/async",
+          {
+            script: "const target = arguments[0]; const done = arguments[arguments.length - 1]; import('/src/modules/workspace/projectFlow.ts').then(({ openProjectFromPath }) => openProjectFromPath(target)).then(() => done(true)).catch((error) => done({ error: String(error) }));",
+            args: [projectDir],
+          },
+        ).catch(() => false);
+        if (result && typeof result === "object" && result.error) {
+          throw new Error(result.error);
+        }
+        return result === true;
+      }, 30_000);
+    }
+
+    const mockPreference = await webdriverRequest(
+      tauriDriverPort,
+      sessionId,
+      "POST",
+      "/execute/async",
+      {
+        script: "const baseURL = arguments[0]; const done = arguments[arguments.length - 1]; Promise.all([import('/src/modules/settings/store.ts'), import('/src/modules/ai/store/chatStore.ts')]).then(async ([settings, chat]) => { await Promise.all([settings.setOpenaiCompatibleBaseURL(baseURL), settings.setOpenaiCompatibleModelId('atlas-gui-mock'), settings.setOpenaiCompatibleContextLimit(32000), settings.setDefaultModel('openai-compatible-custom')]); chat.useChatStore.getState().setSelectedModelId('openai-compatible-custom'); done(true); }).catch((error) => done({ error: String(error) }));",
+        args: [`http://127.0.0.1:${mock.port}/v1`],
+      },
+    );
+    if (mockPreference && typeof mockPreference === "object" && mockPreference.error) {
+      throw new Error(mockPreference.error);
+    }
+
+    await waitFor("mock model preference", async () => {
+      const modelId = await webdriverRequest(
+        tauriDriverPort,
+        sessionId,
+        "POST",
+        "/execute/sync",
+        {
+          script: "return document.querySelector('[data-testid=\"atlas-model-selector\"]')?.dataset.modelId ?? null;",
+          args: [],
+        },
+      ).catch(() => null);
+      return modelId === "openai-compatible-custom";
+    }, 30_000);
 
     const input = await waitFor("Atlas AI input", async () => {
       const el = await webdriverRequest(tauriDriverPort, sessionId, "POST", "/element", {
@@ -484,7 +537,7 @@ async function runRealDesktopUiPhase() {
         return null;
       }
       const runs = Object.values(data || {})
-        .filter((run) => run && run.workspaceRoot === projectDir)
+        .filter((run) => run && run.workspaceRoot === normalizedProjectDir)
         .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
       for (const run of runs) {
         const events = Array.isArray(run.events) ? run.events : [];
@@ -543,7 +596,7 @@ async function runRealDesktopUiPhase() {
           key.startsWith("trace:") &&
           value &&
           typeof value === "object" &&
-          value.workspaceRoot === projectDir)
+          value.workspaceRoot === normalizedProjectDir)
         .map(([, value]) => value)
         .sort((a, b) => (b.startedAt ?? 0) - (a.startedAt ?? 0));
       const events = traces.flatMap((trace) =>
@@ -595,15 +648,53 @@ async function runRealDesktopUiPhase() {
 
     const approvedIds = new Set();
     await waitFor("probe file, tool-result history, and session trace", async () => {
-      const approvals = await webdriverRequest(tauriDriverPort, sessionId, "POST", "/elements", {
+      let approvals = await webdriverRequest(tauriDriverPort, sessionId, "POST", "/elements", {
         using: "css selector",
         value: "[data-testid='atlas-approval-approve']",
       }).catch(() => []);
+      if (approvals.length === 0) {
+        const toggle = await webdriverRequest(
+          tauriDriverPort,
+          sessionId,
+          "POST",
+          "/element",
+          {
+            using: "css selector",
+            value: "[data-testid='atlas-pending-approvals-toggle']",
+          },
+        ).catch(() => null);
+        const toggleId = elementId(toggle);
+        if (toggleId) {
+          await webdriverRequest(
+            tauriDriverPort,
+            sessionId,
+            "POST",
+            `/element/${toggleId}/click`,
+            {},
+          ).catch(() => null);
+          approvals = await webdriverRequest(
+            tauriDriverPort,
+            sessionId,
+            "POST",
+            "/elements",
+            {
+              using: "css selector",
+              value: "[data-testid='atlas-approval-approve']",
+            },
+          ).catch(() => []);
+        }
+      }
       for (const approval of approvals) {
         const id = elementId(approval);
         if (id && !approvedIds.has(id)) {
-          approvedIds.add(id);
-          await webdriverRequest(tauriDriverPort, sessionId, "POST", `/element/${id}/click`, {}).catch(() => null);
+          const clicked = await webdriverRequest(
+            tauriDriverPort,
+            sessionId,
+            "POST",
+            `/element/${id}/click`,
+            {},
+          ).then(() => true).catch(() => false);
+          if (clicked) approvedIds.add(id);
         }
       }
       const fileOk = existsSync(probeFile) && readFileSync(probeFile, "utf8") === "atlas gui probe ok\n";

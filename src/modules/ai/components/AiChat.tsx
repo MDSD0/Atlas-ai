@@ -24,11 +24,12 @@ import {
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
-import { CheckCircle as CheckmarkCircle01Icon, ChevronRight as ArrowRight01Icon, Code as CodeIcon, Copy as CopyIcon, FileText as File01Icon, Hash as HashtagIcon, Terminal as TerminalIcon } from "lucide-react";
+import { CheckCircle as CheckmarkCircle01Icon, ChevronRight as ArrowRight01Icon, Code as CodeIcon, Copy as CopyIcon, FileText as File01Icon, Hash as HashtagIcon, RotateCcw as RotateCcwIcon, Terminal as TerminalIcon } from "lucide-react";
+import { toast } from "sonner";
 import { SLASH_COMMANDS, ATLAS_CMD_RE } from "../lib/slashCommands";
 import { normalizeMessageHistory } from "../lib/sessions";
 import { Spinner } from "@/components/ui/spinner";
-import { useChatStore, sendMessage } from "../store/chatStore";
+import { useChatStore, sendMessage, restoreCheckpoint } from "../store/chatStore";
 import { usePlanStore } from "../store/planStore";
 import type {
   ChatStatus,
@@ -40,8 +41,9 @@ import type {
 } from "ai";
 import { isFileUIPart } from "ai";
 import type { StickToBottomContext } from "use-stick-to-bottom";
-import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useWorkspaceStore } from "@/modules/workspace/workspaceStore";
+import { SubagentRunCard } from "./SubagentRunCard";
 
 function CommandSnippet({ name }: { name: string }) {
   const meta = SLASH_COMMANDS[name];
@@ -296,7 +298,7 @@ export function AiChatView({
           <ConversationEmptyState
             title={title as any}
             description={description}
-            icon={<img src="/logo.png" alt="Atlas Logo" className="w-16 h-16 object-contain opacity-95" />}
+            icon={<img src="/atlas-mark.png" alt="Atlas Logo" className="h-16 w-16 object-contain" />}
           />
         </ConversationContent>
       </Conversation>
@@ -477,6 +479,7 @@ const RenderedMessage = memo(function RenderedMessage({
             ) : null}
           </MessageContent>
           <MessageActions className="opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <RestoreCheckpointAction messageId={message.id} />
             <CopyMessageAction text={copyText} />
           </MessageActions>
         </div>
@@ -567,6 +570,76 @@ const UserFileParts = memo(function UserFileParts({ parts }: { parts: FileUIPart
 });
 
 const COPY_RESET_MS = 1400;
+const RESTORE_ARM_MS = 3500;
+
+/**
+ * "Return arrow": rewind the workspace and conversation to just before this
+ * prompt ran, putting the prompt text back in the composer. Two-step: first
+ * click arms, second click within a few seconds restores.
+ */
+const RestoreCheckpointAction = memo(function RestoreCheckpointAction({
+  messageId,
+}: {
+  messageId: string;
+}) {
+  const [armed, setArmed] = useState(false);
+  const disarmTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (disarmTimer.current) window.clearTimeout(disarmTimer.current);
+    },
+    [],
+  );
+  const onClick = useCallback(async () => {
+    if (!armed) {
+      setArmed(true);
+      disarmTimer.current = window.setTimeout(
+        () => setArmed(false),
+        RESTORE_ARM_MS,
+      );
+      return;
+    }
+    if (disarmTimer.current) window.clearTimeout(disarmTimer.current);
+    setArmed(false);
+    const sessionId = useChatStore.getState().activeSessionId;
+    if (!sessionId) return;
+    const outcome = await restoreCheckpoint(sessionId, messageId);
+    if (!outcome) {
+      toast("Nothing to restore for this prompt");
+      return;
+    }
+    const fileNote =
+      outcome.restored + outcome.deleted > 0
+        ? `${outcome.restored + outcome.deleted} file${
+            outcome.restored + outcome.deleted === 1 ? "" : "s"
+          } reverted`
+        : "no file changes to revert";
+    toast(`Checkpoint restored — ${fileNote}`, {
+      description:
+        outcome.failed > 0
+          ? `${outcome.failed} file(s) could not be restored.`
+          : "Prompt returned to the composer.",
+    });
+  }, [armed, messageId]);
+  return (
+    <MessageAction
+      tooltip={
+        armed
+          ? "Click again to restore workspace & chat to before this prompt"
+          : "Restore checkpoint (rewind files + chat to before this prompt)"
+      }
+      label="Restore checkpoint"
+      onClick={onClick}
+      className={
+        armed
+          ? "size-6 rounded-md text-amber-500 hover:text-amber-400"
+          : "size-6 rounded-md text-muted-foreground/80 hover:text-foreground"
+      }
+    >
+      <RotateCcwIcon size={12} strokeWidth={1.7} />
+    </MessageAction>
+  );
+});
 
 const CopyMessageAction = memo(function CopyMessageAction({
   text,
@@ -852,6 +925,23 @@ const RenderedTool = memo(function RenderedTool({
     // Approval UI is owned by the composer dock. Rendering anything inline
     // makes approvals look like ordinary scrollback and they get missed.
     return null;
+  }
+
+  if (
+    (toolName === "run_subagent" ||
+      toolName === "run_subagents" ||
+      toolName === "worktree_run") &&
+    part.toolCallId
+  ) {
+    return (
+      <SubagentRunCard
+        toolName={toolName}
+        toolCallId={part.toolCallId}
+        state={part.state}
+        input={part.input}
+        output={"output" in part ? part.output : undefined}
+      />
+    );
   }
 
   return (
