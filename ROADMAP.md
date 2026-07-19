@@ -20,10 +20,14 @@ For day-to-day work, use [GitHub Issues](https://github.com/MDSD0/Atlas-ai/issue
 
 ## Near Term
 
-- Publish a fresh signed release with updater metadata
+- Apply for SignPath Foundation open-source signing and integrate Windows publisher signing after acceptance
+- Keep updater metadata and payload signatures verified independently of publisher signing
 - Finish explicit SWE-bench and Terminal-Bench sample signoff on a Docker-ready host
 - Complete Linux and Windows interactive release checks
 - Improve packaged desktop automation where platform support allows it
+- Add branch checkout and creation to the source-control UI
+- Add opt-in editor LSP diagnostics, navigation, language override, and formatter controls
+- Add configurable completion notifications and CLI hooks for supported external coding agents
 - Tighten docs and issue triage for public contributors
 - Keep reducing startup and bundle cost
 
