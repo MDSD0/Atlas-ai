@@ -121,7 +121,10 @@ fn run_blocking(
             // A timed-out foreground command may have spawned descendants
             // (a shell running a dev server, say) — take the whole tree with
             // it, not just the shell itself.
+            #[cfg(windows)]
             drop(job);
+            #[cfg(not(windows))]
+            let _ = job;
             crate::modules::proc::kill_process_group(child.id());
             let _ = child.kill();
             let _ = child.wait();
