@@ -26,6 +26,10 @@ assert.match(updater, /useUpdater\(\{ autoCheck = false \}/);
 assert.match(workflow, /tauri-apps\/tauri-action@action-v1\.0\.0/);
 assert.match(workflow, /uploadUpdaterJson: true/);
 assert.match(workflow, /publish-release:/);
+assert.match(
+  workflow,
+  /verify-updater-assets:[\s\S]*?permissions:\n\s+contents: write/,
+);
 assert.match(workflow, /grep -q '\^latest\\\.json\$'/);
 assert.match(workflow, /grep -q '\\\.sig\$'/);
 
